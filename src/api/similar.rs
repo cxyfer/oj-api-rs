@@ -4,7 +4,6 @@ use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use serde::{Deserialize, Serialize};
-use zerocopy::AsBytes;
 
 use crate::api::error::ProblemDetail;
 use crate::AppState;
@@ -106,7 +105,11 @@ pub async fn similar_by_text(
     Query(query): Query<SimilarByTextQuery>,
 ) -> impl IntoResponse {
     let text = match &query.query {
-        Some(q) if q.len() >= 3 => q.clone(),
+        Some(q) if q.len() >= 3 && q.len() <= 2000 => q.clone(),
+        Some(q) if q.len() > 2000 => {
+            return ProblemDetail::bad_request("query must be at most 2000 characters")
+                .into_response();
+        }
         Some(_) => {
             return ProblemDetail::bad_request("query must be at least 3 characters")
                 .into_response();

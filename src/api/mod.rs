@@ -2,11 +2,9 @@ use std::sync::Arc;
 
 use axum::middleware;
 use axum::routing::get;
-use axum::Extension;
 use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
 
-use crate::auth::AuthPool;
 use crate::AppState;
 
 pub mod daily;

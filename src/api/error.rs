@@ -40,6 +40,7 @@ impl ProblemDetail {
         }
     }
 
+    #[allow(dead_code)]
     pub fn validation(detail: impl Into<String>, errors: Vec<FieldError>) -> Self {
         Self {
             error_type: "about:blank".into(),

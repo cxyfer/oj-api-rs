@@ -8,13 +8,13 @@ use crate::api::error::ProblemDetail;
 use crate::db::DbPool;
 
 #[derive(Clone)]
-pub struct AuthPool(pub Arc<DbPool>);
+pub struct AuthRwPool(pub Arc<DbPool>);
 
 #[derive(Clone)]
 pub struct AdminSecret(pub String);
 
 pub async fn bearer_auth(
-    Extension(auth_pool): Extension<AuthPool>,
+    Extension(auth_pool): Extension<AuthRwPool>,
     request: Request,
     next: Next,
 ) -> Response {
@@ -61,7 +61,7 @@ pub async fn admin_auth(
         .and_then(|v| v.to_str().ok());
 
     match secret_header {
-        Some(s) if s == secret.0 => next.run(request).await,
+        Some(s) if !secret.0.is_empty() && s == secret.0 => next.run(request).await,
         _ => ProblemDetail::unauthorized("invalid admin secret").into_response(),
     }
 }

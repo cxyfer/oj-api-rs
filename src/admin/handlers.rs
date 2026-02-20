@@ -193,6 +193,12 @@ pub async fn trigger_crawler(
     State(state): State<Arc<AppState>>,
     Json(body): Json<TriggerCrawlerRequest>,
 ) -> impl IntoResponse {
+    let valid_sources = ["leetcode", "atcoder", "codeforces"];
+    if !valid_sources.contains(&body.source.as_str()) {
+        return ProblemDetail::bad_request(format!("invalid source: {}", body.source))
+            .into_response();
+    }
+
     let mut lock = state.crawler_lock.lock().await;
 
     if let Some(ref job) = *lock {

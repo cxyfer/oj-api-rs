@@ -84,7 +84,9 @@ async fn main() {
         // Static files
         .nest_service("/static", ServeDir::new("static"))
         // Extensions for auth middleware
-        .layer(Extension(auth::AuthPool(Arc::new(ro_pool))))
+        .layer(Extension(auth::AuthRwPool(Arc::new(
+            db::create_rw_pool(&config.database_path, 2, config.busy_timeout_ms),
+        ))))
         .layer(Extension(auth::AdminSecret(config.admin_secret.clone())))
         .with_state(state);
 

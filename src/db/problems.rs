@@ -84,7 +84,7 @@ pub fn list_problems(pool: &DbPool, params: &ListParams<'_>) -> Option<ListResul
     let conn = pool.get().ok()?;
     let per_page = params.per_page.clamp(1, 100);
     let page = params.page.max(1);
-    let offset = (page - 1) * per_page;
+    let offset = (page - 1).saturating_mul(per_page);
 
     let mut where_clauses = vec!["source = ?1".to_string()];
     let mut sql_params: Vec<Box<dyn rusqlite::types::ToSql>> =
