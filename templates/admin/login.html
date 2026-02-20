@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - OJ API Admin</title>
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body class="login-body">
+    <div class="login-card">
+        <h1>OJ API Admin</h1>
+        {% if !error.is_empty() %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+        <form method="POST" action="/admin/login">
+            <div class="form-group">
+                <label for="secret">Admin Secret</label>
+                <input type="password" id="secret" name="secret" required autofocus>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Login</button>
+        </form>
+    </div>
+</body>
+</html>

@@ -1,9 +1,11 @@
+use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use axum::routing::get;
 use axum::{Extension, Router};
 use tokio::signal;
-use tokio::sync::Semaphore;
+use tokio::sync::{RwLock, Semaphore};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 
@@ -22,6 +24,8 @@ pub struct AppState {
     pub config: config::Config,
     pub crawler_lock: tokio::sync::Mutex<Option<models::CrawlerJob>>,
     pub embed_semaphore: Semaphore,
+    pub token_auth_enabled: Arc<AtomicBool>,
+    pub admin_sessions: Arc<RwLock<HashMap<String, i64>>>,
 }
 
 #[tokio::main]
@@ -52,22 +56,32 @@ async fn main() {
         config.busy_timeout_ms,
     );
 
-    // 5. Ensure api_tokens table exists
+    // 5. Ensure tables exist
     db::ensure_api_tokens_table(&rw_pool);
+    db::ensure_app_settings_table(&rw_pool);
 
-    // 6. Startup self-check
+    // 6. Read initial settings
+    let auth_enabled = db::settings::get_token_auth_enabled(&rw_pool);
+
+    // 7. Startup self-check
     health::startup_self_check(&ro_pool);
 
-    // 7. Build AppState
+    // 8. Build shared auth state
+    let admin_sessions = Arc::new(RwLock::new(HashMap::<String, i64>::new()));
+    let token_auth_flag = Arc::new(AtomicBool::new(auth_enabled));
+
+    // 9. Build AppState (shares Arc refs with Extensions)
     let state = Arc::new(AppState {
         ro_pool: ro_pool.clone(),
         rw_pool,
         config: config.clone(),
         crawler_lock: tokio::sync::Mutex::new(None),
         embed_semaphore: Semaphore::new(4),
+        token_auth_enabled: token_auth_flag.clone(),
+        admin_sessions: admin_sessions.clone(),
     });
 
-    // 8. Assemble routers
+    // 10. Assemble routers
     let health_cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -88,6 +102,8 @@ async fn main() {
             db::create_rw_pool(&config.database_path, 2, config.busy_timeout_ms),
         ))))
         .layer(Extension(auth::AdminSecret(config.admin_secret.clone())))
+        .layer(Extension(auth::AdminSessions(admin_sessions)))
+        .layer(Extension(auth::TokenAuthEnabled(token_auth_flag)))
         .with_state(state);
 
     // 9. Start server

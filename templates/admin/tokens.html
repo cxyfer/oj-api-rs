@@ -2,26 +2,64 @@
 {% block title %}API Tokens{% endblock %}
 {% block content %}
 <h1>API Tokens</h1>
-<table>
-    <thead>
-        <tr>
-            <th>Token</th>
-            <th>Label</th>
-            <th>Created</th>
-            <th>Last Used</th>
-            <th>Active</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for t in tokens %}
-        <tr>
-            <td><code>{{ t.token[..8] }}...{{ t.token[t.token.len()-8..] }}</code></td>
-            <td>{{ t.label.as_deref().unwrap_or("-") }}</td>
-            <td>{{ t.created_at }}</td>
-            <td>{% match t.last_used_at %}{% when Some with (ts) %}{{ ts }}{% when None %}-{% endmatch %}</td>
-            <td>{% if t.is_active == 1 %}✓{% else %}✗{% endif %}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+
+<div class="toggle-row">
+    <div>
+        <div class="label">Token Authentication</div>
+        <div class="sublabel">When disabled, API endpoints are publicly accessible</div>
+    </div>
+    <label class="switch">
+        <input type="checkbox" id="token-auth-toggle" {% if token_auth_enabled %}checked{% endif %}>
+        <span class="slider"></span>
+    </label>
+</div>
+
+<div class="card" style="margin-bottom:1rem;padding:1rem 1.25rem">
+    <div class="inline-form">
+        <div class="form-group">
+            <label for="token-label">Label (optional)</label>
+            <input type="text" id="token-label" placeholder="e.g. my-bot">
+        </div>
+        <button class="btn btn-primary" id="create-token-btn">Generate Token</button>
+    </div>
+</div>
+
+<div class="card">
+    <table id="tokens-table">
+        <thead>
+            <tr>
+                <th>Token</th>
+                <th>Label</th>
+                <th>Created</th>
+                <th>Last Used</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in tokens %}
+            <tr data-token="{{ t.token }}">
+                <td><code>{{ t.token[..8] }}...{{ t.token[t.token.len()-8..] }}</code></td>
+                <td>{{ t.label.as_deref().unwrap_or("-") }}</td>
+                <td>{{ t.created_at }}</td>
+                <td>{% match t.last_used_at %}{% when Some with (ts) %}{{ ts }}{% when None %}-{% endmatch %}</td>
+                <td>{% if t.is_active == 1 %}<span class="badge badge-active">Active</span>{% else %}<span class="badge badge-revoked">Revoked</span>{% endif %}</td>
+                <td>{% if t.is_active == 1 %}<button class="btn btn-danger btn-sm btn-revoke">Revoke</button>{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="modal-overlay" id="token-modal">
+    <div class="modal">
+        <h2>Token Created</h2>
+        <p style="font-size:0.85rem;color:var(--color-muted);margin-bottom:0.75rem">Copy this token now. It will not be shown again.</p>
+        <div class="token-display"></div>
+        <div class="actions">
+            <button class="btn btn-primary btn-copy">Copy</button>
+            <button class="btn btn-close-modal" style="background:rgba(255,255,255,0.1)">Close</button>
+        </div>
+    </div>
+</div>
 {% endblock %}

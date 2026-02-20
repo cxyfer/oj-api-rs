@@ -1,12 +1,15 @@
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
+use axum::{Extension, Form, Json};
+use rand::Rng;
 use serde::Deserialize;
 
 use crate::api::error::ProblemDetail;
+use crate::auth::{AdminSecret, AdminSessions};
 use crate::models::{CrawlerJob, CrawlerStatus, Problem};
 use crate::AppState;
 
@@ -317,5 +320,100 @@ pub async fn crawler_status(
             }))
             .into_response()
         }
+    }
+}
+
+// Login / Logout
+
+#[derive(Deserialize)]
+pub struct LoginForm {
+    pub secret: String,
+}
+
+pub async fn login_submit(
+    Extension(admin_secret): Extension<AdminSecret>,
+    Extension(sessions): Extension<AdminSessions>,
+    Form(form): Form<LoginForm>,
+) -> impl IntoResponse {
+    if admin_secret.0.is_empty() || form.secret != admin_secret.0 {
+        return super::pages::login_page_with_error("Invalid admin secret").into_response();
+    }
+
+    let token: String = {
+        let mut rng = rand::thread_rng();
+        let bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
+        bytes.iter().map(|b| format!("{:02x}", b)).collect()
+    };
+    let expires_at = chrono::Utc::now().timestamp() + 28800;
+
+    sessions.0.write().await.insert(token.clone(), expires_at);
+
+    let cookie = format!(
+        "oj_admin_session={}; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=28800",
+        token
+    );
+
+    (
+        StatusCode::SEE_OTHER,
+        [
+            ("location", "/admin/"),
+            ("set-cookie", &cookie),
+        ],
+    )
+        .into_response()
+}
+
+pub async fn logout(
+    Extension(sessions): Extension<AdminSessions>,
+    request: axum::extract::Request,
+) -> impl IntoResponse {
+    if let Some(token) = crate::auth::extract_cookie(request.headers(), "oj_admin_session") {
+        sessions.0.write().await.remove(token);
+    }
+
+    let cookie = "oj_admin_session=; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=0";
+
+    (
+        StatusCode::SEE_OTHER,
+        [
+            ("location", "/admin/login"),
+            ("set-cookie", cookie),
+        ],
+    )
+        .into_response()
+}
+
+// Settings toggle
+
+#[derive(Deserialize)]
+pub struct TokenAuthSettingRequest {
+    pub enabled: bool,
+}
+
+pub async fn get_token_auth_setting(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let enabled = state.token_auth_enabled.load(Ordering::Acquire);
+    Json(serde_json::json!({ "enabled": enabled }))
+}
+
+pub async fn set_token_auth_setting(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<TokenAuthSettingRequest>,
+) -> impl IntoResponse {
+    let pool = state.rw_pool.clone();
+    let value = if body.enabled { "1" } else { "0" };
+
+    let ok = tokio::task::spawn_blocking(move || {
+        crate::db::settings::set_setting(&pool, "token_auth_enabled", value)
+    })
+    .await
+    .unwrap_or(false);
+
+    if ok {
+        state.token_auth_enabled.store(body.enabled, Ordering::Release);
+        Json(serde_json::json!({ "enabled": body.enabled })).into_response()
+    } else {
+        ProblemDetail::internal("failed to update setting").into_response()
     }
 }

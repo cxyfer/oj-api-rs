@@ -4,34 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Admin{% endblock %} - OJ API</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
-        nav { background: #1a1a2e; padding: 1rem; }
-        nav a { color: #e0e0e0; text-decoration: none; margin-right: 1.5rem; }
-        nav a:hover { color: #fff; }
-        h1 { margin: 1rem 0; }
-        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 4px; overflow: hidden; }
-        th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #eee; font-size: 0.9rem; }
-        th { background: #f8f8f8; font-weight: 600; }
-        .pagination { margin: 1rem 0; }
-        .pagination a { padding: 0.25rem 0.5rem; margin: 0 0.25rem; background: #fff; border: 1px solid #ddd; text-decoration: none; color: #333; border-radius: 3px; }
-        .pagination a.active { background: #1a1a2e; color: #fff; }
-        .badge { display: inline-block; padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.75rem; }
-        .badge-easy { background: #d4edda; color: #155724; }
-        .badge-medium { background: #fff3cd; color: #856404; }
-        .badge-hard { background: #f8d7da; color: #721c24; }
-    </style>
+    <link rel="stylesheet" href="/static/admin.css">
 </head>
 <body>
     <nav>
+        <a class="brand" href="/admin/">OJ API</a>
         <a href="/admin/">Dashboard</a>
         <a href="/admin/problems">Problems</a>
         <a href="/admin/tokens">Tokens</a>
+        <div class="spacer"></div>
+        <a href="#" id="logout-btn">Logout</a>
     </nav>
     <div class="container">
         {% block content %}{% endblock %}
     </div>
+    <div id="toast-container"></div>
+    <script src="/static/admin.js" defer></script>
 </body>
 </html>

@@ -1,3 +1,4 @@
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use askama::Template;
@@ -10,11 +11,76 @@ use crate::models::{ApiToken, ProblemSummary};
 use crate::AppState;
 
 #[derive(Template)]
-#[template(path = "admin/index.html")]
-struct IndexTemplate;
+#[template(path = "admin/login.html")]
+struct LoginTemplate {
+    error: String,
+}
 
-pub async fn index() -> impl IntoResponse {
-    Html(IndexTemplate.render().unwrap_or_default())
+pub async fn login_page() -> impl IntoResponse {
+    Html(
+        LoginTemplate {
+            error: String::new(),
+        }
+        .render()
+        .unwrap_or_default(),
+    )
+}
+
+pub fn login_page_with_error(error: &str) -> Html<String> {
+    Html(
+        LoginTemplate {
+            error: error.to_string(),
+        }
+        .render()
+        .unwrap_or_default(),
+    )
+}
+
+#[derive(Template)]
+#[template(path = "admin/index.html")]
+struct IndexTemplate {
+    total_problems: u32,
+    active_tokens: u32,
+    token_auth_enabled: bool,
+}
+
+pub async fn index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let pool = state.ro_pool.clone();
+    let total_problems = tokio::task::spawn_blocking(move || {
+        let conn = pool.get().ok()?;
+        conn.query_row("SELECT COUNT(*) FROM problems", [], |row| row.get::<_, u32>(0))
+            .ok()
+    })
+    .await
+    .unwrap_or(None)
+    .unwrap_or(0);
+
+    let pool = state.rw_pool.clone();
+    let active_tokens = tokio::task::spawn_blocking(move || {
+        let conn = pool.get().ok()?;
+        conn.query_row(
+            "SELECT COUNT(*) FROM api_tokens WHERE is_active = 1",
+            [],
+            |row| row.get::<_, u32>(0),
+        )
+        .ok()
+    })
+    .await
+    .unwrap_or(None)
+    .unwrap_or(0);
+
+    let token_auth_enabled = state.token_auth_enabled.load(Ordering::Acquire);
+
+    Html(
+        IndexTemplate {
+            total_problems,
+            active_tokens,
+            token_auth_enabled,
+        }
+        .render()
+        .unwrap_or_default(),
+    )
+    .into_response()
 }
 
 #[derive(Deserialize)]
@@ -76,23 +142,25 @@ pub async fn problems_page(
 #[template(path = "admin/tokens.html")]
 struct TokensTemplate {
     tokens: Vec<ApiToken>,
+    token_auth_enabled: bool,
 }
 
-pub async fn tokens_page(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn tokens_page(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool = state.rw_pool.clone();
 
-    let tokens = tokio::task::spawn_blocking(move || {
-        crate::db::tokens::list_tokens(&pool)
-    })
-    .await
-    .unwrap_or_default();
+    let tokens = tokio::task::spawn_blocking(move || crate::db::tokens::list_tokens(&pool))
+        .await
+        .unwrap_or_default();
+
+    let token_auth_enabled = state.token_auth_enabled.load(Ordering::Acquire);
 
     Html(
-        TokensTemplate { tokens }
-            .render()
-            .unwrap_or_default(),
+        TokensTemplate {
+            tokens,
+            token_auth_enabled,
+        }
+        .render()
+        .unwrap_or_default(),
     )
     .into_response()
 }

@@ -1,9 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
-<h1>Admin Dashboard</h1>
-<ul>
-    <li><a href="/admin/problems">Manage Problems</a></li>
-    <li><a href="/admin/tokens">Manage API Tokens</a></li>
-</ul>
+<h1>Dashboard</h1>
+<div class="stats-grid">
+    <a class="stat-card" href="/admin/problems">
+        <div class="label">Total Problems</div>
+        <div class="value">{{ total_problems }}</div>
+    </a>
+    <a class="stat-card" href="/admin/tokens">
+        <div class="label">Active Tokens</div>
+        <div class="value">{{ active_tokens }}</div>
+    </a>
+    <a class="stat-card" href="/admin/tokens">
+        <div class="label">Token Auth</div>
+        <div class="value {% if token_auth_enabled %}success{% else %}danger{% endif %}">{% if token_auth_enabled %}Enabled{% else %}Disabled{% endif %}</div>
+    </a>
+</div>
 {% endblock %}
