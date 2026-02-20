@@ -1,14 +1,20 @@
 use axum::extract::Request;
-use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
+use axum::Extension;
 use std::sync::Arc;
 
 use crate::api::error::ProblemDetail;
 use crate::db::DbPool;
 
+#[derive(Clone)]
+pub struct AuthPool(pub Arc<DbPool>);
+
+#[derive(Clone)]
+pub struct AdminSecret(pub String);
+
 pub async fn bearer_auth(
-    pool: Arc<DbPool>,
+    Extension(auth_pool): Extension<AuthPool>,
     request: Request,
     next: Next,
 ) -> Response {
@@ -30,9 +36,9 @@ pub async fn bearer_auth(
         }
     };
 
-    let pool_clone = pool.clone();
+    let pool = auth_pool.0.clone();
     let valid = tokio::task::spawn_blocking(move || {
-        crate::db::tokens::validate_token(&pool_clone, &token)
+        crate::db::tokens::validate_token(&pool, &token)
     })
     .await
     .unwrap_or(false);
@@ -45,7 +51,7 @@ pub async fn bearer_auth(
 }
 
 pub async fn admin_auth(
-    admin_secret: Arc<String>,
+    Extension(secret): Extension<AdminSecret>,
     request: Request,
     next: Next,
 ) -> Response {
@@ -55,7 +61,7 @@ pub async fn admin_auth(
         .and_then(|v| v.to_str().ok());
 
     match secret_header {
-        Some(s) if s == admin_secret.as_str() => next.run(request).await,
+        Some(s) if s == secret.0 => next.run(request).await,
         _ => ProblemDetail::unauthorized("invalid admin secret").into_response(),
     }
 }
