@@ -1,5 +1,7 @@
+mod api;
 mod config;
 mod db;
+mod detect;
 mod models;
 
 fn main() {
