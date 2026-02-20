@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::Semaphore;
 
+mod admin;
 mod api;
 mod auth;
 mod config;

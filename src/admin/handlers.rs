@@ -1,0 +1,315 @@
+use std::sync::Arc;
+
+use axum::extract::{Path, State};
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::Json;
+use serde::Deserialize;
+
+use crate::api::error::ProblemDetail;
+use crate::models::{CrawlerJob, CrawlerStatus, Problem};
+use crate::AppState;
+
+// Problem CRUD
+
+#[derive(Deserialize)]
+pub struct CreateProblemRequest {
+    pub id: String,
+    pub source: String,
+    pub slug: String,
+    pub title: Option<String>,
+    pub title_cn: Option<String>,
+    pub difficulty: Option<String>,
+    pub ac_rate: Option<f64>,
+    pub rating: Option<f64>,
+    pub contest: Option<String>,
+    pub problem_index: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    pub link: Option<String>,
+    pub category: Option<String>,
+    pub paid_only: Option<i32>,
+    pub content: Option<String>,
+    pub content_cn: Option<String>,
+    #[serde(default)]
+    pub similar_questions: Vec<String>,
+}
+
+impl From<CreateProblemRequest> for Problem {
+    fn from(r: CreateProblemRequest) -> Self {
+        Problem {
+            id: r.id,
+            source: r.source,
+            slug: r.slug,
+            title: r.title,
+            title_cn: r.title_cn,
+            difficulty: r.difficulty,
+            ac_rate: r.ac_rate,
+            rating: r.rating,
+            contest: r.contest,
+            problem_index: r.problem_index,
+            tags: r.tags,
+            link: r.link,
+            category: r.category,
+            paid_only: r.paid_only,
+            content: r.content,
+            content_cn: r.content_cn,
+            similar_questions: r.similar_questions,
+        }
+    }
+}
+
+pub async fn create_problem(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<CreateProblemRequest>,
+) -> impl IntoResponse {
+    let problem: Problem = body.into();
+    let pool = state.rw_pool.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        crate::db::problems::insert_problem(&pool, &problem)
+    })
+    .await;
+
+    match result {
+        Ok(Ok(())) => StatusCode::CREATED.into_response(),
+        Ok(Err(e)) => {
+            ProblemDetail::internal(format!("database error: {}", e)).into_response()
+        }
+        Err(_) => ProblemDetail::internal("task join error").into_response(),
+    }
+}
+
+pub async fn update_problem(
+    State(state): State<Arc<AppState>>,
+    Path((source, id)): Path<(String, String)>,
+    Json(body): Json<CreateProblemRequest>,
+) -> impl IntoResponse {
+    let problem: Problem = body.into();
+    let pool = state.rw_pool.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        crate::db::problems::update_problem(&pool, &source, &id, &problem)
+    })
+    .await;
+
+    match result {
+        Ok(Ok(n)) if n > 0 => StatusCode::OK.into_response(),
+        Ok(Ok(_)) => ProblemDetail::not_found("problem not found").into_response(),
+        Ok(Err(e)) => {
+            ProblemDetail::internal(format!("database error: {}", e)).into_response()
+        }
+        Err(_) => ProblemDetail::internal("task join error").into_response(),
+    }
+}
+
+pub async fn delete_problem(
+    State(state): State<Arc<AppState>>,
+    Path((source, id)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let pool = state.rw_pool.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        crate::db::problems::delete_problem(&pool, &source, &id)
+    })
+    .await;
+
+    match result {
+        Ok(Ok(true)) => StatusCode::NO_CONTENT.into_response(),
+        Ok(Ok(false)) => ProblemDetail::not_found("problem not found").into_response(),
+        Ok(Err(e)) => {
+            ProblemDetail::internal(format!("database error: {}", e)).into_response()
+        }
+        Err(_) => ProblemDetail::internal("task join error").into_response(),
+    }
+}
+
+// Token management
+
+#[derive(Deserialize)]
+pub struct CreateTokenRequest {
+    pub label: Option<String>,
+}
+
+pub async fn list_tokens(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let pool = state.rw_pool.clone();
+    let tokens = tokio::task::spawn_blocking(move || {
+        crate::db::tokens::list_tokens(&pool)
+    })
+    .await
+    .unwrap_or_default();
+
+    Json(tokens).into_response()
+}
+
+pub async fn create_token(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<CreateTokenRequest>,
+) -> impl IntoResponse {
+    let pool = state.rw_pool.clone();
+    let label = body.label;
+
+    let result = tokio::task::spawn_blocking(move || {
+        crate::db::tokens::create_token(&pool, label.as_deref())
+    })
+    .await
+    .unwrap_or(None);
+
+    match result {
+        Some(token) => (StatusCode::CREATED, Json(token)).into_response(),
+        None => ProblemDetail::internal("failed to create token").into_response(),
+    }
+}
+
+pub async fn revoke_token(
+    State(state): State<Arc<AppState>>,
+    Path(token): Path<String>,
+) -> impl IntoResponse {
+    let pool = state.rw_pool.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        crate::db::tokens::revoke_token(&pool, &token)
+    })
+    .await
+    .unwrap_or(None);
+
+    match result {
+        Some(true) => StatusCode::NO_CONTENT.into_response(),
+        Some(false) => ProblemDetail::not_found("token not found").into_response(),
+        None => ProblemDetail::internal("database error").into_response(),
+    }
+}
+
+// Crawler
+
+#[derive(Deserialize)]
+pub struct TriggerCrawlerRequest {
+    pub source: String,
+}
+
+pub async fn trigger_crawler(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<TriggerCrawlerRequest>,
+) -> impl IntoResponse {
+    let mut lock = state.crawler_lock.lock().await;
+
+    if let Some(ref job) = *lock {
+        if job.status == CrawlerStatus::Running {
+            return ProblemDetail::conflict("a crawler is already running").into_response();
+        }
+    }
+
+    let job_id = uuid::Uuid::new_v4().to_string();
+    let started_at = chrono::Utc::now().to_rfc3339();
+
+    let job = CrawlerJob {
+        job_id: job_id.clone(),
+        source: body.source.clone(),
+        started_at: started_at.clone(),
+        status: CrawlerStatus::Running,
+    };
+
+    *lock = Some(job.clone());
+    drop(lock);
+
+    let crawler_source = body.source;
+    let state_clone = state.clone();
+    let timeout_secs = state.config.crawler_timeout_secs;
+
+    tokio::spawn(async move {
+        let script = match crawler_source.as_str() {
+            "leetcode" => "leetcode.py",
+            "atcoder" => "atcoder.py",
+            "codeforces" => "codeforces.py",
+            _ => {
+                let mut lock = state_clone.crawler_lock.lock().await;
+                if let Some(ref mut job) = *lock {
+                    job.status = CrawlerStatus::Failed;
+                }
+                return;
+            }
+        };
+
+        let mut cmd = tokio::process::Command::new("python3");
+        cmd.arg(script);
+        cmd.current_dir("references/leetcode-daily-discord-bot/");
+        cmd.kill_on_drop(true);
+
+        let child = match cmd.spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!("failed to spawn crawler: {}", e);
+                let mut lock = state_clone.crawler_lock.lock().await;
+                if let Some(ref mut job) = *lock {
+                    job.status = CrawlerStatus::Failed;
+                }
+                return;
+            }
+        };
+
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_secs),
+            child.wait_with_output(),
+        )
+        .await;
+
+        let mut lock = state_clone.crawler_lock.lock().await;
+        if let Some(ref mut job) = *lock {
+            match result {
+                Ok(Ok(output)) if output.status.success() => {
+                    job.status = CrawlerStatus::Completed;
+                }
+                Ok(Ok(_)) => {
+                    job.status = CrawlerStatus::Failed;
+                }
+                Ok(Err(e)) => {
+                    tracing::error!("crawler error: {}", e);
+                    job.status = CrawlerStatus::Failed;
+                }
+                Err(_) => {
+                    job.status = CrawlerStatus::TimedOut;
+                }
+            }
+        }
+    });
+
+    (
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({ "job_id": job_id })),
+    )
+        .into_response()
+}
+
+pub async fn crawler_status(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let lock = state.crawler_lock.lock().await;
+
+    match &*lock {
+        Some(job) if job.status == CrawlerStatus::Running => {
+            Json(serde_json::json!({
+                "running": true,
+                "job_id": job.job_id,
+                "source": job.source,
+                "started_at": job.started_at,
+            }))
+            .into_response()
+        }
+        Some(job) => {
+            Json(serde_json::json!({
+                "running": false,
+                "last_job": job,
+            }))
+            .into_response()
+        }
+        None => {
+            Json(serde_json::json!({
+                "running": false,
+                "last_job": null,
+            }))
+            .into_response()
+        }
+    }
+}

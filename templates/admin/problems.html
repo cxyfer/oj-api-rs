@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Problems{% endblock %}
+{% block content %}
+<h1>Problems ({{ source }})</h1>
+<p>Total: {{ total }} | Page {{ page }} of {{ total_pages }}</p>
+<table>
+    <thead>
+        <tr>
+            <th>Source</th>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Difficulty</th>
+            <th>Rating</th>
+            <th>AC Rate</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in problems %}
+        <tr>
+            <td>{{ p.source }}</td>
+            <td>{{ p.id }}</td>
+            <td>{{ p.title.as_deref().unwrap_or("-") }}</td>
+            <td>
+                {% match p.difficulty.as_deref() %}
+                    {% when Some with ("Easy") %}<span class="badge badge-easy">Easy</span>
+                    {% when Some with ("Medium") %}<span class="badge badge-medium">Medium</span>
+                    {% when Some with ("Hard") %}<span class="badge badge-hard">Hard</span>
+                    {% when Some with (d) %}{{ d }}
+                    {% when None %}-
+                {% endmatch %}
+            </td>
+            <td>{% match p.rating %}{% when Some with (r) %}{{ r }}{% when None %}-{% endmatch %}</td>
+            <td>{% match p.ac_rate %}{% when Some with (r) %}{{ r|fmt("{:.1}") }}%{% when None %}-{% endmatch %}</td>
+            <td><a href="/admin/api/problems/{{ p.source }}/{{ p.id }}" data-method="DELETE">Delete</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<div class="pagination">
+    {% if page > 1 %}<a href="?source={{ source }}&page={{ page - 1 }}">&laquo; Prev</a>{% endif %}
+    {% if page < total_pages %}<a href="?source={{ source }}&page={{ page + 1 }}">Next &raquo;</a>{% endif %}
+</div>
+{% endblock %}

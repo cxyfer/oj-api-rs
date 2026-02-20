@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}API Tokens{% endblock %}
+{% block content %}
+<h1>API Tokens</h1>
+<table>
+    <thead>
+        <tr>
+            <th>Token</th>
+            <th>Label</th>
+            <th>Created</th>
+            <th>Last Used</th>
+            <th>Active</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for t in tokens %}
+        <tr>
+            <td><code>{{ t.token[..8] }}...{{ t.token[t.token.len()-8..] }}</code></td>
+            <td>{{ t.label.as_deref().unwrap_or("-") }}</td>
+            <td>{{ t.created_at }}</td>
+            <td>{% match t.last_used_at %}{% when Some with (ts) %}{{ ts }}{% when None %}-{% endmatch %}</td>
+            <td>{% if t.is_active == 1 %}✓{% else %}✗{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
