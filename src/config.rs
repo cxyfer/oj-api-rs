@@ -17,6 +17,7 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Self {
+        let _ = dotenvy::dotenv();
         let admin_secret = env::var("ADMIN_SECRET").unwrap_or_else(|_| {
             eprintln!("FATAL: ADMIN_SECRET environment variable is required");
             std::process::exit(1);
