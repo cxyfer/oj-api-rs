@@ -27,7 +27,7 @@ target
 .gemini/
 
 # Data
-data/*.db
+data/*.db*
 
 # Environment
 .env
