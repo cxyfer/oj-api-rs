@@ -53,13 +53,13 @@
 
 - [x] 6.1 Implement toast error display for API failures (reuse existing `toast` function)
 - [x] 6.2 Implement session expiry detection (401 response) with redirect to login
-- [ ] 6.3 Implement retry mechanism for network errors
+- [x] 6.3 Implement retry mechanism for network errors
 - [x] 6.4 Add error state display in modal for detail fetch failures
 
 ## 7. Frontend - Loading States
 
 - [x] 7.1 Add loading spinner HTML/CSS for tab switching
-- [ ] 7.2 Implement button disabled state during AJAX requests
+- [x] 7.2 Implement button disabled state during AJAX requests
 - [x] 7.3 Add skeleton/loading state for modal content
 - [x] 7.4 Ensure loading indicators are properly removed on success/error
 
@@ -67,10 +67,10 @@
 
 - [x] 8.1 Add ARIA attributes to source tabs (`role="tablist"`, `role="tab"`, `aria-selected`, `aria-controls`)
 - [x] 8.2 Add ARIA attributes to modal (`role="dialog"`, `aria-modal="true"`, `aria-labelledby`)
-- [ ] 8.3 Implement keyboard navigation for tabs (Tab, Enter)
+- [x] 8.3 Implement keyboard navigation for tabs (Arrow keys, Home, End)
 - [x] 8.4 Implement Escape key handler for modal close
-- [ ] 8.5 Verify color contrast meets WCAG AA standards in `static/admin.css`
-- [ ] 8.6 Add focus management (trap focus in modal, restore focus on close)
+- [x] 8.5 Verify color contrast meets WCAG AA standards in `static/admin.css`
+- [x] 8.6 Add focus management (trap focus in modal, restore focus on close)
 
 ## 9. Testing & Validation
 
