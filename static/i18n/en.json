@@ -15,8 +15,128 @@
     "enabled": "Enabled",
     "disabled": "Disabled"
   },
+  "problems": {
+    "title": "Problems",
+    "total": "Total",
+    "page": "Page",
+    "of": "of",
+    "table": {
+      "source": "Source",
+      "id": "ID",
+      "title": "Title",
+      "difficulty": "Difficulty",
+      "rating": "Rating",
+      "ac_rate": "AC Rate"
+    },
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    },
+    "pagination": {
+      "prev": "« Prev",
+      "next": "Next »"
+    }
+  },
+  "tokens": {
+    "title": "API Tokens",
+    "auth_label": "Token Authentication",
+    "auth_sublabel": "When disabled, API endpoints are publicly accessible",
+    "create_label": "Label (optional)",
+    "create_placeholder": "e.g. my-bot",
+    "generate": "Generate Token",
+    "table": {
+      "token": "Token",
+      "label": "Label",
+      "created": "Created",
+      "last_used": "Last Used"
+    },
+    "modal": {
+      "title": "Token Created",
+      "warning": "Copy this token now. It will not be shown again."
+    }
+  },
+  "crawlers": {
+    "title": "Crawlers",
+    "control": {
+      "source": "Source",
+      "args": "Arguments",
+      "trigger": "Trigger"
+    },
+    "status": {
+      "running": "Running",
+      "job": "Job",
+      "started": "Started",
+      "finished": "Finished",
+      "args": "Args"
+    },
+    "history_table": {
+      "trigger": "Trigger",
+      "logs": "Logs"
+    },
+    "modal": {
+      "title": "Job Output"
+    },
+    "flags": {
+      "init": "Init",
+      "full": "Full",
+      "daily": "Daily",
+      "date": "Date",
+      "monthly": "Monthly",
+      "fill_missing_content": "Fill Missing Content",
+      "fill_missing_content_workers": "Content Workers",
+      "missing_content_stats": "Content Stats",
+      "sync_kenkoooo": "Sync Kenkoooo",
+      "sync_history": "Sync History",
+      "fetch_all": "Fetch All",
+      "resume": "Resume",
+      "contest": "Contest",
+      "status": "Status",
+      "reprocess_content": "Reprocess Content",
+      "rate_limit": "Rate Limit",
+      "sync_problemset": "Sync Problemset",
+      "missing_problems": "Missing Problems",
+      "include_gym": "Include Gym"
+    }
+  },
+  "login": {
+    "title": "OJ API Admin",
+    "secret_label": "Admin Secret",
+    "button": "Login"
+  },
   "common": {
     "language": "Language",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "source": "Source",
+    "actions": "Actions",
+    "status": "Status",
+    "active": "Active",
+    "revoked": "Revoked",
+    "delete": "Delete",
+    "revoke": "Revoke",
+    "view": "View",
+    "detail": "Detail",
+    "close": "Close",
+    "copy": "Copy",
+    "confirm": "Confirm",
+    "cancel": "Cancel"
+  },
+  "messages": {
+    "copied": "Copied to clipboard",
+    "token_auth_enabled": "Token auth enabled",
+    "token_auth_disabled": "Token auth disabled",
+    "failed_update_setting": "Failed to update setting",
+    "failed_create_token": "Failed to create token",
+    "confirm_revoke": "Revoke this token?",
+    "token_revoked": "Token revoked",
+    "failed_revoke_token": "Failed to revoke token",
+    "confirm_delete_problem": "Delete this problem?",
+    "problem_deleted": "Problem deleted",
+    "failed_delete_problem": "Failed to delete problem",
+    "crawler_triggered": "Crawler triggered",
+    "failed_trigger_crawler": "Failed to trigger crawler",
+    "fill_args": "Please fill value for ",
+    "fill_year_month": "Please fill year and month for ",
+    "failed_load_output": "Failed to load output"
   }
 }

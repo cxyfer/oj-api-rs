@@ -35,7 +35,7 @@
     function copyToClipboard(text) {
         if (navigator.clipboard) {
             navigator.clipboard.writeText(text).then(function() {
-                toast('Copied to clipboard');
+                toast(i18n.t('messages.copied'));
             });
         } else {
             var ta = document.createElement('textarea');
@@ -44,7 +44,7 @@
             ta.select();
             document.execCommand('copy');
             ta.remove();
-            toast('Copied to clipboard');
+            toast(i18n.t('messages.copied'));
         }
     }
 
@@ -58,10 +58,10 @@
                 body: JSON.stringify({ enabled: enabled })
             }).then(function(res) {
                 if (res.ok) {
-                    toast(enabled ? 'Token auth enabled' : 'Token auth disabled');
+                    toast(enabled ? i18n.t('messages.token_auth_enabled') : i18n.t('messages.token_auth_disabled'));
                 } else {
                     toggle.checked = !enabled;
-                    toast('Failed to update setting', 'error');
+                    toast(i18n.t('messages.failed_update_setting'), 'error');
                 }
             }).catch(function() {
                 toggle.checked = !enabled;
@@ -86,7 +86,7 @@
                 showTokenModal(data.token);
                 addTokenRow(data);
             }).catch(function() {
-                toast('Failed to create token', 'error');
+                toast(i18n.t('messages.failed_create_token'), 'error');
             });
         });
     }
@@ -122,8 +122,8 @@
             '<td>' + (token.label || '-') + '</td>' +
             '<td>' + new Date(token.created_at * 1000).toLocaleDateString() + '</td>' +
             '<td>-</td>' +
-            '<td><span class="badge badge-active">Active</span></td>' +
-            '<td><button class="btn btn-danger btn-sm btn-revoke">Revoke</button></td>';
+            '<td><span class="badge badge-active" data-i18n="common.active">' + i18n.t('common.active') + '</span></td>' +
+            '<td><button class="btn btn-danger btn-sm btn-revoke" data-i18n="common.revoke">' + i18n.t('common.revoke') + '</button></td>';
         tbody.prepend(tr);
     }
 
@@ -132,15 +132,15 @@
         if (!e.target.classList.contains('btn-revoke')) return;
         var row = e.target.closest('tr');
         if (!row || !row.dataset.token) return;
-        showConfirm('Revoke this token?', function() {
+        showConfirm(i18n.t('messages.confirm_revoke'), function() {
             api('/admin/api/tokens/' + encodeURIComponent(row.dataset.token), {
                 method: 'DELETE'
             }).then(function(res) {
                 if (res.ok) {
                     row.remove();
-                    toast('Token revoked');
+                    toast(i18n.t('messages.token_revoked'));
                 } else {
-                    toast('Failed to revoke token', 'error');
+                    toast(i18n.t('messages.failed_revoke_token'), 'error');
                 }
             });
         });
@@ -152,14 +152,14 @@
         e.preventDefault();
         var url = e.target.dataset.url;
         if (!url) return;
-        showConfirm('Delete this problem?', function() {
+        showConfirm(i18n.t('messages.confirm_delete_problem'), function() {
             api(url, { method: 'DELETE' }).then(function(res) {
                 if (res.ok) {
                     var row = e.target.closest('tr');
                     if (row) row.remove();
-                    toast('Problem deleted');
+                    toast(i18n.t('messages.problem_deleted'));
                 } else {
-                    toast('Failed to delete problem', 'error');
+                    toast(i18n.t('messages.failed_delete_problem'), 'error');
                 }
             });
         });
@@ -176,8 +176,8 @@
             '<div class="confirm-box">' +
             '<p>' + message + '</p>' +
             '<div class="actions">' +
-            '<button class="btn btn-danger btn-confirm-yes">Confirm</button>' +
-            '<button class="btn btn-confirm-no" style="background:rgba(255,255,255,0.1)">Cancel</button>' +
+            '<button class="btn btn-danger btn-confirm-yes" data-i18n="common.confirm">' + i18n.t('common.confirm') + '</button>' +
+            '<button class="btn btn-confirm-no" style="background:rgba(255,255,255,0.1)" data-i18n="common.cancel">' + i18n.t('common.cancel') + '</button>' +
             '</div></div>';
         document.body.appendChild(overlay);
 
@@ -199,39 +199,39 @@
 
         var CRAWLER_CONFIG = {
             leetcode: [
-                { flag: '--init', label: 'Init', type: 'checkbox' },
-                { flag: '--full', label: 'Full', type: 'checkbox' },
-                { flag: '--daily', label: 'Daily', type: 'checkbox' },
-                { flag: '--date', label: 'Date', type: 'date', placeholder: 'YYYY-MM-DD' },
-                { flag: '--monthly', label: 'Monthly', type: 'month-year' },
-                { flag: '--fill-missing-content', label: 'Fill Missing Content', type: 'checkbox' },
-                { flag: '--fill-missing-content-workers', label: 'Content Workers', type: 'number', placeholder: 'N', step: '1' },
-                { flag: '--missing-content-stats', label: 'Content Stats', type: 'checkbox' }
+                { flag: '--init', i18nKey: 'init', type: 'checkbox' },
+                { flag: '--full', i18nKey: 'full', type: 'checkbox' },
+                { flag: '--daily', i18nKey: 'daily', type: 'checkbox' },
+                { flag: '--date', i18nKey: 'date', type: 'date', placeholder: 'YYYY-MM-DD' },
+                { flag: '--monthly', i18nKey: 'monthly', type: 'month-year' },
+                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
+                { flag: '--fill-missing-content-workers', i18nKey: 'fill_missing_content_workers', type: 'number', placeholder: 'N', step: '1' },
+                { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' }
             ],
             atcoder: [
-                { flag: '--sync-kenkoooo', label: 'Sync Kenkoooo', type: 'checkbox' },
-                { flag: '--sync-history', label: 'Sync History', type: 'checkbox' },
-                { flag: '--fetch-all', label: 'Fetch All', type: 'checkbox' },
-                { flag: '--resume', label: 'Resume', type: 'checkbox' },
-                { flag: '--contest', label: 'Contest', type: 'text', placeholder: 'Contest ID' },
-                { flag: '--status', label: 'Status', type: 'checkbox' },
-                { flag: '--fill-missing-content', label: 'Fill Missing Content', type: 'checkbox' },
-                { flag: '--missing-content-stats', label: 'Content Stats', type: 'checkbox' },
-                { flag: '--reprocess-content', label: 'Reprocess Content', type: 'checkbox' },
-                { flag: '--rate-limit', label: 'Rate Limit', type: 'number', placeholder: 'seconds', step: '0.1' }
+                { flag: '--sync-kenkoooo', i18nKey: 'sync_kenkoooo', type: 'checkbox' },
+                { flag: '--sync-history', i18nKey: 'sync_history', type: 'checkbox' },
+                { flag: '--fetch-all', i18nKey: 'fetch_all', type: 'checkbox' },
+                { flag: '--resume', i18nKey: 'resume', type: 'checkbox' },
+                { flag: '--contest', i18nKey: 'contest', type: 'text', placeholder: 'Contest ID' },
+                { flag: '--status', i18nKey: 'status', type: 'checkbox' },
+                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
+                { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' },
+                { flag: '--reprocess-content', i18nKey: 'reprocess_content', type: 'checkbox' },
+                { flag: '--rate-limit', i18nKey: 'rate_limit', type: 'number', placeholder: 'seconds', step: '0.1' }
             ],
             codeforces: [
-                { flag: '--sync-problemset', label: 'Sync Problemset', type: 'checkbox' },
-                { flag: '--fetch-all', label: 'Fetch All', type: 'checkbox' },
-                { flag: '--resume', label: 'Resume', type: 'checkbox' },
-                { flag: '--contest', label: 'Contest', type: 'number', placeholder: 'Contest ID', step: '1' },
-                { flag: '--status', label: 'Status', type: 'checkbox' },
-                { flag: '--fill-missing-content', label: 'Fill Missing Content', type: 'checkbox' },
-                { flag: '--missing-content-stats', label: 'Content Stats', type: 'checkbox' },
-                { flag: '--missing-problems', label: 'Missing Problems', type: 'checkbox' },
-                { flag: '--reprocess-content', label: 'Reprocess Content', type: 'checkbox' },
-                { flag: '--include-gym', label: 'Include Gym', type: 'checkbox' },
-                { flag: '--rate-limit', label: 'Rate Limit', type: 'number', placeholder: 'seconds', step: '0.1' }
+                { flag: '--sync-problemset', i18nKey: 'sync_problemset', type: 'checkbox' },
+                { flag: '--fetch-all', i18nKey: 'fetch_all', type: 'checkbox' },
+                { flag: '--resume', i18nKey: 'resume', type: 'checkbox' },
+                { flag: '--contest', i18nKey: 'contest', type: 'number', placeholder: 'Contest ID', step: '1' },
+                { flag: '--status', i18nKey: 'status', type: 'checkbox' },
+                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
+                { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' },
+                { flag: '--missing-problems', i18nKey: 'missing_problems', type: 'checkbox' },
+                { flag: '--reprocess-content', i18nKey: 'reprocess_content', type: 'checkbox' },
+                { flag: '--include-gym', i18nKey: 'include_gym', type: 'checkbox' },
+                { flag: '--rate-limit', i18nKey: 'rate_limit', type: 'number', placeholder: 'seconds', step: '0.1' }
             ]
         };
 
@@ -251,7 +251,7 @@
 
                 var lbl = document.createElement('label');
                 lbl.htmlFor = cb.id;
-                lbl.textContent = f.label;
+                lbl.textContent = i18n.t('crawlers.flags.' + f.i18nKey);
 
                 item.appendChild(cb);
                 item.appendChild(lbl);
@@ -309,7 +309,7 @@
                 if (yearInp) {
                     var monthInp = items[i].querySelector('[data-role="month"]');
                     if (!yearInp.value || !monthInp.value) {
-                        toast('Please fill year and month for ' + flag, 'error');
+                        toast(i18n.t('messages.fill_year_month') + flag, 'error');
                         return null;
                     }
                     args.push(yearInp.value);
@@ -320,7 +320,7 @@
                 var inp = items[i].querySelector('.flag-input');
                 if (inp) {
                     if (!inp.value) {
-                        toast('Please fill value for ' + flag, 'error');
+                        toast(i18n.t('messages.fill_args') + flag, 'error');
                         return null;
                     }
                     args.push(inp.value);
@@ -342,6 +342,11 @@
         // Initial render
         renderArgs(selectedSource);
 
+        // Listen for language changes to re-render crawler args labels
+        document.addEventListener('languageChanged', function() {
+            renderArgs(selectedSource);
+        });
+
         // Trigger
         triggerBtn.addEventListener('click', function() {
             var args = getArgs();
@@ -353,17 +358,17 @@
             }).then(function(res) {
                 if (res.ok) {
                     return res.json().then(function(data) {
-                        toast('Crawler triggered: ' + data.job_id);
+                        toast(i18n.t('messages.crawler_triggered') + ': ' + data.job_id);
                         startPolling();
                     });
                 } else {
                     return res.json().then(function(data) {
-                        toast(data.detail || 'Failed to trigger crawler', 'error');
+                        toast(data.detail || i18n.t('messages.failed_trigger_crawler'), 'error');
                         triggerBtn.disabled = false;
                     });
                 }
             }).catch(function() {
-                toast('Failed to trigger crawler', 'error');
+                toast(i18n.t('messages.failed_trigger_crawler'), 'error');
                 triggerBtn.disabled = false;
             });
         });
@@ -397,47 +402,46 @@
             });
         }
 
-        function updateStatusCard(data) {
-            var card = document.getElementById('crawler-status-card');
-            if (!card) return;
-            if (data.running && data.current_job) {
-                var job = data.current_job;
-                card.style.display = '';
-                card.innerHTML =
-                    '<div class="status-header running">Running</div>' +
-                    '<div class="status-details">' +
-                    '<span><strong>Job:</strong> ' + job.job_id + '</span>' +
-                    '<span><strong>Source:</strong> ' + job.source + '</span>' +
-                    '<span><strong>Args:</strong> ' + (job.args || []).join(' ') + '</span>' +
-                    '<span><strong>Started:</strong> ' + job.started_at + '</span>' +
-                    '</div>';
-            } else {
-                card.style.display = 'none';
+            function updateStatusCard(data) {
+                var card = document.getElementById('crawler-status-card');
+                if (!card) return;
+                if (data.running && data.current_job) {
+                    var job = data.current_job;
+                    card.style.display = '';
+                    card.innerHTML =
+                        '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') + '</div>' +
+                        '<div class="status-details">' +
+                        '<span><strong data-i18n="crawlers.status.job">' + i18n.t('crawlers.status.job') + '</strong>: ' + job.job_id + '</span> ' +
+                        '<span><strong data-i18n="crawlers.status.source">' + i18n.t('crawlers.control.source') + '</strong>: ' + job.source + '</span> ' +
+                        '<span><strong data-i18n="crawlers.status.args">' + i18n.t('crawlers.status.args') + '</strong>: ' + (job.args || []).join(' ') + '</span> ' +
+                        '<span><strong data-i18n="crawlers.status.started">' + i18n.t('crawlers.status.started') + '</strong>: ' + job.started_at + '</span>' +
+                        '</div>';
+                } else {
+                    card.style.display = 'none';
+                }
             }
-        }
-
-        function updateHistoryTable(history) {
-            var tbody = document.querySelector('#crawler-history-table tbody');
-            if (!tbody) return;
-            tbody.innerHTML = '';
-            history.forEach(function(job) {
-                var tr = document.createElement('tr');
-                var logBtn = job.status !== 'running'
-                    ? '<button class="btn btn-sm btn-view-log" data-job-id="' + esc(job.job_id) + '">View</button>'
-                    : '-';
-                tr.innerHTML =
-                    '<td>' + esc(job.source) + '</td>' +
-                    '<td>' + esc((job.args || []).join(' ')) + '</td>' +
-                    '<td>' + esc(job.trigger) + '</td>' +
-                    '<td>' + esc(job.started_at) + '</td>' +
-                    '<td>' + esc(job.finished_at || '-') + '</td>' +
-                    '<td><span class="badge badge-crawler-' + esc(job.status) + '">' + esc(job.status) + '</span></td>' +
-                    '<td>' + logBtn + '</td>';
-                tbody.appendChild(tr);
-            });
-        }
-
-        // Log modal
+        
+            function updateHistoryTable(history) {
+                var tbody = document.querySelector('#crawler-history-table tbody');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+                history.forEach(function(job) {
+                    var tr = document.createElement('tr');
+                    var logBtn = job.status !== 'running'
+                        ? '<button class="btn btn-sm btn-view-log" data-job-id="' + esc(job.job_id) + '" data-i18n="common.view">' + i18n.t('common.view') + '</button>'
+                        : '-';
+                    tr.innerHTML =
+                        '<td>' + esc(job.source) + '</td>' +
+                        '<td>' + esc((job.args || []).join(' ')) + '</td>' +
+                        '<td>' + esc(job.trigger) + '</td>' +
+                        '<td>' + esc(job.started_at) + '</td>' +
+                        '<td>' + esc(job.finished_at || '-') + '</td>' +
+                        '<td><span class="badge badge-crawler-' + esc(job.status) + '">' + esc(job.status) + '</span></td>' +
+                        '<td>' + logBtn + '</td>';
+                    tbody.appendChild(tr);
+                });
+            }
+                // Log modal
         document.addEventListener('click', function(e) {
             if (!e.target.classList.contains('btn-view-log')) return;
             var jobId = e.target.dataset.jobId;
@@ -447,7 +451,7 @@
 
             var stdoutPre = document.getElementById('log-stdout');
             var stderrPre = document.getElementById('log-stderr');
-            stdoutPre.textContent = 'Loading...';
+            stdoutPre.textContent = i18n.t('common.loading');
             stderrPre.textContent = '';
             stderrPre.style.display = 'none';
             stdoutPre.style.display = '';
@@ -460,7 +464,7 @@
 
             api('/admin/api/crawlers/' + encodeURIComponent(jobId) + '/output').then(function(res) {
                 if (!res.ok) {
-                    stdoutPre.textContent = 'Failed to load output (HTTP ' + res.status + ')';
+                    stdoutPre.textContent = i18n.t('messages.failed_load_output') + ' (HTTP ' + res.status + ')';
                     return;
                 }
                 return res.json();
@@ -469,7 +473,7 @@
                 stdoutPre.textContent = data.stdout || '(empty)';
                 stderrPre.textContent = data.stderr || '(empty)';
             }).catch(function() {
-                stdoutPre.textContent = 'Failed to load output';
+                stdoutPre.textContent = i18n.t('messages.failed_load_output');
             });
         });
 
@@ -515,6 +519,175 @@
             e.preventDefault();
             fetch('/admin/logout', { method: 'POST', credentials: 'same-origin' })
                 .then(function() { window.location.href = '/admin/login'; });
+        });
+    }
+
+    // Problems Page
+    var problemsTable = document.getElementById('problems-table');
+    if (problemsTable) {
+        var currentSource = 'leetcode';
+        var currentPage = 1;
+
+        function loadProblems(source, page) {
+            currentSource = source || currentSource;
+            currentPage = page || 1;
+            var tbody = problemsTable.querySelector('tbody');
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center">' + i18n.t('common.loading') + '</td></tr>';
+
+            api('/admin/api/problems/' + currentSource + '?page=' + currentPage + '&per_page=50')
+                .then(function(res) { return res.json(); })
+                .then(function(res) {
+                    renderProblems(res.data);
+                    updateStats(res.meta);
+                    renderPagination(res.meta);
+                })
+                .catch(function(err) {
+                    console.error('failed to load problems', err);
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--color-danger)">Failed to load problems</td></tr>';
+                });
+        }
+
+        function renderProblems(problems) {
+            var tbody = problemsTable.querySelector('tbody');
+            tbody.innerHTML = '';
+            problems.forEach(function(p) {
+                var tr = document.createElement('tr');
+                var difficultyBadge = '';
+                if (p.difficulty) {
+                    var lower = p.difficulty.toLowerCase();
+                    var badgeClass = 'badge-' + lower;
+                    var i18nKey = 'problems.difficulty.' + lower;
+                    var label = i18n.t(i18nKey);
+                    if (label === i18nKey) label = p.difficulty; // fallback
+                    difficultyBadge = '<span class="badge ' + badgeClass + '">' + label + '</span>';
+                }
+
+                var title = p.title || '-';
+                if (i18n.getLanguage() !== 'en' && p.title_cn) {
+                    title = p.title_cn;
+                }
+
+                tr.innerHTML =
+                    '<td>' + p.source + '</td>' +
+                    '<td>' + p.id + '</td>' +
+                    '<td>' + esc(title) + '</td>' +
+                    '<td>' + difficultyBadge + '</td>' +
+                    '<td>' + (p.rating || '-') + '</td>' +
+                    '<td>' + (p.ac_rate ? p.ac_rate.toFixed(1) + '%' : '-') + '</td>' +
+                    '<td>' +
+                    '<button class="btn btn-sm btn-primary btn-view-detail" data-source="' + p.source + '" data-id="' + p.id + '" style="margin-right:0.4rem">' + i18n.t('common.detail') + '</button>' +
+                    '<button class="btn btn-danger btn-sm btn-delete-problem" data-url="/admin/api/problems/' + p.source + '/' + p.id + '">' + i18n.t('common.delete') + '</button>' +
+                    '</td>';
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateStats(meta) {
+            document.getElementById('total-count').textContent = meta.total;
+            document.getElementById('current-page').textContent = meta.page;
+            document.getElementById('total-pages').textContent = meta.total_pages;
+        }
+
+        function renderPagination(meta) {
+            var container = document.getElementById('problems-pagination');
+            if (!container) return;
+            container.innerHTML = '';
+            if (meta.page > 1) {
+                var prev = document.createElement('a');
+                prev.href = '#';
+                prev.innerHTML = i18n.t('problems.pagination.prev');
+                prev.onclick = function(e) { e.preventDefault(); loadProblems(currentSource, meta.page - 1); };
+                container.appendChild(prev);
+            }
+            if (meta.page < meta.total_pages) {
+                var next = document.createElement('a');
+                next.href = '#';
+                next.innerHTML = i18n.t('problems.pagination.next');
+                next.onclick = function(e) { e.preventDefault(); loadProblems(currentSource, meta.page + 1); };
+                container.appendChild(next);
+            }
+        }
+
+        // Source buttons
+        var sourceBtns = document.getElementById('problem-source-btns');
+        if (sourceBtns) {
+            sourceBtns.querySelectorAll('.source-btn').forEach(function(btn) {
+                btn.onclick = function() {
+                    sourceBtns.querySelectorAll('.source-btn').forEach(function(b) { b.classList.remove('active'); });
+                    btn.classList.add('active');
+                    loadProblems(btn.dataset.source, 1);
+                };
+            });
+        }
+
+        // View detail
+        document.addEventListener('click', function(e) {
+            if (!e.target.classList.contains('btn-view-detail')) return;
+            var source = e.target.dataset.source;
+            var id = e.target.dataset.id;
+            showProblemDetail(source, id);
+        });
+
+        function showProblemDetail(source, id) {
+            var modal = document.getElementById('problem-detail-modal');
+            if (!modal) return;
+            
+            var titleEl = document.getElementById('detail-title');
+            var sourceIdEl = document.getElementById('detail-source-id');
+            var difficultyEl = document.getElementById('detail-difficulty');
+            var contentEl = document.getElementById('detail-content');
+
+            titleEl.textContent = i18n.t('common.loading');
+            sourceIdEl.textContent = '';
+            difficultyEl.textContent = '';
+            contentEl.textContent = '';
+            modal.classList.add('active');
+
+            api('/admin/api/problems/' + source + '/' + id)
+                .then(function(res) { return res.json(); })
+                .then(function(p) {
+                    var title = p.title || '-';
+                    if (i18n.getLanguage() !== 'en' && p.title_cn) {
+                        title = p.title_cn;
+                    }
+                    titleEl.textContent = title;
+                    sourceIdEl.textContent = p.source + ' ' + p.id;
+                    if (p.difficulty) {
+                        difficultyEl.textContent = p.difficulty;
+                        difficultyEl.className = 'badge badge-' + p.difficulty.toLowerCase();
+                    }
+                    
+                    var content = p.content || '';
+                    if (i18n.getLanguage() !== 'en' && p.content_cn) {
+                        content = p.content_cn;
+                    }
+                    contentEl.innerHTML = content; // Assuming content might have HTML/Markdown
+                })
+                .catch(function(err) {
+                    titleEl.textContent = 'Error';
+                    contentEl.textContent = 'Failed to load problem detail';
+                });
+        }
+
+        // Close modal
+        document.querySelectorAll('.btn-close-modal').forEach(function(btn) {
+            btn.onclick = function() {
+                document.getElementById('problem-detail-modal').classList.remove('active');
+            };
+        });
+        var detailModal = document.getElementById('problem-detail-modal');
+        if (detailModal) {
+            detailModal.onclick = function(e) {
+                if (e.target === detailModal) detailModal.classList.remove('active');
+            };
+        }
+
+        // Initial load
+        loadProblems(currentSource, 1);
+        
+        // Language change listener
+        document.addEventListener('languageChanged', function() {
+            loadProblems(currentSource, currentPage);
         });
     }
 })();

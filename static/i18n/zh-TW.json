@@ -15,8 +15,128 @@
     "enabled": "已啟用",
     "disabled": "已停用"
   },
+  "problems": {
+    "title": "題目管理",
+    "total": "總計",
+    "page": "第",
+    "of": "頁，共",
+    "table": {
+      "source": "來源",
+      "id": "ID",
+      "title": "標題",
+      "difficulty": "難度",
+      "rating": "分值",
+      "ac_rate": "通過率"
+    },
+    "difficulty": {
+      "easy": "簡單",
+      "medium": "中等",
+      "hard": "困難"
+    },
+    "pagination": {
+      "prev": "« 上一頁",
+      "next": "下一頁 »"
+    }
+  },
+  "tokens": {
+    "title": "API 金鑰管理",
+    "auth_label": "金鑰認證",
+    "auth_sublabel": "停用時，API 端點可公開存取",
+    "create_label": "標籤 (選填)",
+    "create_placeholder": "例如：我的機器人",
+    "generate": "產生金鑰",
+    "table": {
+      "token": "金鑰",
+      "label": "標籤",
+      "created": "建立時間",
+      "last_used": "最後使用"
+    },
+    "modal": {
+      "title": "金鑰已建立",
+      "warning": "請立即複製金鑰，之後將不再顯示。"
+    }
+  },
+  "crawlers": {
+    "title": "爬蟲管理",
+    "control": {
+      "source": "來源",
+      "args": "參數",
+      "trigger": "執行"
+    },
+    "status": {
+      "running": "執行中",
+      "job": "工作",
+      "started": "開始時間",
+      "finished": "結束時間",
+      "args": "參數"
+    },
+    "history_table": {
+      "trigger": "觸發方式",
+      "logs": "日誌"
+    },
+    "modal": {
+      "title": "工作輸出"
+    },
+    "flags": {
+      "init": "初始化",
+      "full": "全量更新",
+      "daily": "每日更新",
+      "date": "指定日期",
+      "monthly": "指定月份",
+      "fill_missing_content": "補充缺失內容",
+      "fill_missing_content_workers": "內容補充執行緒",
+      "missing_content_stats": "內容缺失統計",
+      "sync_kenkoooo": "同步 Kenkoooo",
+      "sync_history": "同步歷史",
+      "fetch_all": "獲取全部",
+      "resume": "斷點續傳",
+      "contest": "競賽 ID",
+      "status": "狀態檢查",
+      "reprocess_content": "重新處理內容",
+      "rate_limit": "頻率限制",
+      "sync_problemset": "同步題目集",
+      "missing_problems": "缺失題目",
+      "include_gym": "包含 Gym"
+    }
+  },
+  "login": {
+    "title": "OJ API 管理後台",
+    "secret_label": "管理員密鑰",
+    "button": "登入"
+  },
   "common": {
     "language": "語言",
-    "loading": "載入中..."
+    "loading": "載入中...",
+    "source": "來源",
+    "actions": "操作",
+    "status": "狀態",
+    "active": "有效",
+    "revoked": "已撤銷",
+    "delete": "刪除",
+    "revoke": "撤銷",
+    "view": "查看",
+    "detail": "詳情",
+    "close": "關閉",
+    "copy": "複製",
+    "confirm": "確定",
+    "cancel": "取消"
+  },
+  "messages": {
+    "copied": "已複製到剪貼簿",
+    "token_auth_enabled": "金鑰認證已啟用",
+    "token_auth_disabled": "金鑰認證已停用",
+    "failed_update_setting": "無法更新設定",
+    "failed_create_token": "無法建立金鑰",
+    "confirm_revoke": "確定要撤銷此金鑰嗎？",
+    "token_revoked": "金鑰已撤銷",
+    "failed_revoke_token": "無法撤銷金鑰",
+    "confirm_delete_problem": "確定要刪除此題目嗎？",
+    "problem_deleted": "題目已刪除",
+    "failed_delete_problem": "無法刪除題目",
+    "crawler_triggered": "爬蟲已啟動",
+    "failed_trigger_crawler": "無法啟動爬蟲",
+    "fill_args": "請填寫此參數的值：",
+    "fill_year_month": "請填寫此參數的年份與月份：",
+    "failed_load_output": "無法載入輸出內容"
   }
 }

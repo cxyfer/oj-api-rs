@@ -1,46 +1,62 @@
 {% extends "base.html" %}
 {% block title %}Problems{% endblock %}
 {% block content %}
-<h1>Problems ({{ source }})</h1>
-<p style="color:var(--color-muted);margin-bottom:1rem">Total: {{ total }} | Page {{ page }} of {{ total_pages }}</p>
+<h1 data-i18n="problems.title">Problems</h1>
+
+<div class="card" style="margin-bottom:1rem;padding:1rem 1.25rem">
+    <div class="form-group">
+        <label data-i18n="common.source">Source</label>
+        <div class="source-btn-group" id="problem-source-btns">
+            <button class="btn source-btn active" data-source="leetcode">LeetCode</button>
+            <button class="btn source-btn" data-source="atcoder">AtCoder</button>
+            <button class="btn source-btn" data-source="codeforces">Codeforces</button>
+        </div>
+    </div>
+</div>
+
+<p style="color:var(--color-muted);margin-bottom:1rem" id="problem-stats">
+    <span data-i18n="problems.total">Total</span>: <span id="total-count">-</span> | 
+    <span data-i18n="problems.page">Page</span> <span id="current-page">-</span> 
+    <span data-i18n="problems.of">of</span> <span id="total-pages">-</span>
+</p>
+
 <div class="card">
-    <table>
+    <table id="problems-table">
         <thead>
             <tr>
-                <th>Source</th>
-                <th>ID</th>
-                <th>Title</th>
-                <th>Difficulty</th>
-                <th>Rating</th>
-                <th>AC Rate</th>
-                <th>Actions</th>
+                <th data-i18n="problems.table.source">Source</th>
+                <th data-i18n="problems.table.id">ID</th>
+                <th data-i18n="problems.table.title">Title</th>
+                <th data-i18n="problems.table.difficulty">Difficulty</th>
+                <th data-i18n="problems.table.rating">Rating</th>
+                <th data-i18n="problems.table.ac_rate">AC Rate</th>
+                <th data-i18n="common.actions">Actions</th>
             </tr>
         </thead>
         <tbody>
-            {% for p in problems %}
-            <tr>
-                <td>{{ p.source }}</td>
-                <td>{{ p.id }}</td>
-                <td>{{ p.title.as_deref().unwrap_or("-") }}</td>
-                <td>
-                    {% match p.difficulty.as_deref() %}
-                        {% when Some with ("Easy") %}<span class="badge badge-easy">Easy</span>
-                        {% when Some with ("Medium") %}<span class="badge badge-medium">Medium</span>
-                        {% when Some with ("Hard") %}<span class="badge badge-hard">Hard</span>
-                        {% when Some with (d) %}{{ d }}
-                        {% when None %}-
-                    {% endmatch %}
-                </td>
-                <td>{% match p.rating %}{% when Some with (r) %}{{ r }}{% when None %}-{% endmatch %}</td>
-                <td>{% match p.ac_rate %}{% when Some with (r) %}{{ r|fmt("{:.1}") }}%{% when None %}-{% endmatch %}</td>
-                <td><button class="btn btn-danger btn-sm btn-delete-problem" data-url="/admin/api/problems/{{ p.source }}/{{ p.id }}">Delete</button></td>
-            </tr>
-            {% endfor %}
+            <tr><td colspan="7" style="text-align:center" data-i18n="common.loading">Loading...</td></tr>
         </tbody>
     </table>
 </div>
-<div class="pagination">
-    {% if page > 1 %}<a href="?source={{ source }}&page={{ page - 1 }}">&laquo; Prev</a>{% endif %}
-    {% if page < total_pages %}<a href="?source={{ source }}&page={{ page + 1 }}">Next &raquo;</a>{% endif %}
+
+<div class="pagination" id="problems-pagination"></div>
+
+<div class="modal-overlay" id="problem-detail-modal">
+    <div class="modal detail-modal">
+        <div class="modal-header">
+            <h2 id="detail-title">Problem Detail</h2>
+            <button class="btn btn-sm btn-close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="detail-meta">
+                <span id="detail-source-id"></span>
+                <span id="detail-difficulty"></span>
+            </div>
+            <div class="detail-content markdown-body" id="detail-content"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-close-modal" data-i18n="common.close">Close</button>
+        </div>
+    </div>
 </div>
 {% endblock %}

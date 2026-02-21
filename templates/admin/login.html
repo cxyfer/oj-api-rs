@@ -8,17 +8,33 @@
 </head>
 <body class="login-body">
     <div class="login-card">
-        <h1>OJ API Admin</h1>
+        <h1 data-i18n="login.title">OJ API Admin</h1>
         {% if !error.is_empty() %}
         <div class="alert alert-danger">{{ error }}</div>
         {% endif %}
         <form method="POST" action="/admin/login">
             <div class="form-group">
-                <label for="secret">Admin Secret</label>
+                <label for="secret" data-i18n="login.secret_label">Admin Secret</label>
                 <input type="password" id="secret" name="secret" required autofocus>
             </div>
-            <button type="submit" class="btn btn-primary btn-block">Login</button>
+            <button type="submit" class="btn btn-primary btn-block" data-i18n="login.button">Login</button>
         </form>
+        
+        <div style="margin-top: 1.5rem; text-align: center; font-size: 0.85rem;">
+            <a href="#" onclick="i18n.cycleLanguage(); return false;" style="color: var(--color-muted); text-decoration: none;">
+                <span data-i18n="common.language">Language</span>:
+                <span id="current-lang-display">English</span>
+            </a>
+        </div>
     </div>
+    <script src="/static/i18n.js"></script>
+    <script>
+        document.addEventListener('languageChanged', function(e) {
+            var display = 'English';
+            if (e.detail === 'zh-TW') display = '繁體中文';
+            if (e.detail === 'zh-CN') display = '简体中文';
+            document.getElementById('current-lang-display').textContent = display;
+        });
+    </script>
 </body>
 </html>

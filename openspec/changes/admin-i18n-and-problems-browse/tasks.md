@@ -14,7 +14,7 @@
 
 - [x] 2.1 Create `static/i18n/en.json` with all translation keys (nav.*, problems.*, modal.*, common.*)
 - [x] 2.2 Create `static/i18n/zh-TW.json` with Traditional Chinese translations
-- [ ] 2.3 Create `static/i18n/zh-CN.json` with Simplified Chinese translations
+- [x] 2.3 Create `static/i18n/zh-CN.json` with Simplified Chinese translations
 - [x] 2.4 Add inline script in `templates/base.html` `<head>` to synchronously load locale from localStorage
 - [x] 2.5 Add language switcher dropdown in `templates/base.html` navigation bar
 - [x] 2.6 Implement i18n loader function in `static/admin.js` (loadLocale, applyTranslations)
@@ -22,12 +22,12 @@
 
 ## 3. Frontend - Template i18n Attributes
 
-- [ ] 3.1 Add `data-i18n` attributes to all text in `templates/base.html`
-- [ ] 3.2 Add `data-i18n` attributes to all text in `templates/admin/index.html`
-- [ ] 3.3 Add `data-i18n` attributes to all text in `templates/admin/problems.html`
-- [ ] 3.4 Add `data-i18n` attributes to all text in `templates/admin/tokens.html`
-- [ ] 3.5 Add `data-i18n` attributes to all text in `templates/admin/crawlers.html`
-- [ ] 3.6 Add `data-i18n` attributes to all text in `templates/admin/login.html`
+- [x] 3.1 Add `data-i18n` attributes to all text in `templates/base.html`
+- [x] 3.2 Add `data-i18n` attributes to all text in `templates/admin/index.html`
+- [x] 3.3 Add `data-i18n` attributes to all text in `templates/admin/problems.html`
+- [x] 3.4 Add `data-i18n` attributes to all text in `templates/admin/tokens.html`
+- [x] 3.5 Add `data-i18n` attributes to all text in `templates/admin/crawlers.html`
+- [x] 3.6 Add `data-i18n` attributes to all text in `templates/admin/login.html`
 
 ## 4. Frontend - Problems Page Source Tabs
 

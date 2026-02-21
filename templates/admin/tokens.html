@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}API Tokens{% endblock %}
 {% block content %}
-<h1>API Tokens</h1>
+<h1 data-i18n="tokens.title">API Tokens</h1>
 
 <div class="toggle-row">
     <div>
-        <div class="label">Token Authentication</div>
-        <div class="sublabel">When disabled, API endpoints are publicly accessible</div>
+        <div class="label" data-i18n="tokens.auth_label">Token Authentication</div>
+        <div class="sublabel" data-i18n="tokens.auth_sublabel">When disabled, API endpoints are publicly accessible</div>
     </div>
     <label class="switch">
         <input type="checkbox" id="token-auth-toggle" {% if token_auth_enabled %}checked{% endif %}>
@@ -17,10 +17,10 @@
 <div class="card" style="margin-bottom:1rem;padding:1rem 1.25rem">
     <div class="inline-form">
         <div class="form-group">
-            <label for="token-label">Label (optional)</label>
-            <input type="text" id="token-label" placeholder="e.g. my-bot">
+            <label for="token-label" data-i18n="tokens.create_label">Label (optional)</label>
+            <input type="text" id="token-label" data-i18n-placeholder="tokens.create_placeholder" placeholder="e.g. my-bot">
         </div>
-        <button class="btn btn-primary" id="create-token-btn">Generate Token</button>
+        <button class="btn btn-primary" id="create-token-btn" data-i18n="tokens.generate">Generate Token</button>
     </div>
 </div>
 
@@ -28,12 +28,12 @@
     <table id="tokens-table">
         <thead>
             <tr>
-                <th>Token</th>
-                <th>Label</th>
-                <th>Created</th>
-                <th>Last Used</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th data-i18n="tokens.table.token">Token</th>
+                <th data-i18n="tokens.table.label">Label</th>
+                <th data-i18n="tokens.table.created">Created</th>
+                <th data-i18n="tokens.table.last_used">Last Used</th>
+                <th data-i18n="common.status">Status</th>
+                <th data-i18n="common.actions">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -43,8 +43,14 @@
                 <td>{{ t.label.as_deref().unwrap_or("-") }}</td>
                 <td>{{ t.created_at }}</td>
                 <td>{% match t.last_used_at %}{% when Some with (ts) %}{{ ts }}{% when None %}-{% endmatch %}</td>
-                <td>{% if t.is_active == 1 %}<span class="badge badge-active">Active</span>{% else %}<span class="badge badge-revoked">Revoked</span>{% endif %}</td>
-                <td>{% if t.is_active == 1 %}<button class="btn btn-danger btn-sm btn-revoke">Revoke</button>{% endif %}</td>
+                <td>
+                    {% if t.is_active == 1 %}
+                    <span class="badge badge-active" data-i18n="common.active">Active</span>
+                    {% else %}
+                    <span class="badge badge-revoked" data-i18n="common.revoked">Revoked</span>
+                    {% endif %}
+                </td>
+                <td>{% if t.is_active == 1 %}<button class="btn btn-danger btn-sm btn-revoke" data-i18n="common.revoke">Revoke</button>{% endif %}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -53,12 +59,12 @@
 
 <div class="modal-overlay" id="token-modal">
     <div class="modal">
-        <h2>Token Created</h2>
-        <p style="font-size:0.85rem;color:var(--color-muted);margin-bottom:0.75rem">Copy this token now. It will not be shown again.</p>
+        <h2 data-i18n="tokens.modal.title">Token Created</h2>
+        <p style="font-size:0.85rem;color:var(--color-muted);margin-bottom:0.75rem" data-i18n="tokens.modal.warning">Copy this token now. It will not be shown again.</p>
         <div class="token-display"></div>
         <div class="actions">
-            <button class="btn btn-primary btn-copy">Copy</button>
-            <button class="btn btn-close-modal" style="background:rgba(255,255,255,0.1)">Close</button>
+            <button class="btn btn-primary btn-copy" data-i18n="common.copy">Copy</button>
+            <button class="btn btn-close-modal" style="background:rgba(255,255,255,0.1)" data-i18n="common.close">Close</button>
         </div>
     </div>
 </div>

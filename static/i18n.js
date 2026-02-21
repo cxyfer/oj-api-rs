@@ -74,10 +74,30 @@
             this.loadTranslations(lang);
         },
 
+        /**
+         * 取得目前語言
+         */
+        getLanguage: function() {
+            return this.currentLang;
+        },
+
+        /**
+         * 循環切換語言 (en -> zh-TW -> zh-CN -> en)
+         */
+        cycleLanguage: function() {
+            var langs = ['en', 'zh-TW', 'zh-CN'];
+            var idx = langs.indexOf(this.currentLang);
+            var nextIdx = (idx + 1) % langs.length;
+            this.setLanguage(langs[nextIdx]);
+        },
+
         init: function() {
             var self = this;
+            // 立即嘗試載入，不一定要等 DOMContentLoaded
+            self.loadTranslations(self.currentLang);
+            
             document.addEventListener('DOMContentLoaded', function() {
-                self.loadTranslations(self.currentLang);
+                self.applyTranslations();
             });
         }
     };

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Crawlers{% endblock %}
 {% block content %}
-<h1>Crawlers</h1>
+<h1 data-i18n="crawlers.title">Crawlers</h1>
 
 <div class="card" style="margin-bottom:1rem;padding:1rem 1.25rem">
     <div class="crawler-control">
         <div class="form-group">
-            <label>Source</label>
+            <label data-i18n="crawlers.control.source">Source</label>
             <div class="source-btn-group">
                 <button class="btn source-btn active" data-source="leetcode">LeetCode</button>
                 <button class="btn source-btn" data-source="atcoder">AtCoder</button>
@@ -14,22 +14,22 @@
             </div>
         </div>
         <div class="form-group">
-            <label>Arguments</label>
+            <label data-i18n="crawlers.control.args">Arguments</label>
             <div id="crawler-args-options" class="args-grid"></div>
         </div>
-        <button class="btn btn-primary" id="crawler-trigger-btn"{% if is_running %} disabled{% endif %}>Trigger</button>
+        <button class="btn btn-primary" id="crawler-trigger-btn"{% if is_running %} disabled{% endif %} data-i18n="crawlers.control.trigger">Trigger</button>
     </div>
 </div>
 
 <div class="card status-card" id="crawler-status-card" style="margin-bottom:1rem{% if !is_running %};display:none{% endif %}">
     {% if is_running %}
     {% match current_job %}{% when Some with (job) %}
-    <div class="status-header running">Running</div>
+    <div class="status-header running" data-i18n="crawlers.status.running">Running</div>
     <div class="status-details">
-        <span><strong>Job:</strong> {{ job.job_id }}</span>
-        <span><strong>Source:</strong> {{ job.source }}</span>
-        <span><strong>Args:</strong> {{ job.args.join(" ") }}</span>
-        <span><strong>Started:</strong> {{ job.started_at }}</span>
+        <span><strong data-i18n="crawlers.status.job">Job</strong>: {{ job.job_id }}</span>
+        <span><strong data-i18n="crawlers.status.source">Source</strong>: {{ job.source }}</span>
+        <span><strong data-i18n="crawlers.status.args">Args</strong>: {{ job.args.join(" ") }}</span>
+        <span><strong data-i18n="crawlers.status.started">Started</strong>: {{ job.started_at }}</span>
     </div>
     {% when None %}{% endmatch %}
     {% endif %}
@@ -39,13 +39,13 @@
     <table id="crawler-history-table">
         <thead>
             <tr>
-                <th>Source</th>
-                <th>Args</th>
-                <th>Trigger</th>
-                <th>Started</th>
-                <th>Finished</th>
-                <th>Status</th>
-                <th>Logs</th>
+                <th data-i18n="crawlers.control.source">Source</th>
+                <th data-i18n="crawlers.control.args">Args</th>
+                <th data-i18n="crawlers.history_table.trigger">Trigger</th>
+                <th data-i18n="crawlers.status.started">Started</th>
+                <th data-i18n="crawlers.status.finished">Finished</th>
+                <th data-i18n="common.status">Status</th>
+                <th data-i18n="crawlers.history_table.logs">Logs</th>
             </tr>
         </thead>
         <tbody>
@@ -61,7 +61,7 @@
                 </td>
                 <td>
                     {% if job.status.to_string() != "running" %}
-                    <button class="btn btn-sm btn-view-log" data-job-id="{{ job.job_id }}">View</button>
+                    <button class="btn btn-sm btn-view-log" data-job-id="{{ job.job_id }}" data-i18n="common.view">View</button>
                     {% else %}-{% endif %}
                 </td>
             </tr>
@@ -73,7 +73,7 @@
 <div class="modal-overlay" id="log-modal">
     <div class="modal log-modal">
         <div class="modal-header">
-            <h2>Job Output</h2>
+            <h2 data-i18n="crawlers.modal.title">Job Output</h2>
             <button class="btn btn-sm btn-close-log">&times;</button>
         </div>
         <div class="log-tabs">

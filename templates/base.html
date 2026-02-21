@@ -14,9 +14,9 @@
         <a href="/admin/crawlers" data-i18n="nav.crawlers">Crawlers</a>
         <a href="/admin/tokens" data-i18n="nav.tokens">Tokens</a>
         <div class="spacer"></div>
-        <a href="#" onclick="i18n.setLanguage(i18n.getCurrentLanguage() === 'en' ? 'zh-TW' : 'en'); return false;" id="lang-toggle">
+        <a href="#" onclick="i18n.cycleLanguage(); return false;" id="lang-toggle">
             <span data-i18n="common.language">Language</span>:
-            <span id="current-lang-display">EN</span>
+            <span id="current-lang-display">English</span>
         </a>
         <a href="#" id="logout-btn" data-i18n="nav.logout">Logout</a>
     </nav>
@@ -28,7 +28,10 @@
     <script src="/static/admin.js" defer></script>
     <script>
         document.addEventListener('languageChanged', function(e) {
-            document.getElementById('current-lang-display').textContent = e.detail === 'en' ? 'English' : '繁體中文';
+            var display = 'English';
+            if (e.detail === 'zh-TW') display = '繁體中文';
+            if (e.detail === 'zh-CN') display = '简体中文';
+            document.getElementById('current-lang-display').textContent = display;
         });
     </script>
 </body>
