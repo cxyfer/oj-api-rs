@@ -176,6 +176,7 @@ pub enum ValueType {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub struct ArgSpec {
     pub flag: &'static str,
     pub arity: u8,

@@ -91,6 +91,7 @@ pub struct ProblemsPageQuery {
 
 #[derive(Template)]
 #[template(path = "admin/problems.html")]
+#[allow(dead_code)]
 struct ProblemsTemplate {
     source: String,
     problems: Vec<ProblemSummary>,
