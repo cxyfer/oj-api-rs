@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
-<h1>Dashboard</h1>
+<h1 data-i18n="dashboard.title">Dashboard</h1>
 <div class="stats-grid">
     <a class="stat-card" href="/admin/problems">
-        <div class="label">Total Problems</div>
+        <div class="label" data-i18n="dashboard.total_problems">Total Problems</div>
         <div class="value">{{ total_problems }}</div>
     </a>
     <a class="stat-card" href="/admin/tokens">
-        <div class="label">Active Tokens</div>
+        <div class="label" data-i18n="dashboard.active_tokens">Active Tokens</div>
         <div class="value">{{ active_tokens }}</div>
     </a>
     <a class="stat-card" href="/admin/tokens">
-        <div class="label">Token Auth</div>
-        <div class="value {% if token_auth_enabled %}success{% else %}danger{% endif %}">{% if token_auth_enabled %}Enabled{% else %}Disabled{% endif %}</div>
+        <div class="label" data-i18n="dashboard.token_auth">Token Auth</div>
+        <div class="value {% if token_auth_enabled %}success{% else %}danger{% endif %}" data-i18n="dashboard.{% if token_auth_enabled %}enabled{% else %}disabled{% endif %}">{% if token_auth_enabled %}Enabled{% else %}Disabled{% endif %}</div>
     </a>
 </div>
 {% endblock %}

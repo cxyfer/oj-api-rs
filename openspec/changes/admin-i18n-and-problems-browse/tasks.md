@@ -12,13 +12,13 @@
 
 ## 2. Frontend - i18n Infrastructure
 
-- [ ] 2.1 Create `static/i18n/en.json` with all translation keys (nav.*, problems.*, modal.*, common.*)
-- [ ] 2.2 Create `static/i18n/zh-TW.json` with Traditional Chinese translations
+- [x] 2.1 Create `static/i18n/en.json` with all translation keys (nav.*, problems.*, modal.*, common.*)
+- [x] 2.2 Create `static/i18n/zh-TW.json` with Traditional Chinese translations
 - [ ] 2.3 Create `static/i18n/zh-CN.json` with Simplified Chinese translations
-- [ ] 2.4 Add inline script in `templates/base.html` `<head>` to synchronously load locale from localStorage
-- [ ] 2.5 Add language switcher dropdown in `templates/base.html` navigation bar
-- [ ] 2.6 Implement i18n loader function in `static/admin.js` (loadLocale, applyTranslations)
-- [ ] 2.7 Implement language switcher event handler in `static/admin.js`
+- [x] 2.4 Add inline script in `templates/base.html` `<head>` to synchronously load locale from localStorage
+- [x] 2.5 Add language switcher dropdown in `templates/base.html` navigation bar
+- [x] 2.6 Implement i18n loader function in `static/admin.js` (loadLocale, applyTranslations)
+- [x] 2.7 Implement language switcher event handler in `static/admin.js`
 
 ## 3. Frontend - Template i18n Attributes
 

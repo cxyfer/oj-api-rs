@@ -9,17 +9,27 @@
 <body>
     <nav>
         <a class="brand" href="/admin/">OJ API</a>
-        <a href="/admin/">Dashboard</a>
-        <a href="/admin/problems">Problems</a>
-        <a href="/admin/crawlers">Crawlers</a>
-        <a href="/admin/tokens">Tokens</a>
+        <a href="/admin/" data-i18n="nav.dashboard">Dashboard</a>
+        <a href="/admin/problems" data-i18n="nav.problems">Problems</a>
+        <a href="/admin/crawlers" data-i18n="nav.crawlers">Crawlers</a>
+        <a href="/admin/tokens" data-i18n="nav.tokens">Tokens</a>
         <div class="spacer"></div>
-        <a href="#" id="logout-btn">Logout</a>
+        <a href="#" onclick="i18n.setLanguage(i18n.getCurrentLanguage() === 'en' ? 'zh-TW' : 'en'); return false;" id="lang-toggle">
+            <span data-i18n="common.language">Language</span>:
+            <span id="current-lang-display">EN</span>
+        </a>
+        <a href="#" id="logout-btn" data-i18n="nav.logout">Logout</a>
     </nav>
     <div class="container">
         {% block content %}{% endblock %}
     </div>
     <div id="toast-container"></div>
+    <script src="/static/i18n.js"></script>
     <script src="/static/admin.js" defer></script>
+    <script>
+        document.addEventListener('languageChanged', function(e) {
+            document.getElementById('current-lang-display').textContent = e.detail === 'en' ? 'English' : '繁體中文';
+        });
+    </script>
 </body>
 </html>

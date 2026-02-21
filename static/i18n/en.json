@@ -1,0 +1,22 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "problems": "Problems",
+    "crawlers": "Crawlers",
+    "tokens": "Tokens",
+    "logout": "Logout"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome to the Online Judge API Admin Panel.",
+    "total_problems": "Total Problems",
+    "active_tokens": "Active Tokens",
+    "token_auth": "Token Auth",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  },
+  "common": {
+    "language": "Language",
+    "loading": "Loading..."
+  }
+}
