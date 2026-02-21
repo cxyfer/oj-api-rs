@@ -6,10 +6,10 @@
 <div class="card" style="margin-bottom:1rem;padding:1rem 1.25rem">
     <div class="form-group">
         <label data-i18n="common.source">Source</label>
-        <div class="source-btn-group" id="problem-source-btns">
-            <button class="btn source-btn{% if source == 'leetcode' %} active{% endif %}" data-source="leetcode" data-i18n="problems.sources.leetcode">LeetCode</button>
-            <button class="btn source-btn{% if source == 'atcoder' %} active{% endif %}" data-source="atcoder" data-i18n="problems.sources.atcoder">AtCoder</button>
-            <button class="btn source-btn{% if source == 'codeforces' %} active{% endif %}" data-source="codeforces" data-i18n="problems.sources.codeforces">Codeforces</button>
+        <div class="source-btn-group" id="problem-source-btns" role="tablist" aria-label="Problem sources">
+            <button class="btn source-btn{% if source == 'leetcode' %} active{% endif %}" data-source="leetcode" data-i18n="problems.sources.leetcode" role="tab" aria-selected="{% if source == 'leetcode' %}true{% else %}false{% endif %}" aria-controls="problems-table">LeetCode</button>
+            <button class="btn source-btn{% if source == 'atcoder' %} active{% endif %}" data-source="atcoder" data-i18n="problems.sources.atcoder" role="tab" aria-selected="{% if source == 'atcoder' %}true{% else %}false{% endif %}" aria-controls="problems-table">AtCoder</button>
+            <button class="btn source-btn{% if source == 'codeforces' %} active{% endif %}" data-source="codeforces" data-i18n="problems.sources.codeforces" role="tab" aria-selected="{% if source == 'codeforces' %}true{% else %}false{% endif %}" aria-controls="problems-table">Codeforces</button>
         </div>
     </div>
 </div>
@@ -42,10 +42,10 @@
 <div class="pagination" id="problems-pagination"></div>
 
 <div class="modal-overlay" id="problem-detail-modal">
-    <div class="modal detail-modal">
+    <div class="modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title">
         <div class="modal-header">
             <h2 id="detail-title">Problem Detail</h2>
-            <button class="btn btn-sm btn-close-modal">&times;</button>
+            <button class="btn btn-sm btn-close-modal" aria-label="Close">&times;</button>
         </div>
         <div class="modal-body">
             <div class="detail-meta">

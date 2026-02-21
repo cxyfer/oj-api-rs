@@ -65,10 +65,10 @@
 
 ## 8. Frontend - Accessibility
 
-- [ ] 8.1 Add ARIA attributes to source tabs (`role="tablist"`, `role="tab"`, `aria-selected`, `aria-controls`)
-- [ ] 8.2 Add ARIA attributes to modal (`role="dialog"`, `aria-modal="true"`, `aria-labelledby`)
+- [x] 8.1 Add ARIA attributes to source tabs (`role="tablist"`, `role="tab"`, `aria-selected`, `aria-controls`)
+- [x] 8.2 Add ARIA attributes to modal (`role="dialog"`, `aria-modal="true"`, `aria-labelledby`)
 - [ ] 8.3 Implement keyboard navigation for tabs (Tab, Enter)
-- [ ] 8.4 Implement Escape key handler for modal close
+- [x] 8.4 Implement Escape key handler for modal close
 - [ ] 8.5 Verify color contrast meets WCAG AA standards in `static/admin.css`
 - [ ] 8.6 Add focus management (trap focus in modal, restore focus on close)
 

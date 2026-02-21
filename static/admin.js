@@ -743,11 +743,13 @@
                     var newSource = this.dataset.source;
                     if (newSource === currentSource) return;
 
-                    // Update active state
+                    // Update active state and ARIA attributes
                     sourceBtns.querySelectorAll('.source-btn').forEach(function(b) {
                         b.classList.remove('active');
+                        b.setAttribute('aria-selected', 'false');
                     });
                     this.classList.add('active');
+                    this.setAttribute('aria-selected', 'true');
 
                     // Load new source
                     currentSource = newSource;
