@@ -39,8 +39,10 @@
       "codeforces": "Codeforces"
     },
     "pagination": {
-      "prev": "« Prev",
-      "next": "Next »"
+      "first": "« First",
+      "prev": "‹ Prev",
+      "next": "Next ›",
+      "last": "Last »"
     }
   },
   "tokens": {

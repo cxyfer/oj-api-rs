@@ -598,20 +598,68 @@
             var container = document.getElementById('problems-pagination');
             if (!container) return;
             container.innerHTML = '';
-            if (meta.page > 1) {
-                var prev = document.createElement('a');
-                prev.href = '#';
-                prev.innerHTML = i18n.t('problems.pagination.prev');
-                prev.onclick = function(e) { e.preventDefault(); loadProblems(currentSource, meta.page - 1); };
-                container.appendChild(prev);
+
+            if (meta.total_pages <= 1) return;
+
+            function createBtn(text, page, disabled) {
+                var btn = document.createElement('a');
+                btn.href = '#';
+                btn.textContent = text;
+                if (disabled) {
+                    btn.classList.add('disabled');
+                    btn.onclick = function(e) { e.preventDefault(); };
+                } else {
+                    btn.onclick = function(e) {
+                        e.preventDefault();
+                        currentPage = page;
+                        history.replaceState(null, '', '/admin/problems?source=' + currentSource + '&page=' + page);
+                        loadProblems(currentSource, page);
+                    };
+                }
+                return btn;
             }
-            if (meta.page < meta.total_pages) {
-                var next = document.createElement('a');
-                next.href = '#';
-                next.innerHTML = i18n.t('problems.pagination.next');
-                next.onclick = function(e) { e.preventDefault(); loadProblems(currentSource, meta.page + 1); };
-                container.appendChild(next);
+
+            // First button
+            container.appendChild(createBtn(i18n.t('problems.pagination.first'), 1, meta.page === 1));
+
+            // Prev button
+            container.appendChild(createBtn(i18n.t('problems.pagination.prev'), meta.page - 1, meta.page === 1));
+
+            // Page numbers (show max 7 buttons)
+            var start = Math.max(1, meta.page - 3);
+            var end = Math.min(meta.total_pages, meta.page + 3);
+
+            if (start > 1) {
+                container.appendChild(createBtn('1', 1, false));
+                if (start > 2) {
+                    var ellipsis = document.createElement('span');
+                    ellipsis.textContent = '...';
+                    ellipsis.style.padding = '0 0.5rem';
+                    container.appendChild(ellipsis);
+                }
             }
+
+            for (var i = start; i <= end; i++) {
+                var btn = createBtn(String(i), i, false);
+                if (i === meta.page) btn.classList.add('active');
+                container.appendChild(btn);
+            }
+
+            if (end < meta.total_pages) {
+                if (end < meta.total_pages - 1) {
+                    var ellipsis = document.createElement('span');
+                    ellipsis.textContent = '...';
+                    ellipsis.style.padding = '0 0.5rem';
+                    container.appendChild(ellipsis);
+                }
+                container.appendChild(createBtn(String(meta.total_pages), meta.total_pages, false));
+            }
+
+            // Next button
+            container.appendChild(createBtn(i18n.t('problems.pagination.next'), meta.page + 1, meta.page === meta.total_pages));
+
+            // Last button
+            container.appendChild(createBtn(i18n.t('problems.pagination.last'), meta.total_pages, meta.page === meta.total_pages));
         }
 
         // Source buttons
