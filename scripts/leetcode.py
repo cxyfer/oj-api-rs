@@ -1308,7 +1308,26 @@ async def main():
     )
     args = parser.parse_args()
 
-    client = LeetCodeClient(data_dir="data")
+    fallback_db = str((Path(__file__).resolve().parent / "../data/data.db").resolve())
+    try:
+        config = get_config()
+        config_dir = Path(config.config_path).resolve().parent
+        db_path = str((config_dir / config.database_path).resolve())
+        scripts_dir = Path(__file__).resolve().parent
+        if Path(db_path).parent == scripts_dir / "data":
+            import sys
+
+            sys.stderr.write(
+                "Warning: config database.path resolves inside scripts/data/, using fallback.\n"
+            )
+            db_path = fallback_db
+    except Exception as e:
+        import sys
+
+        sys.stderr.write(f"Warning: Failed to load config, using default db path. Error: {e}\n")
+        db_path = fallback_db
+
+    client = LeetCodeClient(data_dir="data", db_path=db_path)
 
     if args.init:
         logger.info("Initializing database...")
