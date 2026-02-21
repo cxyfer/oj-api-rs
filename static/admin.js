@@ -1,7 +1,9 @@
 (function() {
     'use strict';
 
-    function api(url, opts = {}) {
+    function api(url, opts, retries) {
+        opts = opts || {};
+        retries = retries === undefined ? 2 : retries;
         opts.credentials = 'same-origin';
         opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
         return fetch(url, opts).then(function(res) {
@@ -10,6 +12,13 @@
                 return Promise.reject(new Error('unauthorized'));
             }
             return res;
+        }).catch(function(err) {
+            if (err.message === 'unauthorized' || retries <= 0) throw err;
+            return new Promise(function(resolve) {
+                setTimeout(resolve, 1000);
+            }).then(function() {
+                return api(url, opts, retries - 1);
+            });
         });
     }
 
@@ -530,26 +539,36 @@
         var currentSource = activeBtn ? activeBtn.dataset.source : 'leetcode';
         var currentPage = 1;
 
+        function setSourceBtnsDisabled(disabled) {
+            if (!sourceBtns) return;
+            sourceBtns.querySelectorAll('.source-btn').forEach(function(b) {
+                b.disabled = disabled;
+            });
+        }
+
         function loadProblems(source, page) {
             currentSource = source || currentSource;
             currentPage = page || 1;
             var tbody = problemsTable.querySelector('tbody');
             tbody.innerHTML = '<tr><td colspan="7" style="text-align:center">' + i18n.t('common.loading') + '</td></tr>';
+            setSourceBtnsDisabled(true);
 
             api('/admin/api/problems/' + currentSource + '?page=' + currentPage + '&per_page=50')
-                .then(function(res) { 
+                .then(function(res) {
                     if (!res.ok) throw new Error('failed to load');
-                    return res.json(); 
+                    return res.json();
                 })
                 .then(function(res) {
                     renderProblems(res.data);
                     updateStats(res.meta);
                     renderPagination(res.meta);
+                    setSourceBtnsDisabled(false);
                 })
                 .catch(function(err) {
                     console.error('failed to load problems', err);
                     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--color-danger)">' + i18n.t('messages.failed_load_problems') + '</td></tr>';
                     toast(i18n.t('messages.failed_load_problems'), 'error');
+                    setSourceBtnsDisabled(false);
                 });
         }
 
@@ -662,103 +681,173 @@
             container.appendChild(createBtn(i18n.t('problems.pagination.last'), meta.total_pages, meta.page === meta.total_pages));
         }
 
-        // Source buttons
-        var sourceBtns = document.getElementById('problem-source-btns');
-        if (sourceBtns) {
-            sourceBtns.querySelectorAll('.source-btn').forEach(function(btn) {
-                btn.onclick = function() {
-                    sourceBtns.querySelectorAll('.source-btn').forEach(function(b) { b.classList.remove('active'); });
-                    btn.classList.add('active');
-                    loadProblems(btn.dataset.source, 1);
-                };
-            });
-        }
-
         // View detail
         document.addEventListener('click', function(e) {
-            if (!e.target.classList.contains('btn-view-detail')) return;
-            var source = e.target.dataset.source;
-            var id = e.target.dataset.id;
-            showProblemDetail(source, id);
+            var btn = e.target.closest('.btn-view-detail');
+            if (!btn || btn.disabled) return;
+            btn.disabled = true;
+            var source = btn.dataset.source;
+            var id = btn.dataset.id;
+            showProblemDetail(source, id).finally(function() { btn.disabled = false; });
         });
 
         function showProblemDetail(source, id) {
             var modal = document.getElementById('problem-detail-modal');
-            if (!modal) return;
-            
+            if (!modal) return Promise.resolve();
+
             var titleEl = document.getElementById('detail-title');
-            var sourceIdEl = document.getElementById('detail-source-id');
-            var difficultyEl = document.getElementById('detail-difficulty');
+            var metaEl = document.getElementById('detail-meta');
+            var fieldsEl = document.getElementById('detail-fields');
             var contentEl = document.getElementById('detail-content');
+            var linkEl = document.getElementById('detail-link');
 
             titleEl.textContent = i18n.t('common.loading');
-            sourceIdEl.textContent = '';
-            difficultyEl.textContent = '';
-            contentEl.textContent = '';
-            modal.classList.add('active');
+            metaEl.innerHTML = '';
+            fieldsEl.innerHTML = '';
+            contentEl.innerHTML = '';
+            linkEl.style.display = 'none';
+            openModal(modal);
 
-            api('/admin/api/problems/' + source + '/' + id)
-                .then(function(res) { return res.json(); })
+            return api('/admin/api/problems/' + source + '/' + id)
+                .then(function(res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.json();
+                })
                 .then(function(p) {
                     var title = p.title || '-';
-                    if (i18n.getLanguage() !== 'en' && p.title_cn) {
-                        title = p.title_cn;
-                    }
+                    if (i18n.getLanguage() !== 'en' && p.title_cn) title = p.title_cn;
                     titleEl.textContent = title;
-                    sourceIdEl.textContent = p.source + ' ' + p.id;
+
+                    // Meta: source/id + difficulty badge
+                    var metaHtml = '<span class="detail-source-id">' + esc(p.source) + ' ' + esc(p.id) + '</span>';
                     if (p.difficulty) {
-                        difficultyEl.textContent = p.difficulty;
-                        difficultyEl.className = 'badge badge-' + p.difficulty.toLowerCase();
+                        var lower = p.difficulty.toLowerCase();
+                        var dKey = 'problems.difficulty.' + lower;
+                        var dLabel = i18n.t(dKey);
+                        if (dLabel === dKey) dLabel = p.difficulty;
+                        metaHtml += ' <span class="badge badge-' + lower + '">' + dLabel + '</span>';
                     }
-                    
+                    if (p.paid_only) metaHtml += ' <span class="badge badge-paid">' + esc(i18n.t('problems.detail.paid_only')) + '</span>';
+                    metaEl.innerHTML = metaHtml;
+
+                    // Fields
+                    var rows = '';
+                    if (p.slug) rows += '<div class="detail-row"><dt>Slug</dt><dd>' + esc(p.slug) + '</dd></div>';
+                    if (p.rating) rows += '<div class="detail-row"><dt>' + esc(i18n.t('problems.table.rating')) + '</dt><dd>' + p.rating + '</dd></div>';
+                    if (p.ac_rate != null) rows += '<div class="detail-row"><dt>' + esc(i18n.t('problems.table.ac_rate')) + '</dt><dd>' + p.ac_rate.toFixed(1) + '%</dd></div>';
+                    if (p.contest) rows += '<div class="detail-row"><dt>' + esc(i18n.t('problems.detail.contest')) + '</dt><dd>' + esc(p.contest) + (p.problem_index ? ' / ' + esc(p.problem_index) : '') + '</dd></div>';
+                    if (p.category) rows += '<div class="detail-row"><dt>' + esc(i18n.t('problems.detail.category')) + '</dt><dd>' + esc(p.category) + '</dd></div>';
+                    if (p.tags && p.tags.length) {
+                        rows += '<div class="detail-row"><dt>' + esc(i18n.t('problems.detail.tags')) + '</dt><dd>' +
+                            p.tags.map(function(t) { return '<span class="detail-tag">' + esc(t) + '</span>'; }).join('') +
+                            '</dd></div>';
+                    }
+                    if (p.similar_questions && p.similar_questions.length) {
+                        rows += '<div class="detail-row"><dt>' + esc(i18n.t('problems.detail.similar')) + '</dt><dd>' +
+                            p.similar_questions.map(function(q) { return '<span class="detail-tag">' + esc(q) + '</span>'; }).join('') +
+                            '</dd></div>';
+                    }
+                    fieldsEl.innerHTML = rows;
+
+                    // Content
                     var content = p.content || '';
-                    if (i18n.getLanguage() !== 'en' && p.content_cn) {
-                        content = p.content_cn;
+                    if (i18n.getLanguage() !== 'en' && p.content_cn) content = p.content_cn;
+                    contentEl.innerHTML = content;
+
+                    // Link button
+                    if (p.link) {
+                        linkEl.href = p.link;
+                        linkEl.style.display = '';
+                    } else {
+                        linkEl.style.display = 'none';
                     }
-                    contentEl.innerHTML = content; // Assuming content might have HTML/Markdown
                 })
-                .catch(function(err) {
-                    titleEl.textContent = 'Error';
-                    contentEl.textContent = 'Failed to load problem detail';
+                .catch(function() {
+                    titleEl.textContent = i18n.t('messages.failed_load_detail');
+                    fieldsEl.innerHTML = '<p style="color:var(--color-danger)">' + esc(i18n.t('messages.failed_load_detail')) + '</p>';
                 });
+        }
+
+        // Focus trap and restore
+        var previousFocus = null;
+
+        function openModal(modal) {
+            previousFocus = document.activeElement;
+            modal.classList.add('active');
+            var firstClose = modal.querySelector('.btn-close-modal');
+            if (firstClose) firstClose.focus();
+        }
+
+        function closeModal() {
+            var modal = document.getElementById('problem-detail-modal');
+            if (modal) modal.classList.remove('active');
+            if (previousFocus) { previousFocus.focus(); previousFocus = null; }
         }
 
         // Close modal
         document.querySelectorAll('.btn-close-modal').forEach(function(btn) {
-            btn.onclick = function() {
-                document.getElementById('problem-detail-modal').classList.remove('active');
-            };
+            btn.onclick = closeModal;
         });
         var detailModal = document.getElementById('problem-detail-modal');
         if (detailModal) {
             detailModal.onclick = function(e) {
-                if (e.target === detailModal) detailModal.classList.remove('active');
+                if (e.target === detailModal) closeModal();
             };
+            // Focus trap and Escape
+            detailModal.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') { closeModal(); return; }
+                if (e.key !== 'Tab') return;
+                var dialog = detailModal.querySelector('[role="dialog"]');
+                if (!dialog) return;
+                var focusable = dialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+                if (!focusable.length) return;
+                var first = focusable[0];
+                var last = focusable[focusable.length - 1];
+                if (e.shiftKey) {
+                    if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+                } else {
+                    if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+                }
+            });
         }
 
         // Source tab click handlers
         if (sourceBtns) {
-            sourceBtns.querySelectorAll('.source-btn').forEach(function(btn) {
-                btn.addEventListener('click', function() {
-                    var newSource = this.dataset.source;
-                    if (newSource === currentSource) return;
+            var tabs = Array.prototype.slice.call(sourceBtns.querySelectorAll('.source-btn'));
 
-                    // Update active state and ARIA attributes
-                    sourceBtns.querySelectorAll('.source-btn').forEach(function(b) {
-                        b.classList.remove('active');
-                        b.setAttribute('aria-selected', 'false');
-                    });
-                    this.classList.add('active');
-                    this.setAttribute('aria-selected', 'true');
+            function activateTab(tab) {
+                var newSource = tab.dataset.source;
+                if (newSource === currentSource) return;
+                tabs.forEach(function(b) {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-selected', 'false');
+                    b.setAttribute('tabindex', '-1');
+                });
+                tab.classList.add('active');
+                tab.setAttribute('aria-selected', 'true');
+                tab.setAttribute('tabindex', '0');
+                tab.focus();
+                currentSource = newSource;
+                currentPage = 1;
+                history.replaceState(null, '', '/admin/problems?source=' + newSource);
+                loadProblems(currentSource, currentPage);
+            }
 
-                    // Load new source
-                    currentSource = newSource;
-                    currentPage = 1;
-
-                    // Update URL
-                    history.replaceState(null, '', '/admin/problems?source=' + newSource);
-
-                    loadProblems(currentSource, currentPage);
+            tabs.forEach(function(btn, idx) {
+                if (!btn.classList.contains('active')) btn.setAttribute('tabindex', '-1');
+                btn.addEventListener('click', function() { activateTab(this); });
+                btn.addEventListener('keydown', function(e) {
+                    var next;
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                        next = tabs[(idx + 1) % tabs.length];
+                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                        next = tabs[(idx - 1 + tabs.length) % tabs.length];
+                    } else if (e.key === 'Home') {
+                        next = tabs[0];
+                    } else if (e.key === 'End') {
+                        next = tabs[tabs.length - 1];
+                    }
+                    if (next) { e.preventDefault(); activateTab(next); }
                 });
             });
         }

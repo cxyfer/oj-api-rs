@@ -38,6 +38,14 @@
       "prev": "‹ 上一页",
       "next": "下一页 ›",
       "last": "最后一页 »"
+    },
+    "detail": {
+      "contest": "竞赛",
+      "category": "分类",
+      "tags": "标签",
+      "similar": "相似题目",
+      "open_link": "打开链接",
+      "paid_only": "付费"
     }
   },
   "tokens": {
@@ -139,6 +147,7 @@
     "failed_trigger_crawler": "无法启动爬虫",
     "fill_args": "请填写此参数的值：",
     "fill_year_month": "请填写此参数的年份与月份：",
-    "failed_load_output": "无法加载输出内容"
+    "failed_load_output": "无法加载输出内容",
+    "failed_load_detail": "无法加载题目详情"
   }
 }

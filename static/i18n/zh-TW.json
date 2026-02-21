@@ -43,6 +43,14 @@
       "prev": "‹ 上一頁",
       "next": "下一頁 ›",
       "last": "最後一頁 »"
+    },
+    "detail": {
+      "contest": "競賽",
+      "category": "分類",
+      "tags": "標籤",
+      "similar": "相似題目",
+      "open_link": "開啟連結",
+      "paid_only": "付費"
     }
   },
   "tokens": {
@@ -145,6 +153,7 @@
     "failed_trigger_crawler": "無法啟動爬蟲",
     "fill_args": "請填寫此參數的值：",
     "fill_year_month": "請填寫此參數的年份與月份：",
-    "failed_load_output": "無法載入輸出內容"
+    "failed_load_output": "無法載入輸出內容",
+    "failed_load_detail": "無法載入題目詳情"
   }
 }

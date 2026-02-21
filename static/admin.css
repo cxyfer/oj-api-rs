@@ -120,6 +120,7 @@ input:focus { border-color: var(--color-primary); }
 .btn-danger { background: transparent; color: var(--color-danger); border: 1px solid var(--color-danger); }
 .btn-danger:hover { background: rgba(255,23,68,0.1); }
 .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 .btn-block { width: 100%; justify-content: center; }
 
 /* Inline form */
@@ -366,6 +367,27 @@ input:focus { border-color: var(--color-primary); }
 .log-stderr { color: #ff6b6b; }
 .btn-view-log { background: rgba(255,255,255,0.08); border: 1px solid var(--color-border); }
 .btn-view-log:hover { border-color: var(--color-primary); }
+
+/* Detail modal */
+.detail-modal { max-width: 600px; width: 95%; }
+.detail-modal .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+.detail-modal .modal-header h2 { margin: 0; }
+.detail-modal .modal-body { max-height: 60vh; overflow-y: auto; }
+.detail-modal .modal-footer { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--color-border); }
+.detail-meta { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.detail-source-id { color: var(--color-muted); font-size: 0.85rem; }
+.detail-fields { margin: 0; }
+.detail-row { display: flex; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--color-border); }
+.detail-row:last-child { border-bottom: none; }
+.detail-row dt { flex-shrink: 0; width: 80px; color: var(--color-muted); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; }
+.detail-row dd { margin: 0; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.detail-tag { display: inline-block; padding: 0.1rem 0.45rem; background: rgba(255,255,255,0.08); border-radius: 3px; font-size: 0.75rem; }
+.detail-content { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--color-border); font-size: 0.85rem; line-height: 1.7; overflow-x: auto; }
+.detail-content:empty { display: none; }
+.detail-content pre { background: var(--bg-body); padding: 0.75rem; border-radius: var(--radius); overflow-x: auto; font-size: 0.8rem; }
+.detail-content code { font-family: monospace; font-size: 0.85em; }
+.detail-content img { max-width: 100%; }
+.badge-paid { background: rgba(255,171,0,0.15); color: #ffab00; }
 
 @media (max-width: 768px) {
     .source-btn-group { flex-wrap: wrap; }

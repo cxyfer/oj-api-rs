@@ -6,7 +6,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{Extension, Form, Json};
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::api::error::ProblemDetail;
 use crate::api::problems::{ListQuery, ListMeta, ListResponse, VALID_SOURCES};
@@ -15,47 +15,6 @@ use crate::models::{CrawlerJob, CrawlerSource, CrawlerStatus, CrawlerTrigger, Pr
 use crate::AppState;
 
 // Problem CRUD
-
-#[derive(Serialize)]
-struct ProblemWithoutContent {
-    id: String,
-    source: String,
-    slug: String,
-    title: Option<String>,
-    title_cn: Option<String>,
-    difficulty: Option<String>,
-    ac_rate: Option<f64>,
-    rating: Option<f64>,
-    contest: Option<String>,
-    problem_index: Option<String>,
-    tags: Vec<String>,
-    link: Option<String>,
-    category: Option<String>,
-    paid_only: Option<i32>,
-    similar_questions: Vec<String>,
-}
-
-impl From<Problem> for ProblemWithoutContent {
-    fn from(p: Problem) -> Self {
-        Self {
-            id: p.id,
-            source: p.source,
-            slug: p.slug,
-            title: p.title,
-            title_cn: p.title_cn,
-            difficulty: p.difficulty,
-            ac_rate: p.ac_rate,
-            rating: p.rating,
-            contest: p.contest,
-            problem_index: p.problem_index,
-            tags: p.tags,
-            link: p.link,
-            category: p.category,
-            paid_only: p.paid_only,
-            similar_questions: p.similar_questions,
-        }
-    }
-}
 
 #[derive(Deserialize)]
 pub struct CreateProblemRequest {
@@ -226,7 +185,7 @@ pub async fn get_problem_detail(
     .await;
 
     match result {
-        Ok(Some(problem)) => Json(ProblemWithoutContent::from(problem)).into_response(),
+        Ok(Some(problem)) => Json(problem).into_response(),
         Ok(None) => ProblemDetail::not_found("problem not found").into_response(),
         Err(_) => ProblemDetail::internal("database error").into_response(),
     }

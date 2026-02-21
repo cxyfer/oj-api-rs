@@ -43,6 +43,14 @@
       "prev": "‹ Prev",
       "next": "Next ›",
       "last": "Last »"
+    },
+    "detail": {
+      "contest": "Contest",
+      "category": "Category",
+      "tags": "Tags",
+      "similar": "Similar",
+      "open_link": "Open Link",
+      "paid_only": "Premium"
     }
   },
   "tokens": {
@@ -145,6 +153,7 @@
     "failed_trigger_crawler": "Failed to trigger crawler",
     "fill_args": "Please fill value for ",
     "fill_year_month": "Please fill year and month for ",
-    "failed_load_output": "Failed to load output"
+    "failed_load_output": "Failed to load output",
+    "failed_load_detail": "Failed to load problem detail"
   }
 }
