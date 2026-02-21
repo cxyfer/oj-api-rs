@@ -14,24 +14,8 @@
             </div>
         </div>
         <div class="form-group">
-            <label>Action</label>
-            <div class="action-radio-group">
-                <label class="action-radio"><input type="radio" name="crawler-action" value="daily" checked> Daily</label>
-                <label class="action-radio"><input type="radio" name="crawler-action" value="date"> Date</label>
-                <label class="action-radio"><input type="radio" name="crawler-action" value="init"> Init</label>
-                <label class="action-radio"><input type="radio" name="crawler-action" value="monthly"> Monthly</label>
-            </div>
-        </div>
-        <div class="form-group date-input-wrapper" style="display:none">
-            <label for="crawler-date">Date</label>
-            <input type="date" id="crawler-date">
-        </div>
-        <div class="form-group monthly-input-wrapper" style="display:none">
-            <label>Year / Month</label>
-            <div style="display:flex;gap:0.5rem">
-                <input type="number" id="crawler-year" placeholder="2024" min="2000" max="2100" style="width:100px">
-                <input type="number" id="crawler-month" placeholder="1" min="1" max="12" style="width:80px">
-            </div>
+            <label>Arguments</label>
+            <div id="crawler-args-options" class="args-grid"></div>
         </div>
         <button class="btn btn-primary" id="crawler-trigger-btn"{% if is_running %} disabled{% endif %}>Trigger</button>
     </div>
@@ -61,6 +45,7 @@
                 <th>Started</th>
                 <th>Finished</th>
                 <th>Status</th>
+                <th>Logs</th>
             </tr>
         </thead>
         <tbody>
@@ -74,9 +59,31 @@
                 <td>
                     <span class="badge badge-crawler-{{ job.status }}">{{ job.status }}</span>
                 </td>
+                <td>
+                    {% if job.status.to_string() != "running" %}
+                    <button class="btn btn-sm btn-view-log" data-job-id="{{ job.job_id }}">View</button>
+                    {% else %}-{% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+</div>
+
+<div class="modal-overlay" id="log-modal">
+    <div class="modal log-modal">
+        <div class="modal-header">
+            <h2>Job Output</h2>
+            <button class="btn btn-sm btn-close-log">&times;</button>
+        </div>
+        <div class="log-tabs">
+            <button class="btn btn-sm log-tab active" data-tab="stdout">stdout</button>
+            <button class="btn btn-sm log-tab" data-tab="stderr">stderr</button>
+        </div>
+        <div class="log-content">
+            <pre id="log-stdout" class="log-pre"></pre>
+            <pre id="log-stderr" class="log-pre log-stderr" style="display:none"></pre>
+        </div>
+    </div>
 </div>
 {% endblock %}

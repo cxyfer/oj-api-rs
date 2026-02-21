@@ -94,6 +94,37 @@ pub struct CrawlerJob {
     pub started_at: String,
     pub finished_at: Option<String>,
     pub status: CrawlerStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stdout: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stderr: Option<String>,
+}
+
+const MAX_OUTPUT_BYTES: usize = 64 * 1024;
+
+impl CrawlerJob {
+    pub fn set_output(&mut self, stdout: Vec<u8>, stderr: Vec<u8>) {
+        self.stdout = if stdout.is_empty() {
+            None
+        } else {
+            let s = if stdout.len() > MAX_OUTPUT_BYTES {
+                String::from_utf8_lossy(&stdout[stdout.len() - MAX_OUTPUT_BYTES..]).into_owned()
+            } else {
+                String::from_utf8_lossy(&stdout).into_owned()
+            };
+            Some(s)
+        };
+        self.stderr = if stderr.is_empty() {
+            None
+        } else {
+            let s = if stderr.len() > MAX_OUTPUT_BYTES {
+                String::from_utf8_lossy(&stderr[stderr.len() - MAX_OUTPUT_BYTES..]).into_owned()
+            } else {
+                String::from_utf8_lossy(&stderr).into_owned()
+            };
+            Some(s)
+        };
+    }
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -132,58 +163,180 @@ impl std::fmt::Display for CrawlerTrigger {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum CrawlerAction {
+// Per-source argument validation
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ValueType {
     None,
-    Daily,
-    Date(String),
-    Init,
-    Monthly(u16, u8),
+    Date,
+    Int,
+    Float,
+    Str,
+    YearMonth,
 }
 
-impl CrawlerAction {
-    pub fn parse(args: &[String]) -> Result<Self, String> {
-        if args.is_empty() {
-            return Ok(Self::None);
-        }
-        match args[0].as_str() {
-            "--daily" if args.len() == 1 => Ok(Self::Daily),
-            "--init" if args.len() == 1 => Ok(Self::Init),
-            "--date" if args.len() == 2 => {
-                let date = &args[1];
-                let re = regex::Regex::new(r"^\d{4}-\d{2}-\d{2}$").unwrap();
-                if !re.is_match(date) {
-                    return Err("invalid date format, expected YYYY-MM-DD".into());
-                }
-                if chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_err() {
-                    return Err("invalid calendar date".into());
-                }
-                Ok(Self::Date(date.clone()))
-            }
-            "--monthly" if args.len() == 3 => {
-                let year: u16 = args[1].parse().map_err(|_| "invalid year")?;
-                let month: u8 = args[2].parse().map_err(|_| "invalid month")?;
-                if !(2000..=2100).contains(&year) {
-                    return Err("year must be between 2000 and 2100".into());
-                }
-                if !(1..=12).contains(&month) {
-                    return Err("month must be between 1 and 12".into());
-                }
-                Ok(Self::Monthly(year, month))
-            }
-            other => Err(format!("unknown or malformed argument: {}", other)),
+#[derive(Debug, Clone, Copy)]
+pub struct ArgSpec {
+    pub flag: &'static str,
+    pub arity: u8,
+    pub value_type: ValueType,
+    pub ui_exposed: bool,
+}
+
+pub static LEETCODE_ARGS: &[ArgSpec] = &[
+    ArgSpec { flag: "--init", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--full", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--daily", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--date", arity: 1, value_type: ValueType::Date, ui_exposed: true },
+    ArgSpec { flag: "--monthly", arity: 2, value_type: ValueType::YearMonth, ui_exposed: true },
+    ArgSpec { flag: "--fill-missing-content", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--fill-missing-content-workers", arity: 1, value_type: ValueType::Int, ui_exposed: true },
+    ArgSpec { flag: "--missing-content-stats", arity: 0, value_type: ValueType::None, ui_exposed: true },
+];
+
+pub static ATCODER_ARGS: &[ArgSpec] = &[
+    ArgSpec { flag: "--sync-kenkoooo", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--sync-history", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--fetch-all", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--resume", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--contest", arity: 1, value_type: ValueType::Str, ui_exposed: true },
+    ArgSpec { flag: "--status", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--fill-missing-content", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--missing-content-stats", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--reprocess-content", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--rate-limit", arity: 1, value_type: ValueType::Float, ui_exposed: true },
+    ArgSpec { flag: "--data-dir", arity: 1, value_type: ValueType::Str, ui_exposed: false },
+    ArgSpec { flag: "--db-path", arity: 1, value_type: ValueType::Str, ui_exposed: false },
+];
+
+pub static CODEFORCES_ARGS: &[ArgSpec] = &[
+    ArgSpec { flag: "--sync-problemset", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--fetch-all", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--resume", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--contest", arity: 1, value_type: ValueType::Int, ui_exposed: true },
+    ArgSpec { flag: "--status", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--fill-missing-content", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--missing-content-stats", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--missing-problems", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--reprocess-content", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--include-gym", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec { flag: "--rate-limit", arity: 1, value_type: ValueType::Float, ui_exposed: true },
+    ArgSpec { flag: "--data-dir", arity: 1, value_type: ValueType::Str, ui_exposed: false },
+    ArgSpec { flag: "--db-path", arity: 1, value_type: ValueType::Str, ui_exposed: false },
+];
+
+#[derive(Debug, Clone, Copy)]
+pub enum CrawlerSource {
+    LeetCode,
+    AtCoder,
+    Codeforces,
+}
+
+impl CrawlerSource {
+    pub fn parse(s: &str) -> Result<Self, String> {
+        match s {
+            "leetcode" => Ok(Self::LeetCode),
+            "atcoder" => Ok(Self::AtCoder),
+            "codeforces" => Ok(Self::Codeforces),
+            _ => Err(format!("invalid source: {}", s)),
         }
     }
 
-    pub fn to_args(&self) -> Vec<String> {
+    pub fn script_name(&self) -> &'static str {
         match self {
-            Self::None => vec![],
-            Self::Daily => vec!["--daily".into()],
-            Self::Date(d) => vec!["--date".into(), d.clone()],
-            Self::Init => vec!["--init".into()],
-            Self::Monthly(y, m) => vec!["--monthly".into(), y.to_string(), m.to_string()],
+            Self::LeetCode => "leetcode.py",
+            Self::AtCoder => "atcoder.py",
+            Self::Codeforces => "codeforces.py",
         }
     }
+
+    pub fn arg_specs(&self) -> &'static [ArgSpec] {
+        match self {
+            Self::LeetCode => LEETCODE_ARGS,
+            Self::AtCoder => ATCODER_ARGS,
+            Self::Codeforces => CODEFORCES_ARGS,
+        }
+    }
+}
+
+pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<String>, String> {
+    let specs = source.arg_specs();
+    let mut seen = std::collections::HashSet::new();
+    let mut i = 0;
+
+    while i < raw_args.len() {
+        let token = &raw_args[i];
+        if !token.starts_with("--") {
+            return Err(format!("unexpected value without flag: {}", token));
+        }
+
+        let spec = specs
+            .iter()
+            .find(|s| s.flag == token)
+            .ok_or_else(|| format!("unknown argument: {}", token))?;
+
+        if !seen.insert(spec.flag) {
+            return Err(format!("duplicate argument: {}", token));
+        }
+
+        let arity = spec.arity as usize;
+        if i + arity >= raw_args.len() {
+            return Err(format!("{} requires {} value(s)", token, arity));
+        }
+
+        match spec.value_type {
+            ValueType::None => {}
+            ValueType::Date => {
+                let v = &raw_args[i + 1];
+                if chrono::NaiveDate::parse_from_str(v, "%Y-%m-%d").is_err() {
+                    return Err(format!("{}: invalid date '{}', expected YYYY-MM-DD", token, v));
+                }
+            }
+            ValueType::Int => {
+                let v = &raw_args[i + 1];
+                if v.parse::<u64>().is_err() {
+                    return Err(format!("{}: invalid integer '{}'", token, v));
+                }
+            }
+            ValueType::Float => {
+                let v = &raw_args[i + 1];
+                match v.parse::<f64>() {
+                    Ok(f) if f.is_finite() && f > 0.0 => {}
+                    _ => return Err(format!("{}: invalid positive float '{}'", token, v)),
+                }
+            }
+            ValueType::Str => {
+                let v = &raw_args[i + 1];
+                if v.is_empty() {
+                    return Err(format!("{}: value must not be empty", token));
+                }
+                if spec.flag == "--data-dir" || spec.flag == "--db-path" {
+                    if v.starts_with('/') {
+                        return Err(format!("{}: must be a relative path", token));
+                    }
+                    if v.contains("..") {
+                        return Err(format!("{}: must not contain '..'", token));
+                    }
+                }
+            }
+            ValueType::YearMonth => {
+                let yv = &raw_args[i + 1];
+                let mv = &raw_args[i + 2];
+                let year: u16 = yv.parse().map_err(|_| format!("{}: invalid year '{}'", token, yv))?;
+                let month: u8 = mv.parse().map_err(|_| format!("{}: invalid month '{}'", token, mv))?;
+                if !(2000..=2100).contains(&year) {
+                    return Err(format!("{}: year must be between 2000 and 2100", token));
+                }
+                if !(1..=12).contains(&month) {
+                    return Err(format!("{}: month must be between 1 and 12", token));
+                }
+            }
+        }
+
+        i += 1 + arity;
+    }
+
+    Ok(raw_args.to_vec())
 }
 
 pub struct DailyFallbackEntry {

@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 use crate::api::error::ProblemDetail;
 use crate::auth::{AdminSecret, AdminSessions};
-use crate::models::{CrawlerAction, CrawlerJob, CrawlerStatus, CrawlerTrigger, Problem};
+use crate::models::{CrawlerJob, CrawlerSource, CrawlerStatus, CrawlerTrigger, Problem};
 use crate::AppState;
 
 // Problem CRUD
@@ -198,17 +198,15 @@ pub async fn trigger_crawler(
     State(state): State<Arc<AppState>>,
     Json(body): Json<TriggerCrawlerRequest>,
 ) -> impl IntoResponse {
-    let valid_sources = ["leetcode", "atcoder", "codeforces"];
-    if !valid_sources.contains(&body.source.as_str()) {
-        return ProblemDetail::bad_request(format!("invalid source: {}", body.source))
-            .into_response();
-    }
+    let source = match CrawlerSource::parse(&body.source) {
+        Ok(s) => s,
+        Err(e) => return ProblemDetail::bad_request(e).into_response(),
+    };
 
-    let action = match CrawlerAction::parse(&body.args) {
+    let args = match crate::models::validate_args(&source, &body.args) {
         Ok(a) => a,
         Err(e) => return ProblemDetail::bad_request(e).into_response(),
     };
-    let args = action.to_args();
 
     let mut lock = state.crawler_lock.lock().await;
 
@@ -229,40 +227,26 @@ pub async fn trigger_crawler(
         started_at: started_at.clone(),
         finished_at: None,
         status: CrawlerStatus::Running,
+        stdout: None,
+        stderr: None,
     };
 
     *lock = Some(job.clone());
     drop(lock);
 
-    let crawler_source = body.source;
+    let script = source.script_name();
     let state_clone = state.clone();
     let timeout_secs = state.config.crawler_timeout_secs;
+    let job_id_clone = job_id.clone();
 
     tokio::spawn(async move {
-        let script = match crawler_source.as_str() {
-            "leetcode" => "leetcode.py",
-            "atcoder" => "atcoder.py",
-            "codeforces" => "codeforces.py",
-            _ => {
-                let mut lock = state_clone.crawler_lock.lock().await;
-                if let Some(ref mut job) = *lock {
-                    job.status = CrawlerStatus::Failed;
-                    job.finished_at = Some(chrono::Utc::now().to_rfc3339());
-                    let mut history = state_clone.crawler_history.lock().await;
-                    if history.len() >= 50 {
-                        history.pop_front();
-                    }
-                    history.push_back(job.clone());
-                }
-                return;
-            }
-        };
-
         let mut cmd = tokio::process::Command::new("uv");
         cmd.args(["run", "python3", script]);
         cmd.args(&args);
         cmd.current_dir("scripts/");
         cmd.kill_on_drop(true);
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
 
         let child = match cmd.spawn() {
             Ok(c) => c,
@@ -292,11 +276,38 @@ pub async fn trigger_crawler(
         if let Some(ref mut job) = *lock {
             job.finished_at = Some(chrono::Utc::now().to_rfc3339());
             match result {
-                Ok(Ok(output)) if output.status.success() => {
-                    job.status = CrawlerStatus::Completed;
-                }
-                Ok(Ok(_)) => {
-                    job.status = CrawlerStatus::Failed;
+                Ok(Ok(output)) => {
+                    // Write log files
+                    if let Err(e) = tokio::fs::create_dir_all("scripts/logs").await {
+                        tracing::warn!("failed to create scripts/logs: {}", e);
+                    }
+                    if !output.stdout.is_empty() {
+                        if let Err(e) = tokio::fs::write(
+                            format!("scripts/logs/{}.stdout.log", job_id_clone),
+                            &output.stdout,
+                        )
+                        .await
+                        {
+                            tracing::warn!("failed to write stdout log: {}", e);
+                        }
+                    }
+                    if !output.stderr.is_empty() {
+                        if let Err(e) = tokio::fs::write(
+                            format!("scripts/logs/{}.stderr.log", job_id_clone),
+                            &output.stderr,
+                        )
+                        .await
+                        {
+                            tracing::warn!("failed to write stderr log: {}", e);
+                        }
+                    }
+
+                    if output.status.success() {
+                        job.status = CrawlerStatus::Completed;
+                    } else {
+                        job.status = CrawlerStatus::Failed;
+                    }
+                    job.set_output(output.stdout, output.stderr);
                 }
                 Ok(Err(e)) => {
                     tracing::error!("crawler error: {}", e);
@@ -326,21 +337,36 @@ pub async fn crawler_status(
 ) -> impl IntoResponse {
     let lock = state.crawler_lock.lock().await;
     let history = state.crawler_history.lock().await;
-    let history_vec: Vec<_> = history.iter().rev().cloned().collect();
+    let history_vec: Vec<_> = history
+        .iter()
+        .rev()
+        .map(|j| {
+            let mut j = j.clone();
+            j.stdout = None;
+            j.stderr = None;
+            j
+        })
+        .collect();
 
     match &*lock {
         Some(job) if job.status == CrawlerStatus::Running => {
+            let mut current = job.clone();
+            current.stdout = None;
+            current.stderr = None;
             Json(serde_json::json!({
                 "running": true,
-                "current_job": job,
+                "current_job": current,
                 "history": history_vec,
             }))
             .into_response()
         }
         Some(job) => {
+            let mut last = job.clone();
+            last.stdout = None;
+            last.stderr = None;
             Json(serde_json::json!({
                 "running": false,
-                "last_job": job,
+                "last_job": last,
                 "history": history_vec,
             }))
             .into_response()
@@ -354,6 +380,46 @@ pub async fn crawler_status(
             .into_response()
         }
     }
+}
+
+pub async fn crawler_output(
+    State(state): State<Arc<AppState>>,
+    Path(job_id): Path<String>,
+) -> impl IntoResponse {
+    if uuid::Uuid::parse_str(&job_id).is_err() {
+        return ProblemDetail::bad_request("invalid job_id").into_response();
+    }
+    // Check in-memory history first
+    let found_in_memory = {
+        let history = state.crawler_history.lock().await;
+        history.iter().find(|j| j.job_id == job_id).map(|job| {
+            serde_json::json!({
+                "stdout": job.stdout,
+                "stderr": job.stderr,
+            })
+        })
+    };
+
+    if let Some(output) = found_in_memory {
+        return Json(output).into_response();
+    }
+
+    // Fallback to files
+    let stdout_path = format!("scripts/logs/{}.stdout.log", job_id);
+    let stderr_path = format!("scripts/logs/{}.stderr.log", job_id);
+
+    let stdout = tokio::fs::read_to_string(&stdout_path).await.ok();
+    let stderr = tokio::fs::read_to_string(&stderr_path).await.ok();
+
+    if stdout.is_none() && stderr.is_none() {
+        return ProblemDetail::not_found("job output not found").into_response();
+    }
+
+    Json(serde_json::json!({
+        "stdout": stdout,
+        "stderr": stderr,
+    }))
+    .into_response()
 }
 
 // Login / Logout

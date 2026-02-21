@@ -119,6 +119,8 @@ pub async fn get_daily(
     cmd.args(&args);
     cmd.current_dir("scripts/");
     cmd.kill_on_drop(true);
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::piped());
 
     let child = match cmd.spawn() {
         Ok(c) => c,
@@ -149,6 +151,7 @@ pub async fn get_daily(
     let state_clone = state.clone();
     let key_clone = key.clone();
     let timeout_secs = state.config.crawler_timeout_secs;
+    let job_id = uuid::Uuid::new_v4().to_string();
 
     tokio::spawn(async move {
         let result = tokio::time::timeout(
@@ -157,9 +160,48 @@ pub async fn get_daily(
         )
         .await;
 
-        let status = match result {
-            Ok(Ok(output)) if output.status.success() => crate::models::CrawlerStatus::Completed,
-            Ok(Ok(_)) => crate::models::CrawlerStatus::Failed,
+        let status = match &result {
+            Ok(Ok(output)) => {
+                // Write log files
+                if let Err(e) = tokio::fs::create_dir_all("scripts/logs").await {
+                    tracing::warn!("failed to create scripts/logs: {}", e);
+                }
+                if !output.stdout.is_empty() {
+                    if let Err(e) = tokio::fs::write(
+                        format!("scripts/logs/{}.stdout.log", job_id),
+                        &output.stdout,
+                    )
+                    .await
+                    {
+                        tracing::warn!("failed to write stdout log: {}", e);
+                    }
+                }
+                if !output.stderr.is_empty() {
+                    if let Err(e) = tokio::fs::write(
+                        format!("scripts/logs/{}.stderr.log", job_id),
+                        &output.stderr,
+                    )
+                    .await
+                    {
+                        tracing::warn!("failed to write stderr log: {}", e);
+                    }
+                }
+
+                let stdout_str = String::from_utf8_lossy(&output.stdout);
+                let preview: String = stdout_str.chars().take(500).collect();
+                tracing::info!(
+                    "daily fallback [{}] completed: status={}, stdout preview: {}",
+                    job_id,
+                    output.status,
+                    preview
+                );
+
+                if output.status.success() {
+                    crate::models::CrawlerStatus::Completed
+                } else {
+                    crate::models::CrawlerStatus::Failed
+                }
+            }
             Ok(Err(e)) => {
                 tracing::error!("daily fallback crawler error: {}", e);
                 crate::models::CrawlerStatus::Failed

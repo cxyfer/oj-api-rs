@@ -26,6 +26,12 @@
         }, 3000);
     }
 
+    function esc(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
     function copyToClipboard(text) {
         if (navigator.clipboard) {
             navigator.clipboard.writeText(text).then(function() {
@@ -191,51 +197,155 @@
         var crawlerPollId = null;
         var selectedSource = 'leetcode';
 
+        var CRAWLER_CONFIG = {
+            leetcode: [
+                { flag: '--init', label: 'Init', type: 'checkbox' },
+                { flag: '--full', label: 'Full', type: 'checkbox' },
+                { flag: '--daily', label: 'Daily', type: 'checkbox' },
+                { flag: '--date', label: 'Date', type: 'date', placeholder: 'YYYY-MM-DD' },
+                { flag: '--monthly', label: 'Monthly', type: 'month-year' },
+                { flag: '--fill-missing-content', label: 'Fill Missing Content', type: 'checkbox' },
+                { flag: '--fill-missing-content-workers', label: 'Content Workers', type: 'number', placeholder: 'N', step: '1' },
+                { flag: '--missing-content-stats', label: 'Content Stats', type: 'checkbox' }
+            ],
+            atcoder: [
+                { flag: '--sync-kenkoooo', label: 'Sync Kenkoooo', type: 'checkbox' },
+                { flag: '--sync-history', label: 'Sync History', type: 'checkbox' },
+                { flag: '--fetch-all', label: 'Fetch All', type: 'checkbox' },
+                { flag: '--resume', label: 'Resume', type: 'checkbox' },
+                { flag: '--contest', label: 'Contest', type: 'text', placeholder: 'Contest ID' },
+                { flag: '--status', label: 'Status', type: 'checkbox' },
+                { flag: '--fill-missing-content', label: 'Fill Missing Content', type: 'checkbox' },
+                { flag: '--missing-content-stats', label: 'Content Stats', type: 'checkbox' },
+                { flag: '--reprocess-content', label: 'Reprocess Content', type: 'checkbox' },
+                { flag: '--rate-limit', label: 'Rate Limit', type: 'number', placeholder: 'seconds', step: '0.1' }
+            ],
+            codeforces: [
+                { flag: '--sync-problemset', label: 'Sync Problemset', type: 'checkbox' },
+                { flag: '--fetch-all', label: 'Fetch All', type: 'checkbox' },
+                { flag: '--resume', label: 'Resume', type: 'checkbox' },
+                { flag: '--contest', label: 'Contest', type: 'number', placeholder: 'Contest ID', step: '1' },
+                { flag: '--status', label: 'Status', type: 'checkbox' },
+                { flag: '--fill-missing-content', label: 'Fill Missing Content', type: 'checkbox' },
+                { flag: '--missing-content-stats', label: 'Content Stats', type: 'checkbox' },
+                { flag: '--missing-problems', label: 'Missing Problems', type: 'checkbox' },
+                { flag: '--reprocess-content', label: 'Reprocess Content', type: 'checkbox' },
+                { flag: '--include-gym', label: 'Include Gym', type: 'checkbox' },
+                { flag: '--rate-limit', label: 'Rate Limit', type: 'number', placeholder: 'seconds', step: '0.1' }
+            ]
+        };
+
+        function renderArgs(source) {
+            var container = document.getElementById('crawler-args-options');
+            if (!container) return;
+            container.innerHTML = '';
+            var flags = CRAWLER_CONFIG[source] || [];
+            flags.forEach(function(f) {
+                var item = document.createElement('div');
+                item.className = 'flag-item';
+
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.dataset.flag = f.flag;
+                cb.id = 'flag-' + f.flag.replace(/^--/, '');
+
+                var lbl = document.createElement('label');
+                lbl.htmlFor = cb.id;
+                lbl.textContent = f.label;
+
+                item.appendChild(cb);
+                item.appendChild(lbl);
+
+                if (f.type === 'month-year') {
+                    var yw = document.createElement('input');
+                    yw.type = 'number';
+                    yw.className = 'flag-input';
+                    yw.placeholder = 'Year';
+                    yw.min = '2000';
+                    yw.max = '2100';
+                    yw.dataset.role = 'year';
+                    yw.disabled = true;
+
+                    var mw = document.createElement('input');
+                    mw.type = 'number';
+                    mw.className = 'flag-input';
+                    mw.placeholder = 'Month';
+                    mw.min = '1';
+                    mw.max = '12';
+                    mw.dataset.role = 'month';
+                    mw.disabled = true;
+
+                    cb.addEventListener('change', function() { yw.disabled = !cb.checked; mw.disabled = !cb.checked; });
+                    item.appendChild(yw);
+                    item.appendChild(mw);
+                } else if (f.type !== 'checkbox') {
+                    var inp = document.createElement('input');
+                    inp.type = f.type === 'date' ? 'date' : (f.type === 'number' ? 'number' : 'text');
+                    inp.className = 'flag-input';
+                    if (f.placeholder) inp.placeholder = f.placeholder;
+                    if (f.step) inp.step = f.step;
+                    inp.disabled = true;
+
+                    cb.addEventListener('change', function() { inp.disabled = !cb.checked; });
+                    item.appendChild(inp);
+                }
+
+                container.appendChild(item);
+            });
+        }
+
+        function getArgs() {
+            var args = [];
+            var container = document.getElementById('crawler-args-options');
+            if (!container) return args;
+            var items = container.querySelectorAll('.flag-item');
+            for (var i = 0; i < items.length; i++) {
+                var cb = items[i].querySelector('input[type="checkbox"]');
+                if (!cb || !cb.checked) continue;
+                var flag = cb.dataset.flag;
+                args.push(flag);
+
+                var yearInp = items[i].querySelector('[data-role="year"]');
+                if (yearInp) {
+                    var monthInp = items[i].querySelector('[data-role="month"]');
+                    if (!yearInp.value || !monthInp.value) {
+                        toast('Please fill year and month for ' + flag, 'error');
+                        return null;
+                    }
+                    args.push(yearInp.value);
+                    args.push(monthInp.value);
+                    continue;
+                }
+
+                var inp = items[i].querySelector('.flag-input');
+                if (inp) {
+                    if (!inp.value) {
+                        toast('Please fill value for ' + flag, 'error');
+                        return null;
+                    }
+                    args.push(inp.value);
+                }
+            }
+            return args;
+        }
+
         // Source selection
         document.querySelectorAll('.source-btn').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 document.querySelectorAll('.source-btn').forEach(function(b) { b.classList.remove('active'); });
                 btn.classList.add('active');
                 selectedSource = btn.dataset.source;
+                renderArgs(selectedSource);
             });
         });
 
-        // Action radio
-        var actionRadios = document.querySelectorAll('input[name="crawler-action"]');
-        var dateWrapper = document.querySelector('.date-input-wrapper');
-        var monthlyWrapper = document.querySelector('.monthly-input-wrapper');
-
-        actionRadios.forEach(function(radio) {
-            radio.addEventListener('change', function() {
-                dateWrapper.style.display = radio.value === 'date' ? '' : 'none';
-                monthlyWrapper.style.display = radio.value === 'monthly' ? '' : 'none';
-            });
-        });
-
-        function getSelectedAction() {
-            var checked = document.querySelector('input[name="crawler-action"]:checked');
-            if (!checked) return [];
-            switch (checked.value) {
-                case 'daily': return ['--daily'];
-                case 'init': return ['--init'];
-                case 'date':
-                    var d = document.getElementById('crawler-date');
-                    return d && d.value ? ['--date', d.value] : null;
-                case 'monthly':
-                    var y = document.getElementById('crawler-year');
-                    var m = document.getElementById('crawler-month');
-                    return (y && y.value && m && m.value) ? ['--monthly', y.value, m.value] : null;
-                default: return [];
-            }
-        }
+        // Initial render
+        renderArgs(selectedSource);
 
         // Trigger
         triggerBtn.addEventListener('click', function() {
-            var args = getSelectedAction();
-            if (args === null) {
-                toast('Please fill in the required fields', 'error');
-                return;
-            }
+            var args = getArgs();
+            if (args === null) return;
             triggerBtn.disabled = true;
             api('/admin/api/crawlers/trigger', {
                 method: 'POST',
@@ -312,16 +422,84 @@
             tbody.innerHTML = '';
             history.forEach(function(job) {
                 var tr = document.createElement('tr');
+                var logBtn = job.status !== 'running'
+                    ? '<button class="btn btn-sm btn-view-log" data-job-id="' + esc(job.job_id) + '">View</button>'
+                    : '-';
                 tr.innerHTML =
-                    '<td>' + job.source + '</td>' +
-                    '<td>' + (job.args || []).join(' ') + '</td>' +
-                    '<td>' + job.trigger + '</td>' +
-                    '<td>' + job.started_at + '</td>' +
-                    '<td>' + (job.finished_at || '-') + '</td>' +
-                    '<td><span class="badge badge-crawler-' + job.status + '">' + job.status + '</span></td>';
+                    '<td>' + esc(job.source) + '</td>' +
+                    '<td>' + esc((job.args || []).join(' ')) + '</td>' +
+                    '<td>' + esc(job.trigger) + '</td>' +
+                    '<td>' + esc(job.started_at) + '</td>' +
+                    '<td>' + esc(job.finished_at || '-') + '</td>' +
+                    '<td><span class="badge badge-crawler-' + esc(job.status) + '">' + esc(job.status) + '</span></td>' +
+                    '<td>' + logBtn + '</td>';
                 tbody.appendChild(tr);
             });
         }
+
+        // Log modal
+        document.addEventListener('click', function(e) {
+            if (!e.target.classList.contains('btn-view-log')) return;
+            var jobId = e.target.dataset.jobId;
+            if (!jobId) return;
+            var modal = document.getElementById('log-modal');
+            if (!modal) return;
+
+            var stdoutPre = document.getElementById('log-stdout');
+            var stderrPre = document.getElementById('log-stderr');
+            stdoutPre.textContent = 'Loading...';
+            stderrPre.textContent = '';
+            stderrPre.style.display = 'none';
+            stdoutPre.style.display = '';
+
+            // Reset tabs
+            modal.querySelectorAll('.log-tab').forEach(function(t) { t.classList.remove('active'); });
+            modal.querySelector('[data-tab="stdout"]').classList.add('active');
+
+            modal.classList.add('active');
+
+            api('/admin/api/crawlers/' + encodeURIComponent(jobId) + '/output').then(function(res) {
+                if (!res.ok) {
+                    stdoutPre.textContent = 'Failed to load output (HTTP ' + res.status + ')';
+                    return;
+                }
+                return res.json();
+            }).then(function(data) {
+                if (!data) return;
+                stdoutPre.textContent = data.stdout || '(empty)';
+                stderrPre.textContent = data.stderr || '(empty)';
+            }).catch(function() {
+                stdoutPre.textContent = 'Failed to load output';
+            });
+        });
+
+        // Log modal tabs
+        document.addEventListener('click', function(e) {
+            if (!e.target.classList.contains('log-tab')) return;
+            var tab = e.target.dataset.tab;
+            var modal = document.getElementById('log-modal');
+            if (!modal) return;
+            modal.querySelectorAll('.log-tab').forEach(function(t) { t.classList.remove('active'); });
+            e.target.classList.add('active');
+            document.getElementById('log-stdout').style.display = tab === 'stdout' ? '' : 'none';
+            document.getElementById('log-stderr').style.display = tab === 'stderr' ? '' : 'none';
+        });
+
+        // Close log modal
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-close-log')) {
+                document.getElementById('log-modal').classList.remove('active');
+            }
+            if (e.target.id === 'log-modal') {
+                e.target.classList.remove('active');
+            }
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                var modal = document.getElementById('log-modal');
+                if (modal) modal.classList.remove('active');
+            }
+        });
 
         // Auto-start polling if already running
         var statusCard = document.getElementById('crawler-status-card');

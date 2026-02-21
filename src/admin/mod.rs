@@ -44,6 +44,10 @@ pub fn admin_router() -> Router<Arc<AppState>> {
             "/admin/api/crawlers/status",
             get(handlers::crawler_status),
         )
+        .route(
+            "/admin/api/crawlers/{job_id}/output",
+            get(handlers::crawler_output),
+        )
         .route_layer(middleware::from_fn(crate::auth::admin_auth));
 
     public.merge(protected)
