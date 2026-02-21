@@ -41,27 +41,27 @@
 
 ## 5. Frontend - Problem Detail Modal
 
-- [ ] 5.1 Add modal HTML structure in `templates/admin/problems.html` (reuse `.modal-overlay` pattern)
-- [ ] 5.2 Add "View" button in Actions column of problems table
-- [ ] 5.3 Add CSS styles for detail modal in `static/admin.css`
-- [ ] 5.4 Implement modal open handler in `static/admin.js`
-- [ ] 5.5 Implement AJAX detail fetch function with loading/error states
-- [ ] 5.6 Implement modal content render function (display tags, link, summary fields)
-- [ ] 5.7 Implement modal close handlers (X button, backdrop click, Escape key)
+- [x] 5.1 Add modal HTML structure in `templates/admin/problems.html` (reuse `.modal-overlay` pattern)
+- [x] 5.2 Add "View" button in Actions column of problems table
+- [x] 5.3 Add CSS styles for detail modal in `static/admin.css`
+- [x] 5.4 Implement modal open handler in `static/admin.js`
+- [x] 5.5 Implement AJAX detail fetch function with loading/error states
+- [x] 5.6 Implement modal content render function (display tags, link, summary fields)
+- [x] 5.7 Implement modal close handlers (X button, backdrop click, Escape key)
 
 ## 6. Frontend - Error Handling
 
-- [ ] 6.1 Implement toast error display for API failures (reuse existing `toast` function)
-- [ ] 6.2 Implement session expiry detection (401 response) with redirect to login
+- [x] 6.1 Implement toast error display for API failures (reuse existing `toast` function)
+- [x] 6.2 Implement session expiry detection (401 response) with redirect to login
 - [ ] 6.3 Implement retry mechanism for network errors
-- [ ] 6.4 Add error state display in modal for detail fetch failures
+- [x] 6.4 Add error state display in modal for detail fetch failures
 
 ## 7. Frontend - Loading States
 
-- [ ] 7.1 Add loading spinner HTML/CSS for tab switching
+- [x] 7.1 Add loading spinner HTML/CSS for tab switching
 - [ ] 7.2 Implement button disabled state during AJAX requests
-- [ ] 7.3 Add skeleton/loading state for modal content
-- [ ] 7.4 Ensure loading indicators are properly removed on success/error
+- [x] 7.3 Add skeleton/loading state for modal content
+- [x] 7.4 Ensure loading indicators are properly removed on success/error
 
 ## 8. Frontend - Accessibility
 
