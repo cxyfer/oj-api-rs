@@ -601,8 +601,9 @@ async def main() -> None:
 
     args = parser.parse_args()
     config = get_config()
-    data_dir = args.data_dir or "data"
-    db_path = args.db_path or config.database_path
+    config_dir = Path(config.config_path).resolve().parent
+    data_dir = args.data_dir or str((config_dir / config.data_dir).resolve())
+    db_path = args.db_path or str((config_dir / config.database_path).resolve())
 
     client = CodeforcesClient(
         data_dir=data_dir,

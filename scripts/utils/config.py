@@ -148,6 +148,11 @@ class ConfigManager:
         return self.get("schedule.timezone", "UTC")
 
     @property
+    def data_dir(self) -> str:
+        """Get data directory"""
+        return self.get("data.dir", "data")
+
+    @property
     def database_path(self) -> str:
         """Get database path"""
         return self.get("database.path", "data/data.db")

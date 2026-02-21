@@ -1308,12 +1308,14 @@ async def main():
     )
     args = parser.parse_args()
 
-    fallback_db = str((Path(__file__).resolve().parent / "../data/data.db").resolve())
+    scripts_dir = Path(__file__).resolve().parent
+    fallback_db = str((scripts_dir / "../data/data.db").resolve())
+    fallback_data = str((scripts_dir / "../data").resolve())
     try:
         config = get_config()
         config_dir = Path(config.config_path).resolve().parent
         db_path = str((config_dir / config.database_path).resolve())
-        scripts_dir = Path(__file__).resolve().parent
+        data_dir = str((config_dir / config.data_dir).resolve())
         if Path(db_path).parent == scripts_dir / "data":
             import sys
 
@@ -1321,13 +1323,21 @@ async def main():
                 "Warning: config database.path resolves inside scripts/data/, using fallback.\n"
             )
             db_path = fallback_db
+        if Path(data_dir) == scripts_dir / "data":
+            import sys
+
+            sys.stderr.write(
+                "Warning: config data.dir resolves inside scripts/data/, using fallback.\n"
+            )
+            data_dir = fallback_data
     except Exception as e:
         import sys
 
-        sys.stderr.write(f"Warning: Failed to load config, using default db path. Error: {e}\n")
+        sys.stderr.write(f"Warning: Failed to load config, using defaults. Error: {e}\n")
         db_path = fallback_db
+        data_dir = fallback_data
 
-    client = LeetCodeClient(data_dir="data", db_path=db_path)
+    client = LeetCodeClient(data_dir=data_dir, db_path=db_path)
 
     if args.init:
         logger.info("Initializing database...")

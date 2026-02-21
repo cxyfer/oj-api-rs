@@ -1,2 +1,5 @@
+[data]
+dir = "../data"
+
 [database]
 path = "../data/data.db"
