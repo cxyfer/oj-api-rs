@@ -33,6 +33,11 @@
       "medium": "中等",
       "hard": "困難"
     },
+    "sources": {
+      "leetcode": "LeetCode",
+      "atcoder": "AtCoder",
+      "codeforces": "Codeforces"
+    },
     "pagination": {
       "prev": "« 上一頁",
       "next": "下一頁 »"
@@ -133,6 +138,7 @@
     "confirm_delete_problem": "確定要刪除此題目嗎？",
     "problem_deleted": "題目已刪除",
     "failed_delete_problem": "無法刪除題目",
+    "failed_load_problems": "無法載入題目列表",
     "crawler_triggered": "爬蟲已啟動",
     "failed_trigger_crawler": "無法啟動爬蟲",
     "fill_args": "請填寫此參數的值：",

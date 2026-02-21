@@ -31,13 +31,13 @@
 
 ## 4. Frontend - Problems Page Source Tabs
 
-- [ ] 4.1 Add source tab button group HTML in `templates/admin/problems.html`
-- [ ] 4.2 Add CSS styles for source tabs in `static/admin.css` (reuse `.source-btn` pattern)
-- [ ] 4.3 Implement source tab click handler in `static/admin.js` with request sequencing
-- [ ] 4.4 Implement AJAX list fetch function with loading state management
-- [ ] 4.5 Implement table body re-render function for problems list
-- [ ] 4.6 Implement URL sync with `history.replaceState` on tab switch
-- [ ] 4.7 Implement pagination reset to page 1 on source change
+- [x] 4.1 Add source tab button group HTML in `templates/admin/problems.html`
+- [x] 4.2 Add CSS styles for source tabs in `static/admin.css` (reuse `.source-btn` pattern)
+- [x] 4.3 Implement source tab click handler in `static/admin.js` with request sequencing
+- [x] 4.4 Implement AJAX list fetch function with loading state management
+- [x] 4.5 Implement table body re-render function for problems list
+- [x] 4.6 Implement URL sync with `history.replaceState` on tab switch
+- [x] 4.7 Implement pagination reset to page 1 on source change
 
 ## 5. Frontend - Problem Detail Modal
 

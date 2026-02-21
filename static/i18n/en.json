@@ -33,6 +33,11 @@
       "medium": "Medium",
       "hard": "Hard"
     },
+    "sources": {
+      "leetcode": "LeetCode",
+      "atcoder": "AtCoder",
+      "codeforces": "Codeforces"
+    },
     "pagination": {
       "prev": "« Prev",
       "next": "Next »"
@@ -133,6 +138,7 @@
     "confirm_delete_problem": "Delete this problem?",
     "problem_deleted": "Problem deleted",
     "failed_delete_problem": "Failed to delete problem",
+    "failed_load_problems": "Failed to load problems",
     "crawler_triggered": "Crawler triggered",
     "failed_trigger_crawler": "Failed to trigger crawler",
     "fill_args": "Please fill value for ",

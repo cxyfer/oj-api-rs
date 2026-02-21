@@ -525,7 +525,9 @@
     // Problems Page
     var problemsTable = document.getElementById('problems-table');
     if (problemsTable) {
-        var currentSource = 'leetcode';
+        var sourceBtns = document.getElementById('problem-source-btns');
+        var activeBtn = sourceBtns ? sourceBtns.querySelector('.source-btn.active') : null;
+        var currentSource = activeBtn ? activeBtn.dataset.source : 'leetcode';
         var currentPage = 1;
 
         function loadProblems(source, page) {
@@ -535,7 +537,10 @@
             tbody.innerHTML = '<tr><td colspan="7" style="text-align:center">' + i18n.t('common.loading') + '</td></tr>';
 
             api('/admin/api/problems/' + currentSource + '?page=' + currentPage + '&per_page=50')
-                .then(function(res) { return res.json(); })
+                .then(function(res) { 
+                    if (!res.ok) throw new Error('failed to load');
+                    return res.json(); 
+                })
                 .then(function(res) {
                     renderProblems(res.data);
                     updateStats(res.meta);
@@ -543,7 +548,8 @@
                 })
                 .catch(function(err) {
                     console.error('failed to load problems', err);
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--color-danger)">Failed to load problems</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--color-danger)">' + i18n.t('messages.failed_load_problems') + '</td></tr>';
+                    toast(i18n.t('messages.failed_load_problems'), 'error');
                 });
         }
 
@@ -680,6 +686,31 @@
             detailModal.onclick = function(e) {
                 if (e.target === detailModal) detailModal.classList.remove('active');
             };
+        }
+
+        // Source tab click handlers
+        if (sourceBtns) {
+            sourceBtns.querySelectorAll('.source-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var newSource = this.dataset.source;
+                    if (newSource === currentSource) return;
+
+                    // Update active state
+                    sourceBtns.querySelectorAll('.source-btn').forEach(function(b) {
+                        b.classList.remove('active');
+                    });
+                    this.classList.add('active');
+
+                    // Load new source
+                    currentSource = newSource;
+                    currentPage = 1;
+
+                    // Update URL
+                    history.replaceState(null, '', '/admin/problems?source=' + newSource);
+
+                    loadProblems(currentSource, currentPage);
+                });
+            });
         }
 
         // Initial load
