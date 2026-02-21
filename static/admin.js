@@ -185,6 +185,151 @@
         });
     }
 
+    // Crawlers page
+    var triggerBtn = document.getElementById('crawler-trigger-btn');
+    if (triggerBtn) {
+        var crawlerPollId = null;
+        var selectedSource = 'leetcode';
+
+        // Source selection
+        document.querySelectorAll('.source-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.source-btn').forEach(function(b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+                selectedSource = btn.dataset.source;
+            });
+        });
+
+        // Action radio
+        var actionRadios = document.querySelectorAll('input[name="crawler-action"]');
+        var dateWrapper = document.querySelector('.date-input-wrapper');
+        var monthlyWrapper = document.querySelector('.monthly-input-wrapper');
+
+        actionRadios.forEach(function(radio) {
+            radio.addEventListener('change', function() {
+                dateWrapper.style.display = radio.value === 'date' ? '' : 'none';
+                monthlyWrapper.style.display = radio.value === 'monthly' ? '' : 'none';
+            });
+        });
+
+        function getSelectedAction() {
+            var checked = document.querySelector('input[name="crawler-action"]:checked');
+            if (!checked) return [];
+            switch (checked.value) {
+                case 'daily': return ['--daily'];
+                case 'init': return ['--init'];
+                case 'date':
+                    var d = document.getElementById('crawler-date');
+                    return d && d.value ? ['--date', d.value] : null;
+                case 'monthly':
+                    var y = document.getElementById('crawler-year');
+                    var m = document.getElementById('crawler-month');
+                    return (y && y.value && m && m.value) ? ['--monthly', y.value, m.value] : null;
+                default: return [];
+            }
+        }
+
+        // Trigger
+        triggerBtn.addEventListener('click', function() {
+            var args = getSelectedAction();
+            if (args === null) {
+                toast('Please fill in the required fields', 'error');
+                return;
+            }
+            triggerBtn.disabled = true;
+            api('/admin/api/crawlers/trigger', {
+                method: 'POST',
+                body: JSON.stringify({ source: selectedSource, args: args })
+            }).then(function(res) {
+                if (res.ok) {
+                    return res.json().then(function(data) {
+                        toast('Crawler triggered: ' + data.job_id);
+                        startPolling();
+                    });
+                } else {
+                    return res.json().then(function(data) {
+                        toast(data.detail || 'Failed to trigger crawler', 'error');
+                        triggerBtn.disabled = false;
+                    });
+                }
+            }).catch(function() {
+                toast('Failed to trigger crawler', 'error');
+                triggerBtn.disabled = false;
+            });
+        });
+
+        // Polling
+        function startPolling() {
+            if (crawlerPollId) return;
+            crawlerPollId = setInterval(pollStatus, 3000);
+            pollStatus();
+        }
+
+        function stopPolling() {
+            if (crawlerPollId) {
+                clearInterval(crawlerPollId);
+                crawlerPollId = null;
+            }
+        }
+
+        function pollStatus() {
+            api('/admin/api/crawlers/status').then(function(res) {
+                if (!res.ok) return;
+                return res.json();
+            }).then(function(data) {
+                if (!data) return;
+                updateStatusCard(data);
+                updateHistoryTable(data.history || []);
+                if (!data.running) {
+                    stopPolling();
+                    triggerBtn.disabled = false;
+                }
+            });
+        }
+
+        function updateStatusCard(data) {
+            var card = document.getElementById('crawler-status-card');
+            if (!card) return;
+            if (data.running && data.current_job) {
+                var job = data.current_job;
+                card.style.display = '';
+                card.innerHTML =
+                    '<div class="status-header running">Running</div>' +
+                    '<div class="status-details">' +
+                    '<span><strong>Job:</strong> ' + job.job_id + '</span>' +
+                    '<span><strong>Source:</strong> ' + job.source + '</span>' +
+                    '<span><strong>Args:</strong> ' + (job.args || []).join(' ') + '</span>' +
+                    '<span><strong>Started:</strong> ' + job.started_at + '</span>' +
+                    '</div>';
+            } else {
+                card.style.display = 'none';
+            }
+        }
+
+        function updateHistoryTable(history) {
+            var tbody = document.querySelector('#crawler-history-table tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            history.forEach(function(job) {
+                var tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td>' + job.source + '</td>' +
+                    '<td>' + (job.args || []).join(' ') + '</td>' +
+                    '<td>' + job.trigger + '</td>' +
+                    '<td>' + job.started_at + '</td>' +
+                    '<td>' + (job.finished_at || '-') + '</td>' +
+                    '<td><span class="badge badge-crawler-' + job.status + '">' + job.status + '</span></td>';
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Auto-start polling if already running
+        var statusCard = document.getElementById('crawler-status-card');
+        if (statusCard && statusCard.style.display !== 'none') {
+            startPolling();
+        }
+    }
+
     // Logout
     var logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {

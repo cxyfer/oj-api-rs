@@ -18,6 +18,7 @@ pub fn admin_router() -> Router<Arc<AppState>> {
         .route("/admin/", get(pages::index))
         .route("/admin/problems", get(pages::problems_page))
         .route("/admin/tokens", get(pages::tokens_page))
+        .route("/admin/crawlers", get(pages::crawlers_page))
         .route("/admin/api/problems", post(handlers::create_problem))
         .route(
             "/admin/api/problems/{source}/{id}",

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
@@ -23,6 +23,8 @@ pub struct AppState {
     pub rw_pool: db::DbPool,
     pub config: config::Config,
     pub crawler_lock: tokio::sync::Mutex<Option<models::CrawlerJob>>,
+    pub crawler_history: tokio::sync::Mutex<VecDeque<models::CrawlerJob>>,
+    pub daily_fallback: tokio::sync::Mutex<HashMap<String, models::DailyFallbackEntry>>,
     pub embed_semaphore: Semaphore,
     pub token_auth_enabled: Arc<AtomicBool>,
     pub admin_sessions: Arc<RwLock<HashMap<String, i64>>>,
@@ -76,6 +78,8 @@ async fn main() {
         rw_pool,
         config: config.clone(),
         crawler_lock: tokio::sync::Mutex::new(None),
+        crawler_history: tokio::sync::Mutex::new(VecDeque::new()),
+        daily_fallback: tokio::sync::Mutex::new(HashMap::new()),
         embed_semaphore: Semaphore::new(4),
         token_auth_enabled: token_auth_flag.clone(),
         admin_sessions: admin_sessions.clone(),

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Crawlers{% endblock %}
+{% block content %}
+<h1>Crawlers</h1>
+
+<div class="card" style="margin-bottom:1rem;padding:1rem 1.25rem">
+    <div class="crawler-control">
+        <div class="form-group">
+            <label>Source</label>
+            <div class="source-btn-group">
+                <button class="btn source-btn active" data-source="leetcode">LeetCode</button>
+                <button class="btn source-btn" data-source="atcoder">AtCoder</button>
+                <button class="btn source-btn" data-source="codeforces">Codeforces</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Action</label>
+            <div class="action-radio-group">
+                <label class="action-radio"><input type="radio" name="crawler-action" value="daily" checked> Daily</label>
+                <label class="action-radio"><input type="radio" name="crawler-action" value="date"> Date</label>
+                <label class="action-radio"><input type="radio" name="crawler-action" value="init"> Init</label>
+                <label class="action-radio"><input type="radio" name="crawler-action" value="monthly"> Monthly</label>
+            </div>
+        </div>
+        <div class="form-group date-input-wrapper" style="display:none">
+            <label for="crawler-date">Date</label>
+            <input type="date" id="crawler-date">
+        </div>
+        <div class="form-group monthly-input-wrapper" style="display:none">
+            <label>Year / Month</label>
+            <div style="display:flex;gap:0.5rem">
+                <input type="number" id="crawler-year" placeholder="2024" min="2000" max="2100" style="width:100px">
+                <input type="number" id="crawler-month" placeholder="1" min="1" max="12" style="width:80px">
+            </div>
+        </div>
+        <button class="btn btn-primary" id="crawler-trigger-btn"{% if is_running %} disabled{% endif %}>Trigger</button>
+    </div>
+</div>
+
+<div class="card status-card" id="crawler-status-card" style="margin-bottom:1rem{% if !is_running %};display:none{% endif %}">
+    {% if is_running %}
+    {% match current_job %}{% when Some with (job) %}
+    <div class="status-header running">Running</div>
+    <div class="status-details">
+        <span><strong>Job:</strong> {{ job.job_id }}</span>
+        <span><strong>Source:</strong> {{ job.source }}</span>
+        <span><strong>Args:</strong> {{ job.args.join(" ") }}</span>
+        <span><strong>Started:</strong> {{ job.started_at }}</span>
+    </div>
+    {% when None %}{% endmatch %}
+    {% endif %}
+</div>
+
+<div class="card">
+    <table id="crawler-history-table">
+        <thead>
+            <tr>
+                <th>Source</th>
+                <th>Args</th>
+                <th>Trigger</th>
+                <th>Started</th>
+                <th>Finished</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in history %}
+            <tr>
+                <td>{{ job.source }}</td>
+                <td>{{ job.args.join(" ") }}</td>
+                <td>{{ job.trigger }}</td>
+                <td>{{ job.started_at }}</td>
+                <td>{% match job.finished_at %}{% when Some with (t) %}{{ t }}{% when None %}-{% endmatch %}</td>
+                <td>
+                    <span class="badge badge-crawler-{{ job.status }}">{{ job.status }}</span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

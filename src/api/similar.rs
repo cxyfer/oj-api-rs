@@ -138,9 +138,9 @@ pub async fn similar_by_text(
     };
 
     // Spawn Python subprocess
-    let mut cmd = tokio::process::Command::new("python3");
-    cmd.args(["embedding_cli.py", "--embed-text", &text]);
-    cmd.current_dir("references/leetcode-daily-discord-bot/");
+    let mut cmd = tokio::process::Command::new("uv");
+    cmd.args(["run", "python3", "embedding_cli.py", "--embed-text", &text]);
+    cmd.current_dir("scripts/");
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
     cmd.kill_on_drop(true);

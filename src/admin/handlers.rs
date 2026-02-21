@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 use crate::api::error::ProblemDetail;
 use crate::auth::{AdminSecret, AdminSessions};
-use crate::models::{CrawlerJob, CrawlerStatus, Problem};
+use crate::models::{CrawlerAction, CrawlerJob, CrawlerStatus, CrawlerTrigger, Problem};
 use crate::AppState;
 
 // Problem CRUD
@@ -190,6 +190,8 @@ pub async fn revoke_token(
 #[derive(Deserialize)]
 pub struct TriggerCrawlerRequest {
     pub source: String,
+    #[serde(default)]
+    pub args: Vec<String>,
 }
 
 pub async fn trigger_crawler(
@@ -201,6 +203,12 @@ pub async fn trigger_crawler(
         return ProblemDetail::bad_request(format!("invalid source: {}", body.source))
             .into_response();
     }
+
+    let action = match CrawlerAction::parse(&body.args) {
+        Ok(a) => a,
+        Err(e) => return ProblemDetail::bad_request(e).into_response(),
+    };
+    let args = action.to_args();
 
     let mut lock = state.crawler_lock.lock().await;
 
@@ -216,7 +224,10 @@ pub async fn trigger_crawler(
     let job = CrawlerJob {
         job_id: job_id.clone(),
         source: body.source.clone(),
+        args: args.clone(),
+        trigger: CrawlerTrigger::Admin,
         started_at: started_at.clone(),
+        finished_at: None,
         status: CrawlerStatus::Running,
     };
 
@@ -236,14 +247,21 @@ pub async fn trigger_crawler(
                 let mut lock = state_clone.crawler_lock.lock().await;
                 if let Some(ref mut job) = *lock {
                     job.status = CrawlerStatus::Failed;
+                    job.finished_at = Some(chrono::Utc::now().to_rfc3339());
+                    let mut history = state_clone.crawler_history.lock().await;
+                    if history.len() >= 50 {
+                        history.pop_front();
+                    }
+                    history.push_back(job.clone());
                 }
                 return;
             }
         };
 
-        let mut cmd = tokio::process::Command::new("python3");
-        cmd.arg(script);
-        cmd.current_dir("references/leetcode-daily-discord-bot/");
+        let mut cmd = tokio::process::Command::new("uv");
+        cmd.args(["run", "python3", script]);
+        cmd.args(&args);
+        cmd.current_dir("scripts/");
         cmd.kill_on_drop(true);
 
         let child = match cmd.spawn() {
@@ -253,6 +271,12 @@ pub async fn trigger_crawler(
                 let mut lock = state_clone.crawler_lock.lock().await;
                 if let Some(ref mut job) = *lock {
                     job.status = CrawlerStatus::Failed;
+                    job.finished_at = Some(chrono::Utc::now().to_rfc3339());
+                    let mut history = state_clone.crawler_history.lock().await;
+                    if history.len() >= 50 {
+                        history.pop_front();
+                    }
+                    history.push_back(job.clone());
                 }
                 return;
             }
@@ -266,6 +290,7 @@ pub async fn trigger_crawler(
 
         let mut lock = state_clone.crawler_lock.lock().await;
         if let Some(ref mut job) = *lock {
+            job.finished_at = Some(chrono::Utc::now().to_rfc3339());
             match result {
                 Ok(Ok(output)) if output.status.success() => {
                     job.status = CrawlerStatus::Completed;
@@ -281,6 +306,11 @@ pub async fn trigger_crawler(
                     job.status = CrawlerStatus::TimedOut;
                 }
             }
+            let mut history = state_clone.crawler_history.lock().await;
+            if history.len() >= 50 {
+                history.pop_front();
+            }
+            history.push_back(job.clone());
         }
     });
 
@@ -295,14 +325,15 @@ pub async fn crawler_status(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
     let lock = state.crawler_lock.lock().await;
+    let history = state.crawler_history.lock().await;
+    let history_vec: Vec<_> = history.iter().rev().cloned().collect();
 
     match &*lock {
         Some(job) if job.status == CrawlerStatus::Running => {
             Json(serde_json::json!({
                 "running": true,
-                "job_id": job.job_id,
-                "source": job.source,
-                "started_at": job.started_at,
+                "current_job": job,
+                "history": history_vec,
             }))
             .into_response()
         }
@@ -310,6 +341,7 @@ pub async fn crawler_status(
             Json(serde_json::json!({
                 "running": false,
                 "last_job": job,
+                "history": history_vec,
             }))
             .into_response()
         }
@@ -317,6 +349,7 @@ pub async fn crawler_status(
             Json(serde_json::json!({
                 "running": false,
                 "last_job": null,
+                "history": history_vec,
             }))
             .into_response()
         }

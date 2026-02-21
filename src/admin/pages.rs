@@ -7,7 +7,7 @@ use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse};
 use serde::Deserialize;
 
-use crate::models::{ApiToken, ProblemSummary};
+use crate::models::{ApiToken, CrawlerJob, ProblemSummary};
 use crate::AppState;
 
 #[derive(Template)]
@@ -158,6 +158,39 @@ pub async fn tokens_page(State(state): State<Arc<AppState>>) -> impl IntoRespons
         TokensTemplate {
             tokens,
             token_auth_enabled,
+        }
+        .render()
+        .unwrap_or_default(),
+    )
+    .into_response()
+}
+
+#[derive(Template)]
+#[template(path = "admin/crawlers.html")]
+struct CrawlersTemplate {
+    is_running: bool,
+    current_job: Option<CrawlerJob>,
+    history: Vec<CrawlerJob>,
+}
+
+pub async fn crawlers_page(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let lock = state.crawler_lock.lock().await;
+    let is_running = lock
+        .as_ref()
+        .map(|j| j.status == crate::models::CrawlerStatus::Running)
+        .unwrap_or(false);
+    let current_job = if is_running { lock.clone() } else { None };
+    drop(lock);
+
+    let history_lock = state.crawler_history.lock().await;
+    let history: Vec<CrawlerJob> = history_lock.iter().rev().cloned().collect();
+    drop(history_lock);
+
+    Html(
+        CrawlersTemplate {
+            is_running,
+            current_job,
+            history,
         }
         .render()
         .unwrap_or_default(),
