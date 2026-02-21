@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::middleware;
-use axum::routing::{delete, get, post, put};
+use axum::routing::{delete, get, post};
 use axum::Router;
 
 use crate::AppState;
@@ -21,8 +21,14 @@ pub fn admin_router() -> Router<Arc<AppState>> {
         .route("/admin/crawlers", get(pages::crawlers_page))
         .route("/admin/api/problems", post(handlers::create_problem))
         .route(
+            "/admin/api/problems/{source}",
+            get(handlers::get_problems_list),
+        )
+        .route(
             "/admin/api/problems/{source}/{id}",
-            put(handlers::update_problem).delete(handlers::delete_problem),
+            get(handlers::get_problem_detail)
+                .put(handlers::update_problem)
+                .delete(handlers::delete_problem),
         )
         .route(
             "/admin/api/tokens",

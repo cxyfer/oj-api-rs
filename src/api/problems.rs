@@ -17,20 +17,20 @@ pub struct ListQuery {
 }
 
 #[derive(Serialize)]
-struct ListMeta {
-    total: u32,
-    page: u32,
-    per_page: u32,
-    total_pages: u32,
+pub(crate) struct ListMeta {
+    pub total: u32,
+    pub page: u32,
+    pub per_page: u32,
+    pub total_pages: u32,
 }
 
 #[derive(Serialize)]
-struct ListResponse<T: Serialize> {
-    data: Vec<T>,
-    meta: ListMeta,
+pub(crate) struct ListResponse<T: Serialize> {
+    pub data: Vec<T>,
+    pub meta: ListMeta,
 }
 
-const VALID_SOURCES: &[&str] = &["atcoder", "leetcode", "codeforces"];
+pub(crate) const VALID_SOURCES: &[&str] = &["atcoder", "leetcode", "codeforces"];
 
 pub async fn get_problem(
     State(state): State<Arc<AppState>>,

@@ -1,19 +1,61 @@
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{Extension, Form, Json};
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::api::error::ProblemDetail;
+use crate::api::problems::{ListQuery, ListMeta, ListResponse, VALID_SOURCES};
 use crate::auth::{AdminSecret, AdminSessions};
 use crate::models::{CrawlerJob, CrawlerSource, CrawlerStatus, CrawlerTrigger, Problem};
 use crate::AppState;
 
 // Problem CRUD
+
+#[derive(Serialize)]
+struct ProblemWithoutContent {
+    id: String,
+    source: String,
+    slug: String,
+    title: Option<String>,
+    title_cn: Option<String>,
+    difficulty: Option<String>,
+    ac_rate: Option<f64>,
+    rating: Option<f64>,
+    contest: Option<String>,
+    problem_index: Option<String>,
+    tags: Vec<String>,
+    link: Option<String>,
+    category: Option<String>,
+    paid_only: Option<i32>,
+    similar_questions: Vec<String>,
+}
+
+impl From<Problem> for ProblemWithoutContent {
+    fn from(p: Problem) -> Self {
+        Self {
+            id: p.id,
+            source: p.source,
+            slug: p.slug,
+            title: p.title,
+            title_cn: p.title_cn,
+            difficulty: p.difficulty,
+            ac_rate: p.ac_rate,
+            rating: p.rating,
+            contest: p.contest,
+            problem_index: p.problem_index,
+            tags: p.tags,
+            link: p.link,
+            category: p.category,
+            paid_only: p.paid_only,
+            similar_questions: p.similar_questions,
+        }
+    }
+}
 
 #[derive(Deserialize)]
 pub struct CreateProblemRequest {
@@ -124,6 +166,69 @@ pub async fn delete_problem(
             ProblemDetail::internal(format!("database error: {}", e)).into_response()
         }
         Err(_) => ProblemDetail::internal("task join error").into_response(),
+    }
+}
+
+pub async fn get_problems_list(
+    State(state): State<Arc<AppState>>,
+    Path(source): Path<String>,
+    Query(query): Query<ListQuery>,
+) -> impl IntoResponse {
+    if !VALID_SOURCES.contains(&source.as_str()) {
+        return ProblemDetail::bad_request(format!("invalid source: {}", source)).into_response();
+    }
+
+    let pool = state.ro_pool.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let tags: Option<Vec<&str>> = query
+            .tags
+            .as_ref()
+            .map(|t| t.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect());
+
+        let params = crate::db::problems::ListParams {
+            source: &source,
+            page: query.page.unwrap_or(1),
+            per_page: query.per_page.unwrap_or(20),
+            difficulty: query.difficulty.as_deref(),
+            tags,
+        };
+        crate::db::problems::list_problems(&pool, &params)
+    })
+    .await;
+
+    match result {
+        Ok(Some(r)) => Json(ListResponse {
+            data: r.data,
+            meta: ListMeta {
+                total: r.total,
+                page: r.page,
+                per_page: r.per_page,
+                total_pages: r.total_pages,
+            },
+        })
+        .into_response(),
+        Ok(None) | Err(_) => ProblemDetail::internal("database error").into_response(),
+    }
+}
+
+pub async fn get_problem_detail(
+    State(state): State<Arc<AppState>>,
+    Path((source, id)): Path<(String, String)>,
+) -> impl IntoResponse {
+    if !VALID_SOURCES.contains(&source.as_str()) {
+        return ProblemDetail::bad_request(format!("invalid source: {}", source)).into_response();
+    }
+
+    let pool = state.ro_pool.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        crate::db::problems::get_problem(&pool, &source, &id)
+    })
+    .await;
+
+    match result {
+        Ok(Some(problem)) => Json(ProblemWithoutContent::from(problem)).into_response(),
+        Ok(None) => ProblemDetail::not_found("problem not found").into_response(),
+        Err(_) => ProblemDetail::internal("database error").into_response(),
     }
 }
 
