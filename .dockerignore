@@ -1,0 +1,9 @@
+target/
+references/
+scripts/.venv/
+scripts/__pycache__/
+scripts/logs/
+scripts/embeddings/
+.git/
+.env
+.claude/
