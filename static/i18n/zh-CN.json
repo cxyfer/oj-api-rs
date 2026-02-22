@@ -46,7 +46,20 @@
       "similar": "相似题目",
       "open_link": "打开链接",
       "paid_only": "付费"
-    }
+    },
+    "search_placeholder": "搜索 ID 或标题...",
+    "difficulty_all": "所有难度",
+    "per_page": "每页",
+    "tag_mode": {
+      "any": "匹配任一",
+      "all": "匹配全部"
+    },
+    "tags_placeholder": "按标签筛选...",
+    "tags_selected": "已选 {count} 个标签",
+    "no_results": "未找到符合的题目",
+    "match_mode": "模式",
+    "rating_min": "最低",
+    "rating_max": "最高"
   },
   "tokens": {
     "title": "API 令牌管理",

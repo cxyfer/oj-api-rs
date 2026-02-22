@@ -51,7 +51,20 @@
       "similar": "相似題目",
       "open_link": "開啟連結",
       "paid_only": "付費"
-    }
+    },
+    "search_placeholder": "搜尋 ID 或標題...",
+    "difficulty_all": "所有難度",
+    "per_page": "每頁",
+    "tag_mode": {
+      "any": "符合任一",
+      "all": "符合全部"
+    },
+    "tags_placeholder": "依標籤過濾...",
+    "tags_selected": "已選 {count} 個標籤",
+    "no_results": "找不到符合的題目",
+    "match_mode": "模式",
+    "rating_min": "最低",
+    "rating_max": "最高"
   },
   "tokens": {
     "title": "API 金鑰管理",

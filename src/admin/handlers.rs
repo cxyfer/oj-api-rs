@@ -9,7 +9,7 @@ use rand::Rng;
 use serde::Deserialize;
 
 use crate::api::error::ProblemDetail;
-use crate::api::problems::{ListQuery, ListMeta, ListResponse, VALID_SOURCES};
+use crate::api::problems::{ListQuery, ListMeta, ListResponse, VALID_SOURCES, validate_list_query};
 use crate::auth::{AdminSecret, AdminSessions};
 use crate::models::{CrawlerJob, CrawlerSource, CrawlerStatus, CrawlerTrigger, Problem};
 use crate::AppState;
@@ -136,6 +136,9 @@ pub async fn get_problems_list(
     if !VALID_SOURCES.contains(&source.as_str()) {
         return ProblemDetail::bad_request(format!("invalid source: {}", source)).into_response();
     }
+    if let Err(e) = validate_list_query(&query) {
+        return ProblemDetail::bad_request(e).into_response();
+    }
 
     let pool = state.ro_pool.clone();
     let result = tokio::task::spawn_blocking(move || {
@@ -150,6 +153,12 @@ pub async fn get_problems_list(
             per_page: query.per_page.unwrap_or(20),
             difficulty: query.difficulty.as_deref(),
             tags,
+            search: query.search.as_deref(),
+            sort_by: query.sort_by.as_deref(),
+            sort_order: query.sort_order.as_deref(),
+            tag_mode: query.tag_mode.as_deref().unwrap_or("any"),
+            rating_min: query.rating_min,
+            rating_max: query.rating_max,
         };
         crate::db::problems::list_problems(&pool, &params)
     })
@@ -167,6 +176,27 @@ pub async fn get_problems_list(
         })
         .into_response(),
         Ok(None) | Err(_) => ProblemDetail::internal("database error").into_response(),
+    }
+}
+
+pub async fn get_tags_list(
+    State(state): State<Arc<AppState>>,
+    Path(source): Path<String>,
+) -> impl IntoResponse {
+    if !VALID_SOURCES.contains(&source.as_str()) {
+        return ProblemDetail::bad_request(format!("invalid source: {}", source)).into_response();
+    }
+
+    let pool = state.ro_pool.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        crate::db::problems::list_tags(&pool, &source)
+    })
+    .await
+    .unwrap_or(None);
+
+    match result {
+        Some(tags) => Json(tags).into_response(),
+        None => ProblemDetail::internal("database error").into_response(),
     }
 }
 

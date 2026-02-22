@@ -28,6 +28,10 @@ pub fn public_router() -> Router<Arc<AppState>> {
             "/api/v1/problems/{source}",
             get(problems::list_problems),
         )
+        .route(
+            "/api/v1/tags/{source}",
+            get(problems::list_tags),
+        )
         .route("/api/v1/resolve/{*query}", get(resolve::resolve))
         .route("/api/v1/daily", get(daily::get_daily))
         .route(

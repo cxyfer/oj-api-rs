@@ -25,6 +25,10 @@ pub fn admin_router() -> Router<Arc<AppState>> {
             get(handlers::get_problems_list),
         )
         .route(
+            "/admin/api/tags/{source}",
+            get(handlers::get_tags_list),
+        )
+        .route(
             "/admin/api/problems/{source}/{id}",
             get(handlers::get_problem_detail)
                 .put(handlers::update_problem)

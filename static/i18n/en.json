@@ -51,7 +51,20 @@
       "similar": "Similar",
       "open_link": "Open Link",
       "paid_only": "Premium"
-    }
+    },
+    "search_placeholder": "Search by ID or title...",
+    "difficulty_all": "All Difficulties",
+    "per_page": "Per page",
+    "tag_mode": {
+      "any": "Match Any",
+      "all": "Match All"
+    },
+    "tags_placeholder": "Filter by tags...",
+    "tags_selected": "{count} tags selected",
+    "no_results": "No problems found",
+    "match_mode": "Mode",
+    "rating_min": "Min",
+    "rating_max": "Max"
   },
   "tokens": {
     "title": "API Tokens",

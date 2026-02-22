@@ -116,6 +116,12 @@ pub async fn problems_page(
             per_page: 50,
             difficulty: None,
             tags: None,
+            search: None,
+            sort_by: None,
+            sort_order: None,
+            tag_mode: "any",
+            rating_min: None,
+            rating_max: None,
         };
         crate::db::problems::list_problems(&pool, &params)
     })

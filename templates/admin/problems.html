@@ -3,20 +3,58 @@
 {% block content %}
 <h1 data-i18n="problems.title">Problems</h1>
 
-<div class="card" style="margin-bottom:1rem;padding:1rem 1.25rem">
-    <div class="form-group">
-        <label data-i18n="common.source">Source</label>
-        <div class="source-btn-group" id="problem-source-btns" role="tablist" aria-label="Problem sources">
-            <button class="btn source-btn{% if source == "leetcode" %} active{% endif %}" data-source="leetcode" data-i18n="problems.sources.leetcode" role="tab" aria-selected="{% if source == "leetcode" %}true{% else %}false{% endif %}" aria-controls="problems-table">LeetCode</button>
-            <button class="btn source-btn{% if source == "atcoder" %} active{% endif %}" data-source="atcoder" data-i18n="problems.sources.atcoder" role="tab" aria-selected="{% if source == "atcoder" %}true{% else %}false{% endif %}" aria-controls="problems-table">AtCoder</button>
-            <button class="btn source-btn{% if source == "codeforces" %} active{% endif %}" data-source="codeforces" data-i18n="problems.sources.codeforces" role="tab" aria-selected="{% if source == "codeforces" %}true{% else %}false{% endif %}" aria-controls="problems-table">Codeforces</button>
+<div class="source-tabs-container">
+    <div class="source-btn-group" id="problem-source-btns" role="tablist" aria-label="Problem sources">
+        <button class="btn source-btn{% if source == "leetcode" %} active{% endif %}" data-source="leetcode" data-i18n="problems.sources.leetcode" role="tab" aria-selected="{% if source == "leetcode" %}true{% else %}false{% endif %}" aria-controls="problems-table">LeetCode</button>
+        <button class="btn source-btn{% if source == "atcoder" %} active{% endif %}" data-source="atcoder" data-i18n="problems.sources.atcoder" role="tab" aria-selected="{% if source == "atcoder" %}true{% else %}false{% endif %}" aria-controls="problems-table">AtCoder</button>
+        <button class="btn source-btn{% if source == "codeforces" %} active{% endif %}" data-source="codeforces" data-i18n="problems.sources.codeforces" role="tab" aria-selected="{% if source == "codeforces" %}true{% else %}false{% endif %}" aria-controls="problems-table">Codeforces</button>
+    </div>
+</div>
+
+<div class="card filter-card">
+    <div class="filter-row">
+        <div class="filter-field filter-field-grow search-field">
+            <input type="text" id="problem-search" data-i18n-placeholder="problems.search_placeholder" placeholder="Search by ID or title..." aria-label="Search problems">
+            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <div class="filter-field" id="difficulty-filter-field">
+            <select id="problem-difficulty" class="filter-select" aria-label="Filter by difficulty">
+                <option value="" data-i18n="problems.difficulty_all">All Difficulties</option>
+                <option value="easy" data-i18n="problems.difficulty.easy">Easy</option>
+                <option value="medium" data-i18n="problems.difficulty.medium">Medium</option>
+                <option value="hard" data-i18n="problems.difficulty.hard">Hard</option>
+            </select>
+        </div>
+        <div class="filter-field" id="rating-range-field" style="display:none">
+            <div class="rating-range-row">
+                <input type="number" id="rating-min" class="rating-input" data-i18n-placeholder="problems.rating_min" placeholder="Min" aria-label="Minimum rating">
+                <span class="rating-sep">–</span>
+                <input type="number" id="rating-max" class="rating-input" data-i18n-placeholder="problems.rating_max" placeholder="Max" aria-label="Maximum rating">
+            </div>
+        </div>
+        <div class="filter-field filter-field-grow">
+            <div class="multi-select" id="tags-select">
+                <button class="multi-select-btn" type="button" id="tags-select-btn" data-i18n="problems.tags_placeholder" aria-label="Filter by tags">Filter by tags...</button>
+                <div class="multi-select-panel" id="tags-panel"></div>
+            </div>
+        </div>
+        <div class="filter-field tag-mode-container">
+            <label class="field-label" data-i18n="problems.match_mode">Mode</label>
+            <button class="tag-mode-toggle" id="tag-mode-btn" type="button" aria-label="Toggle tag match mode">OR</button>
+        </div>
+        <div class="filter-field">
+            <select id="problem-per-page" class="filter-select" aria-label="Per page">
+                <option value="20">20</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+            </select>
         </div>
     </div>
 </div>
 
 <p style="color:var(--color-muted);margin-bottom:1rem" id="problem-stats">
-    <span data-i18n="problems.total">Total</span>: <span id="total-count">-</span> | 
-    <span data-i18n="problems.page">Page</span> <span id="current-page">-</span> 
+    <span data-i18n="problems.total">Total</span>: <span id="total-count">-</span> |
+    <span data-i18n="problems.page">Page</span> <span id="current-page">-</span>
     <span data-i18n="problems.of">of</span> <span id="total-pages">-</span>
 </p>
 
@@ -25,16 +63,17 @@
         <thead>
             <tr>
                 <th data-i18n="problems.table.source">Source</th>
-                <th data-i18n="problems.table.id">ID</th>
+                <th data-sort="id" data-i18n="problems.table.id">ID</th>
                 <th data-i18n="problems.table.title">Title</th>
-                <th data-i18n="problems.table.difficulty">Difficulty</th>
-                <th data-i18n="problems.table.rating">Rating</th>
-                <th data-i18n="problems.table.ac_rate">AC Rate</th>
+                <th class="col-tags" data-i18n="problems.detail.tags">Tags</th>
+                <th class="col-difficulty" data-sort="difficulty" data-i18n="problems.table.difficulty">Difficulty</th>
+                <th class="col-rating" data-sort="rating" data-i18n="problems.table.rating">Rating</th>
+                <th class="col-ac-rate" data-sort="ac_rate" data-i18n="problems.table.ac_rate">AC Rate</th>
                 <th data-i18n="common.actions">Actions</th>
             </tr>
         </thead>
         <tbody>
-            <tr><td colspan="7" style="text-align:center" data-i18n="common.loading">Loading...</td></tr>
+            <tr><td colspan="8" style="text-align:center" data-i18n="common.loading">Loading...</td></tr>
         </tbody>
     </table>
 </div>

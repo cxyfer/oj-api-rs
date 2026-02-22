@@ -538,6 +538,88 @@
         var activeBtn = sourceBtns ? sourceBtns.querySelector('.source-btn.active') : null;
         var currentSource = activeBtn ? activeBtn.dataset.source : 'leetcode';
         var currentPage = 1;
+        var currentSearch = '';
+        var currentDifficulty = '';
+        var currentTags = [];
+        var currentTagMode = 'any';
+        var currentSortBy = '';
+        var currentSortOrder = '';
+        var currentPerPage = 50;
+        var currentRatingMin = '';
+        var currentRatingMax = '';
+
+        function debounce(fn, ms) {
+            var timer;
+            return function() {
+                var args = arguments;
+                var ctx = this;
+                clearTimeout(timer);
+                timer = setTimeout(function() { fn.apply(ctx, args); }, ms);
+            };
+        }
+
+        function parseUrlState() {
+            var params = new URLSearchParams(window.location.search);
+            if (params.get('source') && ['leetcode', 'atcoder', 'codeforces'].indexOf(params.get('source')) !== -1) {
+                currentSource = params.get('source');
+            }
+            currentPage = parseInt(params.get('page'), 10) || 1;
+            currentSearch = params.get('search') || '';
+            currentDifficulty = params.get('difficulty') || '';
+            currentPerPage = parseInt(params.get('per_page'), 10) || 50;
+            currentSortBy = params.get('sort_by') || '';
+            currentSortOrder = params.get('sort_order') || '';
+            currentTagMode = params.get('tag_mode') || 'any';
+            currentRatingMin = params.get('rating_min') || '';
+            currentRatingMax = params.get('rating_max') || '';
+            var tagsParam = params.get('tags') || '';
+            currentTags = tagsParam ? tagsParam.split(',').filter(function(t) { return t; }) : [];
+        }
+
+        function syncUrlState() {
+            var params = new URLSearchParams();
+            params.set('source', currentSource);
+            if (currentPage > 1) params.set('page', currentPage);
+            if (currentSearch) params.set('search', currentSearch);
+            if (currentDifficulty) params.set('difficulty', currentDifficulty);
+            if (currentPerPage !== 50) params.set('per_page', currentPerPage);
+            if (currentSortBy) params.set('sort_by', currentSortBy);
+            if (currentSortOrder) params.set('sort_order', currentSortOrder);
+            if (currentTags.length) params.set('tags', currentTags.join(','));
+            if (currentTagMode !== 'any') params.set('tag_mode', currentTagMode);
+            if (currentRatingMin) params.set('rating_min', currentRatingMin);
+            if (currentRatingMax) params.set('rating_max', currentRatingMax);
+            history.replaceState(null, '', '/admin/problems?' + params.toString());
+        }
+
+        function resetFilters() {
+            currentPage = 1;
+            currentSearch = '';
+            currentDifficulty = '';
+            currentTags = [];
+            currentTagMode = 'any';
+            currentSortBy = '';
+            currentSortOrder = '';
+            currentPerPage = 50;
+            currentRatingMin = '';
+            currentRatingMax = '';
+
+            var searchInput = document.getElementById('problem-search');
+            if (searchInput) searchInput.value = '';
+            var diffSelect = document.getElementById('problem-difficulty');
+            if (diffSelect) diffSelect.value = '';
+            var ppSelect = document.getElementById('problem-per-page');
+            if (ppSelect) ppSelect.value = '50';
+            var modeBtn = document.getElementById('tag-mode-btn');
+            if (modeBtn) modeBtn.textContent = 'OR';
+            var ratingMinInput = document.getElementById('rating-min');
+            if (ratingMinInput) ratingMinInput.value = '';
+            var ratingMaxInput = document.getElementById('rating-max');
+            if (ratingMaxInput) ratingMaxInput.value = '';
+
+            updateSortHeaders();
+            updateTagsBtnText();
+        }
 
         function setSourceBtnsDisabled(disabled) {
             if (!sourceBtns) return;
@@ -550,10 +632,22 @@
             currentSource = source || currentSource;
             currentPage = page || 1;
             var tbody = problemsTable.querySelector('tbody');
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center">' + i18n.t('common.loading') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center">' + i18n.t('common.loading') + '</td></tr>';
             setSourceBtnsDisabled(true);
 
-            api('/admin/api/problems/' + currentSource + '?page=' + currentPage + '&per_page=50')
+            var url = '/admin/api/problems/' + currentSource + '?page=' + currentPage + '&per_page=' + currentPerPage;
+            if (currentSearch) url += '&search=' + encodeURIComponent(currentSearch);
+            if (currentDifficulty) url += '&difficulty=' + encodeURIComponent(currentDifficulty);
+            if (currentTags.length) url += '&tags=' + encodeURIComponent(currentTags.join(','));
+            if (currentTagMode !== 'any') url += '&tag_mode=' + encodeURIComponent(currentTagMode);
+            if (currentSortBy) url += '&sort_by=' + encodeURIComponent(currentSortBy);
+            if (currentSortOrder) url += '&sort_order=' + encodeURIComponent(currentSortOrder);
+            if (currentRatingMin) url += '&rating_min=' + encodeURIComponent(currentRatingMin);
+            if (currentRatingMax) url += '&rating_max=' + encodeURIComponent(currentRatingMax);
+
+            syncUrlState();
+
+            api(url)
                 .then(function(res) {
                     if (!res.ok) throw new Error('failed to load');
                     return res.json();
@@ -566,15 +660,191 @@
                 })
                 .catch(function(err) {
                     console.error('failed to load problems', err);
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--color-danger)">' + i18n.t('messages.failed_load_problems') + '</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--color-danger)">' + i18n.t('messages.failed_load_problems') + '</td></tr>';
                     toast(i18n.t('messages.failed_load_problems'), 'error');
                     setSourceBtnsDisabled(false);
                 });
         }
 
+        function loadTags(source) {
+            var panel = document.getElementById('tags-panel');
+            if (!panel) return;
+            panel.innerHTML = '';
+            api('/admin/api/tags/' + source).then(function(res) {
+                if (!res.ok) return;
+                return res.json();
+            }).then(function(tags) {
+                if (!tags || !tags.length) return;
+                tags.forEach(function(tag) {
+                    var item = document.createElement('label');
+                    item.className = 'multi-select-item';
+                    var cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.value = tag;
+                    if (currentTags.indexOf(tag) !== -1) cb.checked = true;
+                    cb.addEventListener('change', function() {
+                        if (cb.checked) {
+                            if (currentTags.indexOf(tag) === -1) currentTags.push(tag);
+                        } else {
+                            currentTags = currentTags.filter(function(t) { return t !== tag; });
+                        }
+                        currentPage = 1;
+                        updateTagsBtnText();
+                        loadProblems();
+                    });
+                    var span = document.createElement('span');
+                    span.textContent = tag;
+                    item.appendChild(cb);
+                    item.appendChild(span);
+                    panel.appendChild(item);
+                });
+            });
+        }
+
+        function updateTagsBtnText() {
+            var btn = document.getElementById('tags-select-btn');
+            if (!btn) return;
+            if (currentTags.length > 0) {
+                var tmpl = i18n.t('problems.tags_selected');
+                btn.textContent = tmpl.replace('{count}', currentTags.length);
+            } else {
+                btn.textContent = i18n.t('problems.tags_placeholder');
+            }
+        }
+
+        function updateSortHeaders() {
+            problemsTable.querySelectorAll('th[data-sort]').forEach(function(th) {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (th.dataset.sort === currentSortBy) {
+                    if (currentSortOrder === 'asc') th.classList.add('sort-asc');
+                    else if (currentSortOrder === 'desc') th.classList.add('sort-desc');
+                }
+            });
+        }
+
+        // Tags multi-select dropdown
+        var tagsBtn = document.getElementById('tags-select-btn');
+        var tagsPanel = document.getElementById('tags-panel');
+        if (tagsBtn && tagsPanel) {
+            tagsBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                tagsPanel.classList.toggle('open');
+            });
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('#tags-select')) {
+                    tagsPanel.classList.remove('open');
+                }
+            });
+        }
+
+        // Tag mode toggle
+        var tagModeBtn = document.getElementById('tag-mode-btn');
+        if (tagModeBtn) {
+            tagModeBtn.addEventListener('click', function() {
+                currentTagMode = currentTagMode === 'any' ? 'all' : 'any';
+                tagModeBtn.textContent = currentTagMode === 'any' ? 'OR' : 'AND';
+                currentPage = 1;
+                loadProblems();
+            });
+        }
+
+        // Search input
+        var searchInput = document.getElementById('problem-search');
+        if (searchInput) {
+            var debouncedSearch = debounce(function() {
+                currentSearch = searchInput.value.trim();
+                currentPage = 1;
+                loadProblems();
+            }, 300);
+            searchInput.addEventListener('input', debouncedSearch);
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    currentSearch = searchInput.value.trim();
+                    currentPage = 1;
+                    loadProblems();
+                }
+            });
+        }
+
+        // Difficulty select
+        var diffSelect = document.getElementById('problem-difficulty');
+        if (diffSelect) {
+            diffSelect.addEventListener('change', function() {
+                currentDifficulty = diffSelect.value;
+                currentPage = 1;
+                loadProblems();
+            });
+        }
+
+        // Per-page select
+        var ppSelect = document.getElementById('problem-per-page');
+        if (ppSelect) {
+            ppSelect.addEventListener('change', function() {
+                currentPerPage = parseInt(ppSelect.value, 10) || 50;
+                currentPage = 1;
+                loadProblems();
+            });
+        }
+
+        // Rating range inputs
+        var ratingMinInput = document.getElementById('rating-min');
+        var ratingMaxInput = document.getElementById('rating-max');
+        if (ratingMinInput && ratingMaxInput) {
+            var debouncedRating = debounce(function() {
+                currentRatingMin = ratingMinInput.value.trim();
+                currentRatingMax = ratingMaxInput.value.trim();
+                currentPage = 1;
+                loadProblems();
+            }, 500);
+            ratingMinInput.addEventListener('input', debouncedRating);
+            ratingMaxInput.addEventListener('input', debouncedRating);
+        }
+
+        // Source-aware filter/column visibility
+        function updateSourceVisibility(source) {
+            var diffField = document.getElementById('difficulty-filter-field');
+            var ratingField = document.getElementById('rating-range-field');
+            var tagsSelect = document.getElementById('tags-select');
+            var tagModeContainer = document.querySelector('.tag-mode-container');
+            var showRating = source === 'leetcode' || source === 'codeforces';
+            if (diffField) diffField.style.display = source === 'leetcode' ? '' : 'none';
+            if (ratingField) ratingField.style.display = showRating ? '' : 'none';
+            if (tagsSelect) tagsSelect.parentElement.style.display = source === 'atcoder' ? 'none' : '';
+            if (tagModeContainer) tagModeContainer.style.display = source === 'atcoder' ? 'none' : '';
+            problemsTable.classList.remove('source-leetcode', 'source-atcoder', 'source-codeforces');
+            problemsTable.classList.add('source-' + source);
+        }
+
+        // Sortable headers
+        problemsTable.querySelectorAll('th[data-sort]').forEach(function(th) {
+            th.addEventListener('click', function() {
+                var col = th.dataset.sort;
+                if (currentSortBy === col) {
+                    if (currentSortOrder === 'asc') {
+                        currentSortOrder = 'desc';
+                    } else if (currentSortOrder === 'desc') {
+                        currentSortBy = '';
+                        currentSortOrder = '';
+                    } else {
+                        currentSortOrder = 'asc';
+                    }
+                } else {
+                    currentSortBy = col;
+                    currentSortOrder = 'asc';
+                }
+                currentPage = 1;
+                updateSortHeaders();
+                loadProblems();
+            });
+        });
+
         function renderProblems(problems) {
             var tbody = problemsTable.querySelector('tbody');
             tbody.innerHTML = '';
+            if (!problems.length) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--color-muted)">' + i18n.t('problems.no_results') + '</td></tr>';
+                return;
+            }
             problems.forEach(function(p) {
                 var tr = document.createElement('tr');
                 var difficultyBadge = '';
@@ -583,7 +853,7 @@
                     var badgeClass = 'badge-' + lower;
                     var i18nKey = 'problems.difficulty.' + lower;
                     var label = i18n.t(i18nKey);
-                    if (label === i18nKey) label = p.difficulty; // fallback
+                    if (label === i18nKey) label = p.difficulty;
                     difficultyBadge = '<span class="badge ' + badgeClass + '">' + label + '</span>';
                 }
 
@@ -592,16 +862,29 @@
                     title = p.title_cn;
                 }
 
+                var tagsHtml = '-';
+                if (p.tags && p.tags.length) {
+                    tagsHtml = p.tags.map(function(t) {
+                        return '<span class="table-tag">' + esc(t) + '</span>';
+                    }).join(' ');
+                }
+
+                var ratingDisplay = '-';
+                if (p.rating != null) {
+                    ratingDisplay = currentSource === 'leetcode' ? p.rating.toFixed(2) : String(p.rating);
+                }
+
                 tr.innerHTML =
-                    '<td>' + p.source + '</td>' +
-                    '<td>' + p.id + '</td>' +
+                    '<td>' + esc(p.source) + '</td>' +
+                    '<td>' + esc(p.id) + '</td>' +
                     '<td>' + esc(title) + '</td>' +
-                    '<td>' + difficultyBadge + '</td>' +
-                    '<td>' + (p.rating || '-') + '</td>' +
-                    '<td>' + (p.ac_rate ? p.ac_rate.toFixed(1) + '%' : '-') + '</td>' +
+                    '<td class="col-tags">' + tagsHtml + '</td>' +
+                    '<td class="col-difficulty">' + difficultyBadge + '</td>' +
+                    '<td class="col-rating">' + ratingDisplay + '</td>' +
+                    '<td class="col-ac-rate">' + (p.ac_rate ? p.ac_rate.toFixed(1) + '%' : '-') + '</td>' +
                     '<td>' +
-                    '<button class="btn btn-sm btn-primary btn-view-detail" data-source="' + p.source + '" data-id="' + p.id + '" style="margin-right:0.4rem">' + i18n.t('common.detail') + '</button>' +
-                    '<button class="btn btn-danger btn-sm btn-delete-problem" data-url="/admin/api/problems/' + p.source + '/' + p.id + '">' + i18n.t('common.delete') + '</button>' +
+                    '<button class="btn btn-sm btn-primary btn-view-detail" data-source="' + esc(p.source) + '" data-id="' + esc(p.id) + '" style="margin-right:0.4rem">' + i18n.t('common.detail') + '</button>' +
+                    '<button class="btn btn-danger btn-sm btn-delete-problem" data-url="/admin/api/problems/' + encodeURIComponent(p.source) + '/' + encodeURIComponent(p.id) + '">' + i18n.t('common.delete') + '</button>' +
                     '</td>';
                 tbody.appendChild(tr);
             });
@@ -631,7 +914,6 @@
                     btn.onclick = function(e) {
                         e.preventDefault();
                         currentPage = page;
-                        history.replaceState(null, '', '/admin/problems?source=' + currentSource + '&page=' + page);
                         loadProblems(currentSource, page);
                     };
                 }
@@ -828,9 +1110,10 @@
                 tab.setAttribute('tabindex', '0');
                 tab.focus();
                 currentSource = newSource;
-                currentPage = 1;
-                history.replaceState(null, '', '/admin/problems?source=' + newSource);
-                loadProblems(currentSource, currentPage);
+                resetFilters();
+                updateSourceVisibility(currentSource);
+                loadTags(currentSource);
+                loadProblems(currentSource, 1);
             }
 
             tabs.forEach(function(btn, idx) {
@@ -853,10 +1136,37 @@
         }
 
         // Initial load
-        loadProblems(currentSource, 1);
+        parseUrlState();
+
+        // Restore UI state from URL
+        if (searchInput) searchInput.value = currentSearch;
+        if (diffSelect) diffSelect.value = currentDifficulty;
+        if (ppSelect) ppSelect.value = String(currentPerPage);
+        if (tagModeBtn) tagModeBtn.textContent = currentTagMode === 'any' ? 'OR' : 'AND';
+        if (ratingMinInput) ratingMinInput.value = currentRatingMin;
+        if (ratingMaxInput) ratingMaxInput.value = currentRatingMax;
+
+        // Activate correct source tab
+        if (sourceBtns) {
+            sourceBtns.querySelectorAll('.source-btn').forEach(function(b) {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false');
+                if (b.dataset.source === currentSource) {
+                    b.classList.add('active');
+                    b.setAttribute('aria-selected', 'true');
+                }
+            });
+        }
+
+        updateSortHeaders();
+        updateTagsBtnText();
+        updateSourceVisibility(currentSource);
+        loadTags(currentSource);
+        loadProblems(currentSource, currentPage);
         
         // Language change listener
         document.addEventListener('languageChanged', function() {
+            updateTagsBtnText();
             loadProblems(currentSource, currentPage);
         });
     }

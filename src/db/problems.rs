@@ -70,6 +70,12 @@ pub struct ListParams<'a> {
     pub per_page: u32,
     pub difficulty: Option<&'a str>,
     pub tags: Option<Vec<&'a str>>,
+    pub search: Option<&'a str>,
+    pub sort_by: Option<&'a str>,
+    pub sort_order: Option<&'a str>,
+    pub tag_mode: &'a str,
+    pub rating_min: Option<f64>,
+    pub rating_max: Option<f64>,
 }
 
 pub struct ListResult {
@@ -97,7 +103,27 @@ pub fn list_problems(pool: &DbPool, params: &ListParams<'_>) -> Option<ListResul
         idx += 1;
     }
 
+    if let Some(search) = params.search {
+        let trimmed = search.trim();
+        if !trimmed.is_empty() {
+            let escaped = trimmed
+                .replace('\\', "\\\\")
+                .replace('%', "\\%")
+                .replace('_', "\\_");
+            let like_val = format!("%{}%", escaped);
+            where_clauses.push(format!(
+                "(id LIKE ?{i} ESCAPE '\\' OR COALESCE(title,'') LIKE ?{j} ESCAPE '\\' OR COALESCE(title_cn,'') LIKE ?{k} ESCAPE '\\')",
+                i = idx, j = idx + 1, k = idx + 2
+            ));
+            sql_params.push(Box::new(like_val.clone()));
+            sql_params.push(Box::new(like_val.clone()));
+            sql_params.push(Box::new(like_val));
+            idx += 3;
+        }
+    }
+
     if let Some(ref tags) = params.tags {
+        let joiner = if params.tag_mode == "all" { " AND " } else { " OR " };
         let tag_conditions: Vec<String> = tags
             .iter()
             .map(|tag| {
@@ -111,8 +137,19 @@ pub fn list_problems(pool: &DbPool, params: &ListParams<'_>) -> Option<ListResul
             })
             .collect();
         if !tag_conditions.is_empty() {
-            where_clauses.push(format!("({})", tag_conditions.join(" OR ")));
+            where_clauses.push(format!("({})", tag_conditions.join(joiner)));
         }
+    }
+
+    if let Some(min) = params.rating_min {
+        where_clauses.push(format!("rating >= ?{}", idx));
+        sql_params.push(Box::new(min));
+        idx += 1;
+    }
+    if let Some(max) = params.rating_max {
+        where_clauses.push(format!("rating <= ?{}", idx));
+        sql_params.push(Box::new(max));
+        idx += 1;
     }
 
     let where_sql = where_clauses.join(" AND ");
@@ -132,11 +169,28 @@ pub fn list_problems(pool: &DbPool, params: &ListParams<'_>) -> Option<ListResul
         (total + per_page - 1) / per_page
     };
 
+    let order_col = match params.sort_by {
+        Some("difficulty") => "CASE WHEN LOWER(difficulty)='easy' THEN 1 WHEN LOWER(difficulty)='medium' THEN 2 WHEN LOWER(difficulty)='hard' THEN 3 ELSE 4 END",
+        Some("rating") => "rating",
+        Some("ac_rate") => "ac_rate",
+        Some("id") => "id",
+        _ => "id",
+    };
+    let order_dir = match params.sort_by {
+        Some(_) => match params.sort_order {
+            Some("desc") => "DESC",
+            _ => "ASC",
+        },
+        None => "ASC",
+    };
+
     let select_sql = format!(
         "SELECT id, source, slug, title, title_cn, difficulty, ac_rate, rating, \
          contest, problem_index, tags, link \
-         FROM problems WHERE {} ORDER BY id ASC LIMIT ?{} OFFSET ?{}",
+         FROM problems WHERE {} ORDER BY {} {}, id ASC LIMIT ?{} OFFSET ?{}",
         where_sql,
+        order_col,
+        order_dir,
         idx,
         idx + 1
     );
@@ -228,4 +282,23 @@ pub fn delete_problem(pool: &DbPool, source: &str, id: &str) -> rusqlite::Result
     )?;
     tx.commit()?;
     Ok(affected > 0)
+}
+
+pub fn list_tags(pool: &DbPool, source: &str) -> Option<Vec<String>> {
+    let conn = pool.get().ok()?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT DISTINCT LOWER(TRIM(je.value)) AS tag \
+             FROM problems p, json_each(\
+                 CASE WHEN p.tags IS NOT NULL AND p.tags != '' AND json_valid(p.tags) \
+                      THEN p.tags ELSE '[]' END\
+             ) je \
+             WHERE p.source = ?1 AND TRIM(je.value) != '' \
+             ORDER BY tag ASC",
+        )
+        .ok()?;
+    let rows = stmt
+        .query_map(params![source], |row| row.get::<_, String>(0))
+        .ok()?;
+    Some(rows.filter_map(|r| r.ok()).collect())
 }
