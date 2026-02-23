@@ -6,14 +6,14 @@ Built with Rust (axum + SQLite), featuring vector similarity search, a tri-lingu
 
 ## Supported Platforms
 
-| Platform | Source Key |
-|----------|-----------|
-| LeetCode | `leetcode` |
-| AtCoder | `atcoder` |
-| Codeforces | `codeforces` |
-| Luogu | `luogu` |
-| UVa | `uva` |
-| SPOJ | `spoj` |
+| Platform | Source Key | Status |
+|----------|-----------|--------|
+| LeetCode | `leetcode` | ✅ |
+| AtCoder | `atcoder` | ✅ |
+| Codeforces | `codeforces` | ✅ |
+| Luogu | `luogu` | 🚧 Planned |
+| UVa | `uva` | 🚧 Planned |
+| SPOJ | `spoj` | 🚧 Planned |
 
 ## Tech Stack
 
