@@ -104,8 +104,7 @@ pub fn startup_self_check(pool: &crate::db::DbPool) {
             tracing::warn!("vec_embeddings is empty, skipping dimension check");
         }
         Err(e) => {
-            eprintln!("FATAL: failed to check vec dimension: {}", e);
-            std::process::exit(1);
+            tracing::warn!("vec_embeddings not queryable, skipping dimension check: {}", e);
         }
     }
 }

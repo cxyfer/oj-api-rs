@@ -43,10 +43,13 @@ async fn main() {
         )
         .init();
 
-    // 3. Register sqlite-vec
+    // 3. Ensure data directory exists
+    db::ensure_data_dir(&config.database_path);
+
+    // 4. Register sqlite-vec
     db::register_sqlite_vec();
 
-    // 4. Build pools
+    // 5. Build pools
     let ro_pool = db::create_ro_pool(
         &config.database_path,
         config.db_pool_max_size,
@@ -58,21 +61,22 @@ async fn main() {
         config.busy_timeout_ms,
     );
 
-    // 5. Ensure tables exist
+    // 6. Ensure tables exist
+    db::ensure_data_tables(&rw_pool);
     db::ensure_api_tokens_table(&rw_pool);
     db::ensure_app_settings_table(&rw_pool);
 
-    // 6. Read initial settings
+    // 7. Read initial settings
     let auth_enabled = db::settings::get_token_auth_enabled(&rw_pool);
 
-    // 7. Startup self-check
+    // 8. Startup self-check
     health::startup_self_check(&ro_pool);
 
-    // 8. Build shared auth state
+    // 9. Build shared auth state
     let admin_sessions = Arc::new(RwLock::new(HashMap::<String, i64>::new()));
     let token_auth_flag = Arc::new(AtomicBool::new(auth_enabled));
 
-    // 9. Build AppState (shares Arc refs with Extensions)
+    // 10. Build AppState (shares Arc refs with Extensions)
     let state = Arc::new(AppState {
         ro_pool: ro_pool.clone(),
         rw_pool,
@@ -85,7 +89,7 @@ async fn main() {
         admin_sessions: admin_sessions.clone(),
     });
 
-    // 10. Assemble routers
+    // 11. Assemble routers
     let health_cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)

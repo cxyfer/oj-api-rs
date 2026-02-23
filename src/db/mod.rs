@@ -50,6 +50,77 @@ pub fn create_rw_pool(path: &str, max_size: u32, busy_timeout_ms: u64) -> DbPool
         .expect("failed to create read-write pool")
 }
 
+pub fn ensure_data_dir(path: &str) {
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        std::fs::create_dir_all(parent).unwrap_or_else(|e| {
+            eprintln!("FATAL: failed to create database directory {:?}: {}", parent, e);
+            std::process::exit(1);
+        });
+    }
+}
+
+pub fn ensure_data_tables(pool: &DbPool) {
+    let conn = pool.get().expect("failed to get connection");
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS problems (
+            id TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT 'leetcode',
+            slug TEXT NOT NULL,
+            title TEXT,
+            title_cn TEXT,
+            difficulty TEXT,
+            ac_rate REAL,
+            rating REAL,
+            contest TEXT,
+            problem_index TEXT,
+            tags TEXT,
+            link TEXT,
+            category TEXT,
+            paid_only INTEGER,
+            content TEXT,
+            content_cn TEXT,
+            similar_questions TEXT,
+            PRIMARY KEY (source, id)
+        );
+        CREATE TABLE IF NOT EXISTS daily_challenge (
+            date TEXT NOT NULL,
+            domain TEXT NOT NULL,
+            id INTEGER,
+            slug TEXT NOT NULL,
+            title TEXT,
+            title_cn TEXT,
+            difficulty TEXT,
+            ac_rate REAL,
+            rating REAL,
+            contest TEXT,
+            problem_index TEXT,
+            tags TEXT,
+            link TEXT,
+            category TEXT,
+            paid_only INTEGER,
+            content TEXT,
+            content_cn TEXT,
+            similar_questions TEXT,
+            PRIMARY KEY (date, domain)
+        );
+        CREATE TABLE IF NOT EXISTS problem_embeddings (
+            source TEXT NOT NULL,
+            problem_id TEXT NOT NULL,
+            rewritten_content TEXT,
+            model TEXT NOT NULL,
+            dim INTEGER NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (source, problem_id)
+        );
+        CREATE VIRTUAL TABLE IF NOT EXISTS vec_embeddings USING vec0(
+            source TEXT,
+            problem_id TEXT,
+            embedding float[768]
+        );",
+    )
+    .expect("failed to create data tables");
+}
+
 pub fn ensure_app_settings_table(pool: &DbPool) {
     let conn = pool.get().expect("failed to get connection");
     conn.execute_batch(
