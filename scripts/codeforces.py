@@ -10,6 +10,7 @@ from typing import Optional, Union
 from bs4 import BeautifulSoup
 from curl_cffi.requests import AsyncSession
 
+from utils.base_crawler import BaseCrawler
 from utils.config import get_config
 from utils.database import ProblemsDatabaseManager
 from utils.html_converter import (
@@ -33,7 +34,7 @@ RATE_LIMIT_MARKERS = (
 )
 
 
-class CodeforcesClient:
+class CodeforcesClient(BaseCrawler):
     API_BASE = "https://codeforces.com/api"
     PROBLEMSET_API = f"{API_BASE}/problemset.problems"
     CONTEST_LIST_API = f"{API_BASE}/contest.list"
@@ -49,6 +50,7 @@ class CodeforcesClient:
         backoff_base: float = 2.0,
         max_backoff: float = 60.0,
     ) -> None:
+        super().__init__(crawler_name="codeforces")
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.progress_file = self.data_dir / "codeforces_progress.json"
@@ -60,8 +62,7 @@ class CodeforcesClient:
         self._last_request_at = time.monotonic() - rate_limit
 
     def _headers(self, referer: Optional[str] = None) -> dict:
-        # curl_cffi impersonate handles most headers
-        headers = {}
+        headers: dict[str, str] = {}
         if referer:
             headers["Referer"] = referer
         return headers
@@ -203,7 +204,7 @@ class CodeforcesClient:
         return merged
 
     async def sync_problemset(self) -> list[dict]:
-        async with AsyncSession(impersonate="chrome124") as session:
+        async with self._create_curl_session(impersonate="chrome124") as session:
             payload = await self._fetch_json(session, self.PROBLEMSET_API)
         if not payload:
             return []
@@ -229,7 +230,7 @@ class CodeforcesClient:
     async def fetch_contest_list(self, include_gym: bool = False) -> list[int]:
         gym_flag = "true" if include_gym else "false"
         url = f"{self.CONTEST_LIST_API}?gym={gym_flag}"
-        async with AsyncSession(impersonate="chrome124") as session:
+        async with self._create_curl_session(impersonate="chrome124") as session:
             payload = await self._fetch_json(session, url)
         if not payload:
             return []
@@ -402,7 +403,7 @@ class CodeforcesClient:
         return content
 
     async def fetch_single_contest(self, contest_id: int) -> int:
-        async with AsyncSession(impersonate="chrome124") as session:
+        async with self._create_curl_session(impersonate="chrome124") as session:
             problems = await self.fetch_contest_problems(contest_id, session)
             if not problems:
                 return 0
@@ -426,7 +427,7 @@ class CodeforcesClient:
             len(remaining),
         )
         total = 0
-        async with AsyncSession(impersonate="chrome124") as session:
+        async with self._create_curl_session(impersonate="chrome124") as session:
             for contest_id in contests:
                 if str(contest_id) in fetched:
                     continue
@@ -454,7 +455,7 @@ class CodeforcesClient:
         filled = 0
         logger.info("Fetching missing content for %s problems...", total)
 
-        async with AsyncSession(impersonate="chrome124") as session:
+        async with self._create_curl_session(impersonate="chrome124") as session:
             for index, (problem_id, link) in enumerate(missing, start=1):
                 content = await self.fetch_content_by_url(session, link)
                 if content:

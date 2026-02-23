@@ -8,6 +8,7 @@ import aiohttp
 import pytz
 from bs4 import BeautifulSoup
 
+from utils.base_crawler import BaseCrawler
 from utils.config import get_config
 from utils.database import DailyChallengeDatabaseManager, ProblemsDatabaseManager
 from utils.html_converter import normalize_math_delimiters
@@ -65,7 +66,7 @@ def generate_history_dates(anchor_date: str, years: int = 5) -> list[str]:
     return dates
 
 
-class LeetCodeClient:
+class LeetCodeClient(BaseCrawler):
     """
     LeetCode API Client for fetching problems, daily challenges and more.
     Supports both LeetCode.com and LeetCode.cn domains.
@@ -98,6 +99,8 @@ class LeetCodeClient:
         self.domain = domain.lower()
         if self.domain not in ["com", "cn"]:
             raise ValueError("Domain must be either 'com' or 'cn'")
+
+        super().__init__(crawler_name="leetcode")
 
         self.max_retries = max_retries
         self.retry_delay = retry_delay
@@ -169,13 +172,11 @@ class LeetCodeClient:
         attempt = 0
         while attempt < self.max_retries:
             try:
-                async with aiohttp.ClientSession() as session:
+                async with self._create_aiohttp_session() as session:
                     async with session.get(
                         url,
-                        headers={
-                            "User-Agent": "Mozilla/5.0",
-                            "X-Requested-With": "XMLHttpRequest",
-                        },
+                        headers={**self._headers(), "X-Requested-With": "XMLHttpRequest"},
+                        proxy=self._get_aiohttp_request_proxy("https"),
                     ) as res:
                         if res.status != 200:
                             raise Exception(f"HTTP {res.status}")
@@ -252,8 +253,8 @@ class LeetCodeClient:
         attempt = 0
         while attempt < self.max_retries:
             try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(self.RATINGS_URL) as res:
+                async with self._create_aiohttp_session() as session:
+                    async with session.get(self.RATINGS_URL, proxy=self._get_aiohttp_request_proxy("https")) as res:
                         if res.status != 200:
                             raise Exception(f"HTTP {res.status}")
                         text = await res.text()
@@ -301,7 +302,7 @@ class LeetCodeClient:
         """
         url = self.graphql_url
         headers = {
-            "User-Agent": "Mozilla/5.0",
+            **self._headers(),
             "X-Requested-With": "XMLHttpRequest",
             "Content-Type": "application/json",
         }
@@ -338,8 +339,8 @@ class LeetCodeClient:
         attempt = 0
         while attempt < self.max_retries:
             try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(url, headers=headers, json=payload) as res:
+                async with self._create_aiohttp_session() as session:
+                    async with session.post(url, headers=headers, json=payload, proxy=self._get_aiohttp_request_proxy("https")) as res:
                         if res.status != 200:
                             raise Exception(f"HTTP {res.status}")
                         text = await res.text()
@@ -562,8 +563,8 @@ class LeetCodeClient:
 
         logger.info(f"Fetching daily challenge from LeetCode {domain.upper()} API...")
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(api_endpoint, headers=headers, json=payload) as res:
+        async with self._create_aiohttp_session() as session:
+            async with session.post(api_endpoint, headers=headers, json=payload, proxy=self._get_aiohttp_request_proxy("https")) as res:
                 if res.status != 200:
                     error_msg = f"API request failed, status code: {res.status}, response: {await res.text()}"
                     logger.error(error_msg)
@@ -837,8 +838,8 @@ class LeetCodeClient:
         try:
             logger.info(f"Fetching recent AC submissions for user: {username}")
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(self.graphql_url, headers=headers, json=payload) as response:
+            async with self._create_aiohttp_session() as session:
+                async with session.post(self.graphql_url, headers=headers, json=payload, proxy=self._get_aiohttp_request_proxy("https")) as response:
                     if response.status != 200:
                         error_text = await response.text()
                         logger.error(f"API request failed: {response.status} - {error_text}")
@@ -931,9 +932,8 @@ class LeetCodeClient:
 
         # Request headers
         headers = {
+            **self._headers(referer="https://leetcode.com/problemset/"),
             "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0",
-            "Referer": "https://leetcode.com/problemset/",
             "Origin": "https://leetcode.com",
         }
 
@@ -947,8 +947,8 @@ class LeetCodeClient:
         try:
             logger.info(f"Fetching monthly daily challenges for {year}-{month}")
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(self.graphql_url, headers=headers, json=payload) as response:
+            async with self._create_aiohttp_session() as session:
+                async with session.post(self.graphql_url, headers=headers, json=payload, proxy=self._get_aiohttp_request_proxy("https")) as response:
                     if response.status != 200:
                         error_text = await response.text()
                         logger.error(f"API request failed: {response.status} - {error_text}")

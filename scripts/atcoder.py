@@ -9,6 +9,7 @@ from typing import Optional
 import aiohttp
 from bs4 import BeautifulSoup
 
+from utils.base_crawler import BaseCrawler
 from utils.config import get_config
 from utils.database import ProblemsDatabaseManager
 from utils.html_converter import fix_relative_urls_in_soup, normalize_newlines, table_to_markdown
@@ -16,10 +17,8 @@ from utils.logger import get_leetcode_logger
 
 logger = get_leetcode_logger()
 
-USER_AGENT = "LeetCodeDailyDiscordBot/1.0"
 
-
-class AtCoderClient:
+class AtCoderClient(BaseCrawler):
     KENKOOOO_PROBLEMS_URL = "https://kenkoooo.com/atcoder/resources/problems.json"
     CONTEST_ARCHIVE_URL = "https://atcoder.jp/contests/archive"
     CONTEST_TASKS_URL_TEMPLATE = "https://atcoder.jp/contests/{contest_id}/tasks"
@@ -34,6 +33,7 @@ class AtCoderClient:
         backoff_base: float = 1.0,
         max_backoff: float = 30.0,
     ) -> None:
+        super().__init__(crawler_name="atcoder")
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.progress_file = self.data_dir / "atcoder_progress.json"
@@ -45,13 +45,9 @@ class AtCoderClient:
         self._last_request_at = 0.0
 
     def _headers(self, referer: Optional[str] = None) -> dict:
-        headers = {
-            "User-Agent": USER_AGENT,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9,ja;q=0.8",
-        }
-        if referer:
-            headers["Referer"] = referer
+        headers = super()._headers(referer)
+        headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        headers["Accept-Language"] = "en-US,en;q=0.9,ja;q=0.8"
         return headers
 
     async def _throttle(self) -> None:
@@ -70,7 +66,11 @@ class AtCoderClient:
         for attempt in range(1, self.max_retries + 1):
             await self._throttle()
             try:
-                async with session.get(url, headers=self._headers(referer)) as response:
+                async with session.get(
+                    url,
+                    headers=self._headers(referer),
+                    proxy=self._get_aiohttp_request_proxy("https"),
+                ) as response:
                     if response.status == 429:
                         backoff = min(self.max_backoff, self.backoff_base * (2 ** (attempt - 1)))
                         logger.warning("Rate limited (%s). Backing off %.1fs", url, backoff)
@@ -275,7 +275,7 @@ class AtCoderClient:
         }
 
     async def fetch_from_kenkoooo(self) -> list[dict]:
-        async with aiohttp.ClientSession() as session:
+        async with self._create_aiohttp_session() as session:
             text = await self._fetch_text(session, self.KENKOOOO_PROBLEMS_URL)
         if not text:
             return []
@@ -297,7 +297,7 @@ class AtCoderClient:
     async def fetch_contest_list(self, pages: Optional[int] = None) -> list[str]:
         contests: list[str] = []
         page = 1
-        async with aiohttp.ClientSession() as session:
+        async with self._create_aiohttp_session() as session:
             while True:
                 if pages is not None and page > pages:
                     break
@@ -387,7 +387,7 @@ class AtCoderClient:
             json.dump(progress, f, indent=2, sort_keys=True)
 
     async def fetch_single_contest(self, contest_id: str) -> int:
-        async with aiohttp.ClientSession() as session:
+        async with self._create_aiohttp_session() as session:
             problems = await self.fetch_contest_problems(contest_id, session)
             if not problems:
                 return 0
@@ -403,7 +403,7 @@ class AtCoderClient:
         progress = self.get_progress() if resume else {"fetched_contests": []}
         fetched = set(progress.get("fetched_contests", []))
         total = 0
-        async with aiohttp.ClientSession() as session:
+        async with self._create_aiohttp_session() as session:
             for contest_id in contests:
                 if contest_id in fetched:
                     continue
@@ -441,7 +441,7 @@ class AtCoderClient:
         filled = 0
         logger.info("Fetching missing content for %s problems...", total)
 
-        async with aiohttp.ClientSession() as session:
+        async with self._create_aiohttp_session() as session:
             for index, (problem_id, link) in enumerate(missing, start=1):
                 content = await self.fetch_content_by_url(session, link)
                 if content:

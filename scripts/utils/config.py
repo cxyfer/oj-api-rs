@@ -4,6 +4,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -116,6 +117,31 @@ class ConfigManager:
             min_similarity=section.get("min_similarity", 0.70),
         )
 
+    def get_crawler_config(self, crawler_name: str) -> "CrawlerHttpConfig":
+        _FIELDS = ("user_agent", "proxy", "http_proxy", "https_proxy", "socks5_proxy")
+        global_section = self._config.get("crawler", {})
+        per_crawler = global_section.get(crawler_name, {}) if isinstance(global_section, dict) else {}
+
+        def _norm(val: Any) -> Optional[str]:
+            if val is None:
+                return None
+            s = str(val).strip()
+            return s if s else None
+
+        merged = {}
+        for field in _FIELDS:
+            value = _norm(per_crawler.get(field)) if isinstance(per_crawler, dict) else None
+            if value is None:
+                value = _norm(global_section.get(field))
+            merged[field] = value
+
+        proxy_fields = ("proxy", "http_proxy", "https_proxy", "socks5_proxy")
+        for field in proxy_fields:
+            if merged[field] is not None:
+                _validate_proxy_url(merged[field])
+
+        return CrawlerHttpConfig(**merged)
+
 
 @dataclass
 class EmbeddingModelConfig:
@@ -142,6 +168,35 @@ class RewriteModelConfig:
 class SimilarConfig:
     top_k: int = 5
     min_similarity: float = 0.70
+
+
+_VALID_PROXY_SCHEMES = {"http", "https", "socks5", "socks5h"}
+
+
+def _validate_proxy_url(url: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme not in _VALID_PROXY_SCHEMES:
+        raise ValueError(
+            f"Invalid proxy scheme '{parsed.scheme}' in '{url}'. "
+            f"Must be one of: {', '.join(sorted(_VALID_PROXY_SCHEMES))}"
+        )
+    if not parsed.hostname:
+        raise ValueError(f"Proxy URL missing host: '{url}'")
+
+
+@dataclass(frozen=True)
+class CrawlerHttpConfig:
+    user_agent: Optional[str] = None
+    proxy: Optional[str] = None
+    http_proxy: Optional[str] = None
+    https_proxy: Optional[str] = None
+    socks5_proxy: Optional[str] = None
+
+    def resolve_proxy(self, scheme: str = "https") -> Optional[str]:
+        if scheme not in ("http", "https"):
+            raise ValueError(f"Invalid scheme '{scheme}', must be 'http' or 'https'")
+        specific = self.http_proxy if scheme == "http" else self.https_proxy
+        return specific or self.socks5_proxy or self.proxy or None
 
 
 _config: Optional[ConfigManager] = None
