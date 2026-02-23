@@ -17,6 +17,7 @@ COPY --from=builder /app/target/release/oj-api-rs /usr/local/bin/
 COPY templates/ /app/templates/
 COPY static/ /app/static/
 COPY scripts/ /app/scripts/
+COPY config.toml.example /app/config.toml.example
 WORKDIR /app
 RUN cd scripts && uv sync --frozen --no-dev
 EXPOSE 3000

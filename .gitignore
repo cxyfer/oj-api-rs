@@ -252,4 +252,5 @@ scripts/logs/
 
 # Environment
 .env
+config.toml
 

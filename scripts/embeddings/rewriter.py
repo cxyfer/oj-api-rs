@@ -89,7 +89,7 @@ class EmbeddingRewriter:
             # base_url set without api_key -> error
             raise ValueError(
                 "Rewrite model has base_url configured but no api_key. "
-                "Please also set api_key in [llm.gemini.models.rewrite]"
+                "Please also set api_key in [gemini.models.rewrite]"
             )
 
         # Use model-specific base_url if set, otherwise inherit global

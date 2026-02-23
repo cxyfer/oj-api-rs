@@ -28,14 +28,20 @@ pub struct AppState {
     pub embed_semaphore: Semaphore,
     pub token_auth_enabled: Arc<AtomicBool>,
     pub admin_sessions: Arc<RwLock<HashMap<String, i64>>>,
+    pub config_path: Option<String>,
 }
 
 #[tokio::main]
 async fn main() {
     // 1. Load config
-    let config = config::Config::from_env();
+    let config = config::Config::load();
 
-    // 2. Init tracing
+    // 2. Set RUST_LOG from config (only if not already set)
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", &config.logging.rust_log);
+    }
+
+    // 3. Init tracing
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -43,40 +49,41 @@ async fn main() {
         )
         .init();
 
-    // 3. Ensure data directory exists
-    db::ensure_data_dir(&config.database_path);
+    // 4. Ensure data directory exists
+    db::ensure_data_dir(&config.database.path);
 
-    // 4. Register sqlite-vec
+    // 5. Register sqlite-vec
     db::register_sqlite_vec();
 
-    // 5. Build pools
+    // 6. Build pools
     let ro_pool = db::create_ro_pool(
-        &config.database_path,
-        config.db_pool_max_size,
-        config.busy_timeout_ms,
+        &config.database.path,
+        config.database.pool_max_size,
+        config.database.busy_timeout_ms,
     );
     let rw_pool = db::create_rw_pool(
-        &config.database_path,
+        &config.database.path,
         2, // admin operations are infrequent
-        config.busy_timeout_ms,
+        config.database.busy_timeout_ms,
     );
 
-    // 6. Ensure tables exist
+    // 7. Ensure tables exist
     db::ensure_data_tables(&rw_pool);
     db::ensure_api_tokens_table(&rw_pool);
     db::ensure_app_settings_table(&rw_pool);
 
-    // 7. Read initial settings
+    // 8. Read initial settings
     let auth_enabled = db::settings::get_token_auth_enabled(&rw_pool);
 
-    // 8. Startup self-check
+    // 9. Startup self-check
     health::startup_self_check(&ro_pool);
 
-    // 9. Build shared auth state
+    // 10. Build shared auth state
     let admin_sessions = Arc::new(RwLock::new(HashMap::<String, i64>::new()));
     let token_auth_flag = Arc::new(AtomicBool::new(auth_enabled));
 
-    // 10. Build AppState (shares Arc refs with Extensions)
+    // 11. Build AppState
+    let config_path_for_children = Some(config.config_path.to_string_lossy().into_owned());
     let state = Arc::new(AppState {
         ro_pool: ro_pool.clone(),
         rw_pool,
@@ -84,12 +91,13 @@ async fn main() {
         crawler_lock: tokio::sync::Mutex::new(None),
         crawler_history: tokio::sync::Mutex::new(VecDeque::new()),
         daily_fallback: tokio::sync::Mutex::new(HashMap::new()),
-        embed_semaphore: Semaphore::new(4),
+        embed_semaphore: Semaphore::new(config.embedding.concurrency as usize),
         token_auth_enabled: token_auth_flag.clone(),
         admin_sessions: admin_sessions.clone(),
+        config_path: config_path_for_children,
     });
 
-    // 11. Assemble routers
+    // 12. Assemble routers
     let health_cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -107,24 +115,24 @@ async fn main() {
         .nest_service("/static", ServeDir::new("static"))
         // Extensions for auth middleware
         .layer(Extension(auth::AuthRwPool(Arc::new(
-            db::create_rw_pool(&config.database_path, 2, config.busy_timeout_ms),
+            db::create_rw_pool(&config.database.path, 2, config.database.busy_timeout_ms),
         ))))
-        .layer(Extension(auth::AdminSecret(config.admin_secret.clone())))
+        .layer(Extension(auth::AdminSecret(config.server.admin_secret.clone())))
         .layer(Extension(auth::AdminSessions(admin_sessions)))
         .layer(Extension(auth::TokenAuthEnabled(token_auth_flag)))
         .with_state(state);
 
-    // 9. Start server
-    let listener = tokio::net::TcpListener::bind(&config.listen_addr)
+    // 13. Start server
+    let listener = tokio::net::TcpListener::bind(&config.server.listen_addr)
         .await
         .unwrap_or_else(|e| {
-            eprintln!("FATAL: failed to bind to {}: {}", config.listen_addr, e);
+            eprintln!("FATAL: failed to bind to {}: {}", config.server.listen_addr, e);
             std::process::exit(1);
         });
 
-    tracing::info!("listening on {}", config.listen_addr);
+    tracing::info!("listening on {}", config.server.listen_addr);
 
-    let shutdown_timeout = config.graceful_shutdown_secs;
+    let shutdown_timeout = config.server.graceful_shutdown_secs;
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal(shutdown_timeout))
         .await

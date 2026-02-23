@@ -54,7 +54,7 @@ class EmbeddingGenerator:
             # base_url set without api_key -> error
             raise ValueError(
                 "Embedding model has base_url configured but no api_key. "
-                "Please also set api_key in [llm.gemini.models.embedding]"
+                "Please also set api_key in [gemini.models.embedding]"
             )
 
         # Use model-specific base_url if set, otherwise inherit global

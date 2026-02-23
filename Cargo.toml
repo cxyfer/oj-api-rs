@@ -23,4 +23,4 @@ chrono = { version = "0.4", features = ["serde"] }
 rand = "0.8"
 uuid = { version = "1", features = ["v4"] }
 urlencoding = "2"
-dotenvy = "0.15"
+toml = "1"

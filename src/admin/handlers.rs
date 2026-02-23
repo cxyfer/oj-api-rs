@@ -330,7 +330,7 @@ pub async fn trigger_crawler(
 
     let script = source.script_name();
     let state_clone = state.clone();
-    let timeout_secs = state.config.crawler_timeout_secs;
+    let timeout_secs = state.config.crawler.timeout_secs;
     let job_id_clone = job_id.clone();
 
     tokio::spawn(async move {
@@ -341,6 +341,10 @@ pub async fn trigger_crawler(
         cmd.kill_on_drop(true);
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
+
+        if let Some(ref cp) = state_clone.config_path {
+            cmd.env("CONFIG_PATH", cp);
+        }
 
         let child = match cmd.spawn() {
             Ok(c) => c,

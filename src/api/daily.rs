@@ -122,6 +122,10 @@ pub async fn get_daily(
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
 
+    if let Some(ref cp) = state.config_path {
+        cmd.env("CONFIG_PATH", cp);
+    }
+
     let child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) => {
@@ -150,7 +154,7 @@ pub async fn get_daily(
     // Spawn background task
     let state_clone = state.clone();
     let key_clone = key.clone();
-    let timeout_secs = state.config.crawler_timeout_secs;
+    let timeout_secs = state.config.crawler.timeout_secs;
     let job_id = uuid::Uuid::new_v4().to_string();
 
     tokio::spawn(async move {

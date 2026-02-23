@@ -1313,23 +1313,8 @@ async def main():
     fallback_data = str((scripts_dir / "../data").resolve())
     try:
         config = get_config()
-        config_dir = Path(config.config_path).resolve().parent
-        db_path = str((config_dir / config.database_path).resolve())
-        data_dir = str((config_dir / config.data_dir).resolve())
-        if Path(db_path).parent == scripts_dir / "data":
-            import sys
-
-            sys.stderr.write(
-                "Warning: config database.path resolves inside scripts/data/, using fallback.\n"
-            )
-            db_path = fallback_db
-        if Path(data_dir) == scripts_dir / "data":
-            import sys
-
-            sys.stderr.write(
-                "Warning: config data.dir resolves inside scripts/data/, using fallback.\n"
-            )
-            data_dir = fallback_data
+        db_path = str(Path(config.database_path).resolve())
+        data_dir = str(Path(db_path).parent)
     except Exception as e:
         import sys
 

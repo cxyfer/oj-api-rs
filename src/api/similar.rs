@@ -46,7 +46,7 @@ pub async fn similar_by_problem(
         .map(|s| s.split(',').map(|v| v.trim().to_string()).collect());
 
     let pool = state.ro_pool.clone();
-    let over_fetch = state.config.over_fetch_factor;
+    let over_fetch = state.config.embedding.over_fetch_factor;
 
     let source_clone = source.clone();
     let id_clone = id.clone();
@@ -126,8 +126,7 @@ pub async fn similar_by_text(
         .as_ref()
         .map(|s| s.split(',').map(|v| v.trim().to_string()).collect());
 
-    let embed_timeout = state.config.embed_timeout_secs;
-    let gemini_key = state.config.gemini_api_key.clone();
+    let embed_timeout = state.config.embedding.timeout_secs;
 
     // Acquire semaphore permit
     let _permit = match state.embed_semaphore.acquire().await {
@@ -145,8 +144,8 @@ pub async fn similar_by_text(
     cmd.stderr(std::process::Stdio::piped());
     cmd.kill_on_drop(true);
 
-    if let Some(key) = &gemini_key {
-        cmd.env("GEMINI_API_KEY", key);
+    if let Some(ref cp) = state.config_path {
+        cmd.env("CONFIG_PATH", cp);
     }
 
     let child = match cmd.spawn() {
@@ -197,7 +196,7 @@ pub async fn similar_by_text(
     };
 
     let pool = state.ro_pool.clone();
-    let over_fetch = state.config.over_fetch_factor;
+    let over_fetch = state.config.embedding.over_fetch_factor;
 
     let result = tokio::task::spawn_blocking(move || {
         let k = (limit * over_fetch).min(200);

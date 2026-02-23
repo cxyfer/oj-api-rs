@@ -28,8 +28,8 @@ Built with Rust (axum + SQLite), featuring vector similarity search, a tri-lingu
 ## Quick Start
 
 ```bash
-cp .env.example .env
-# Edit .env — ADMIN_SECRET is required
+cp config.toml.example config.toml
+# Edit config.toml — set server.admin_secret
 
 cargo run --release
 ```
@@ -41,28 +41,40 @@ The server starts at `http://0.0.0.0:3000` by default.
 ```bash
 docker build -t oj-api-rs .
 docker run -p 3000:3000 \
-  -e ADMIN_SECRET=your-secret \
+  -v ./config.toml:/app/config.toml:ro \
   -v oj-data:/app/data \
   oj-api-rs
 ```
 
 ## Configuration
 
-All settings are loaded from environment variables (auto-reads `.env`).
+All settings are loaded from `config.toml` at the project root (overridable via `CONFIG_PATH` env var). See `config.toml.example` for all options and defaults.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LISTEN_ADDR` | `0.0.0.0:3000` | Server bind address |
-| `DATABASE_PATH` | `data/data.db` | SQLite database path |
-| `ADMIN_SECRET` | *(required)* | Admin login credential |
-| `GEMINI_API_KEY` | *(optional)* | Google Gemini API key for embeddings |
-| `DB_POOL_MAX_SIZE` | `8` | Read-only connection pool size |
-| `BUSY_TIMEOUT_MS` | `5000` | SQLite busy timeout (ms) |
-| `EMBED_TIMEOUT_SECS` | `30` | Embedding CLI timeout |
-| `CRAWLER_TIMEOUT_SECS` | `300` | Crawler process timeout |
-| `OVER_FETCH_FACTOR` | `4` | KNN over-fetch multiplier |
-| `GRACEFUL_SHUTDOWN_SECS` | `10` | Shutdown grace period |
-| `RUST_LOG` | `info` | Log level filter |
+```toml
+[server]
+listen_addr = "0.0.0.0:3000"
+admin_secret = "changeme"       # required — warning emitted if empty or "changeme"
+graceful_shutdown_secs = 10
+
+[database]
+path = "data/data.db"           # resolved relative to config file directory
+pool_max_size = 8
+busy_timeout_ms = 5000
+
+[gemini]
+api_key = ""                    # Gemini API key (Python-only, Rust ignores this section)
+
+[crawler]
+timeout_secs = 300
+
+[embedding]
+timeout_secs = 30
+over_fetch_factor = 4
+concurrency = 4                 # 1..=32
+
+[logging]
+rust_log = "info"
+```
 
 ## API Endpoints
 
@@ -166,7 +178,7 @@ Python Crawlers (scripts/)
 ```
 src/
 ├── main.rs           # Entry point, router assembly, graceful shutdown
-├── config.rs         # Environment-based configuration
+├── config.rs         # TOML-based configuration (config.toml + serde)
 ├── models.rs         # Shared data structures (Problem, CrawlerJob, etc.)
 ├── health.rs         # Health check with DB/extension validation
 ├── detect.rs         # Source detection (URL, prefix, pattern inference)
@@ -193,7 +205,6 @@ scripts/              # Python crawlers and embedding pipeline
 ├── atcoder.py        # AtCoder crawler (--fetch-all, --resume, --contest, ...)
 ├── codeforces.py     # Codeforces crawler (--sync-problemset, --fetch-all, ...)
 ├── embedding_cli.py  # Embedding pipeline (--build, --embed-text)
-├── config.toml       # DB path config for scripts
 ├── utils/            # Shared utilities (config, database, logger, html_converter)
 └── embeddings/       # Embedding modules (generator, rewriter, searcher, storage)
 

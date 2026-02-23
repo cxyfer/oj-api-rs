@@ -6,4 +6,5 @@ scripts/logs/
 scripts/embeddings/
 .git/
 .env
+config.toml
 .claude/
