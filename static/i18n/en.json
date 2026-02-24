@@ -124,7 +124,8 @@
       "rate_limit": "Rate Limit",
       "sync_problemset": "Sync Problemset",
       "missing_problems": "Missing Problems",
-      "include_gym": "Include Gym"
+      "include_gym": "Include Gym",
+      "test": "Test Target"
     }
   },
   "login": {

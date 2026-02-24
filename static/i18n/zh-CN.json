@@ -119,7 +119,8 @@
       "rate_limit": "频率限制",
       "sync_problemset": "同步题目集",
       "missing_problems": "缺失题目",
-      "include_gym": "包含 Gym"
+      "include_gym": "包含 Gym",
+      "test": "测试目标"
     }
   },
   "login": {

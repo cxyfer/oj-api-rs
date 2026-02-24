@@ -124,7 +124,8 @@
       "rate_limit": "頻率限制",
       "sync_problemset": "同步題目集",
       "missing_problems": "缺失題目",
-      "include_gym": "包含 Gym"
+      "include_gym": "包含 Gym",
+      "test": "測試目標"
     }
   },
   "login": {

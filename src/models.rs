@@ -226,11 +226,16 @@ pub static CODEFORCES_ARGS: &[ArgSpec] = &[
     ArgSpec { flag: "--db-path", arity: 1, value_type: ValueType::Str, ui_exposed: false },
 ];
 
+pub static DIAG_ARGS: &[ArgSpec] = &[
+    ArgSpec { flag: "--test", arity: 1, value_type: ValueType::Str, ui_exposed: true },
+];
+
 #[derive(Debug, Clone, Copy)]
 pub enum CrawlerSource {
     LeetCode,
     AtCoder,
     Codeforces,
+    Diag,
 }
 
 impl CrawlerSource {
@@ -239,6 +244,7 @@ impl CrawlerSource {
             "leetcode" => Ok(Self::LeetCode),
             "atcoder" => Ok(Self::AtCoder),
             "codeforces" => Ok(Self::Codeforces),
+            "diag" => Ok(Self::Diag),
             _ => Err(format!("invalid source: {}", s)),
         }
     }
@@ -248,6 +254,7 @@ impl CrawlerSource {
             Self::LeetCode => "leetcode.py",
             Self::AtCoder => "atcoder.py",
             Self::Codeforces => "codeforces.py",
+            Self::Diag => "diag.py",
         }
     }
 
@@ -256,6 +263,7 @@ impl CrawlerSource {
             Self::LeetCode => LEETCODE_ARGS,
             Self::AtCoder => ATCODER_ARGS,
             Self::Codeforces => CODEFORCES_ARGS,
+            Self::Diag => DIAG_ARGS,
         }
     }
 }

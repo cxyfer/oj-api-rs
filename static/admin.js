@@ -241,6 +241,9 @@
                 { flag: '--reprocess-content', i18nKey: 'reprocess_content', type: 'checkbox' },
                 { flag: '--include-gym', i18nKey: 'include_gym', type: 'checkbox' },
                 { flag: '--rate-limit', i18nKey: 'rate_limit', type: 'number', placeholder: 'seconds', step: '0.1' }
+            ],
+            diag: [
+                { flag: '--test', i18nKey: 'test', type: 'select', options: ['global', 'leetcode', 'atcoder', 'codeforces'] }
             ]
         };
 
@@ -287,6 +290,18 @@
                     cb.addEventListener('change', function() { yw.disabled = !cb.checked; mw.disabled = !cb.checked; });
                     item.appendChild(yw);
                     item.appendChild(mw);
+                } else if (f.type === 'select') {
+                    var sel = document.createElement('select');
+                    sel.className = 'flag-input';
+                    sel.disabled = true;
+                    (f.options || []).forEach(function(o) {
+                        var opt = document.createElement('option');
+                        opt.value = o;
+                        opt.textContent = o;
+                        sel.appendChild(opt);
+                    });
+                    cb.addEventListener('change', function() { sel.disabled = !cb.checked; });
+                    item.appendChild(sel);
                 } else if (f.type !== 'checkbox') {
                     var inp = document.createElement('input');
                     inp.type = f.type === 'date' ? 'date' : (f.type === 'number' ? 'number' : 'text');
