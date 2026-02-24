@@ -116,7 +116,8 @@ pub fn ensure_data_tables(pool: &DbPool) {
             source TEXT,
             problem_id TEXT,
             embedding float[768]
-        );",
+        );
+        CREATE INDEX IF NOT EXISTS idx_problems_source_slug ON problems(source, slug);",
     )
     .expect("failed to create data tables");
 }

@@ -91,6 +91,16 @@ fn row_to_summary(row: &Row<'_>) -> rusqlite::Result<ProblemSummary> {
     })
 }
 
+pub fn get_problem_id_by_slug(pool: &DbPool, source: &str, slug: &str) -> Option<String> {
+    let conn = pool.get().ok()?;
+    conn.query_row(
+        "SELECT id FROM problems WHERE source = ?1 AND slug = ?2 LIMIT 1",
+        params![source, slug],
+        |row| row.get(0),
+    )
+    .ok()
+}
+
 pub fn get_problem(pool: &DbPool, source: &str, id: &str) -> Option<Problem> {
     let conn = pool.get().ok()?;
     conn.query_row(

@@ -25,18 +25,28 @@ pub async fn resolve(
 
     let (source, id) = crate::detect::detect_source(&decoded);
     let source_str = source.to_string();
-    let id_clone = id.clone();
+    let id_for_closure = id.clone();
 
     let pool = state.ro_pool.clone();
-    let problem = tokio::task::spawn_blocking(move || {
-        crate::db::problems::get_problem(&pool, &source_str, &id_clone)
+    let (effective_id, problem) = tokio::task::spawn_blocking(move || {
+        let eid = if source_str == "leetcode"
+            && id_for_closure.contains(|c: char| !c.is_ascii_digit())
+        {
+            let slug = id_for_closure.to_lowercase();
+            crate::db::problems::get_problem_id_by_slug(&pool, "leetcode", &slug)
+                .unwrap_or(slug)
+        } else {
+            id_for_closure
+        };
+        let problem = crate::db::problems::get_problem(&pool, &source_str, &eid);
+        (eid, problem)
     })
     .await
-    .unwrap_or(None);
+    .unwrap_or((id, None));
 
     Json(ResolveResponse {
         source: source.to_string(),
-        id,
+        id: effective_id,
         problem,
     })
     .into_response()
