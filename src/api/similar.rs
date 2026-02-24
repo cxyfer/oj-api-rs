@@ -17,6 +17,7 @@ pub struct SimilarByProblemQuery {
 
 #[derive(Deserialize)]
 pub struct SimilarByTextQuery {
+    #[serde(alias = "q")]
     pub query: Option<String>,
     pub limit: Option<u32>,
     pub threshold: Option<f32>,
@@ -104,16 +105,28 @@ pub async fn similar_by_text(
     State(state): State<Arc<AppState>>,
     Query(query): Query<SimilarByTextQuery>,
 ) -> impl IntoResponse {
-    let text = match &query.query {
-        Some(q) if q.len() >= 3 && q.len() <= 2000 => q.clone(),
+    let processed = query.query.as_deref().map(|q| {
+        let trimmed = q.trim();
+        if trimmed.len() >= 2 && trimmed.starts_with('"') && trimmed.ends_with('"') {
+            &trimmed[1..trimmed.len() - 1]
+        } else {
+            trimmed
+        }
+    });
+
+    let text = match processed {
+        Some("") => {
+            return ProblemDetail::bad_request("query parameter is required").into_response();
+        }
         Some(q) if q.len() > 2000 => {
             return ProblemDetail::bad_request("query must be at most 2000 characters")
                 .into_response();
         }
-        Some(_) => {
+        Some(q) if q.len() < 3 => {
             return ProblemDetail::bad_request("query must be at least 3 characters")
                 .into_response();
         }
+        Some(q) => q.to_string(),
         None => {
             return ProblemDetail::bad_request("query parameter is required").into_response();
         }
