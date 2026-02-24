@@ -3,6 +3,7 @@
     "dashboard": "Dashboard",
     "problems": "Problems",
     "crawlers": "Crawlers",
+    "embeddings": "Embeddings",
     "tokens": "Tokens",
     "logout": "Logout"
   },
@@ -168,6 +169,33 @@
     "fill_args": "Please fill value for ",
     "fill_year_month": "Please fill year and month for ",
     "failed_load_output": "Failed to load output",
-    "failed_load_detail": "Failed to load problem detail"
+    "failed_load_detail": "Failed to load problem detail",
+    "embedding_triggered": "Embedding job triggered",
+    "failed_trigger_embedding": "Failed to trigger embedding job"
+  },
+  "embeddings": {
+    "title": "Embeddings",
+    "stats": {
+      "title": "Statistics",
+      "total": "Total",
+      "with_content": "With Content",
+      "embedded": "Embedded",
+      "pending": "Pending"
+    },
+    "control": {
+      "source": "Source",
+      "all_sources": "All Sources",
+      "rebuild": "Rebuild (delete existing)",
+      "dry_run": "Dry Run",
+      "batch_size": "Batch Size",
+      "filter": "Filter",
+      "trigger": "Build Embeddings"
+    },
+    "progress": {
+      "rewriting": "Rewriting",
+      "embedding": "Embedding",
+      "completed": "Completed",
+      "failed": "Failed"
+    }
   }
 }

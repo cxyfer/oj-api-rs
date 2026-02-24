@@ -571,3 +571,12 @@ td.col-tags { line-height: 1.8; }
     .filter-field-grow { width: 100%; }
     .tag-mode-container { width: 80px; }
 }
+
+/* Progress bar */
+.progress-label { font-size: 0.85rem; color: var(--color-muted); margin-bottom: 0.25rem; }
+.progress-bar { height: 6px; background: var(--bg-body); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--color-primary); transition: width 0.3s ease; border-radius: 3px; }
+
+/* Embedding control */
+.embedding-control { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+.embedding-control .form-group { margin-bottom: 0; }

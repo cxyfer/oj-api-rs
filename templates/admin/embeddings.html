@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Embeddings{% endblock %}
+{% block content %}
+<h1 data-i18n="embeddings.title">Embeddings</h1>
+
+<div class="card" style="margin-bottom:1rem;padding:1rem 1.25rem">
+    <h2 data-i18n="embeddings.stats.title" style="margin-top:0">Statistics</h2>
+    <table id="embedding-stats-table">
+        <thead>
+            <tr>
+                <th data-i18n="common.source">Source</th>
+                <th data-i18n="embeddings.stats.total">Total</th>
+                <th data-i18n="embeddings.stats.with_content">With Content</th>
+                <th data-i18n="embeddings.stats.embedded">Embedded</th>
+                <th data-i18n="embeddings.stats.pending">Pending</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td colspan="5" style="text-align:center" data-i18n="common.loading">Loading...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card" style="margin-bottom:1rem;padding:1rem 1.25rem">
+    <div class="embedding-control">
+        <div class="form-group">
+            <label data-i18n="embeddings.control.source">Source</label>
+            <select id="embedding-source" class="flag-input" style="width:auto;display:inline-block">
+                <option value="all" data-i18n="embeddings.control.all_sources">All Sources</option>
+                <option value="leetcode">LeetCode</option>
+                <option value="atcoder">AtCoder</option>
+                <option value="codeforces">Codeforces</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="flag-item" style="display:inline-flex;align-items:center;gap:0.5rem">
+                <input type="checkbox" id="embedding-rebuild">
+                <span data-i18n="embeddings.control.rebuild">Rebuild</span>
+            </label>
+        </div>
+        <div class="form-group">
+            <label class="flag-item" style="display:inline-flex;align-items:center;gap:0.5rem">
+                <input type="checkbox" id="embedding-dry-run">
+                <span data-i18n="embeddings.control.dry_run">Dry Run</span>
+            </label>
+        </div>
+        <div class="form-group">
+            <label data-i18n="embeddings.control.batch_size">Batch Size</label>
+            <input type="number" id="embedding-batch-size" class="flag-input" style="width:5rem" min="1" max="256" placeholder="32">
+        </div>
+        <div class="form-group">
+            <label data-i18n="embeddings.control.filter">Filter</label>
+            <input type="text" id="embedding-filter" class="flag-input" style="width:10rem" placeholder="ID substring">
+        </div>
+        <button class="btn btn-primary" id="embedding-trigger-btn"{% if is_running %} disabled{% endif %} data-i18n="embeddings.control.trigger">Build Embeddings</button>
+    </div>
+</div>
+
+<div class="card status-card" id="embedding-status-card" style="margin-bottom:1rem{% if !is_running %};display:none{% endif %}">
+    {% if is_running %}
+    {% match current_job %}{% when Some with (job) %}
+    <div class="status-header running" data-i18n="crawlers.status.running">Running</div>
+    <div class="status-details">
+        <span><strong data-i18n="crawlers.status.job">Job</strong>: {{ job.job_id }}</span>
+        <span><strong data-i18n="common.source">Source</strong>: {{ job.source }}</span>
+        <span><strong data-i18n="crawlers.status.started">Started</strong>: {{ job.started_at }}</span>
+    </div>
+    <div id="embedding-progress-bar" style="margin-top:0.5rem"></div>
+    {% when None %}{% endmatch %}
+    {% endif %}
+</div>
+
+<div class="card">
+    <table id="embedding-history-table">
+        <thead>
+            <tr>
+                <th data-i18n="common.source">Source</th>
+                <th data-i18n="crawlers.status.args">Args</th>
+                <th data-i18n="crawlers.status.started">Started</th>
+                <th data-i18n="crawlers.status.finished">Finished</th>
+                <th data-i18n="common.status">Status</th>
+                <th data-i18n="crawlers.history_table.logs">Logs</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in history %}
+            <tr>
+                <td>{{ job.source }}</td>
+                <td>{{ job.args.join(" ") }}</td>
+                <td>{{ job.started_at }}</td>
+                <td>{% match job.finished_at %}{% when Some with (t) %}{{ t }}{% when None %}-{% endmatch %}</td>
+                <td>
+                    <span class="badge badge-crawler-{{ job.status }}">{{ job.status }}</span>
+                </td>
+                <td>
+                    {% if job.status.to_string() != "running" %}
+                    <button class="btn btn-sm btn-view-embed-log" data-job-id="{{ job.job_id }}" data-i18n="common.view">View</button>
+                    {% else %}-{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="modal-overlay" id="embed-log-modal">
+    <div class="modal log-modal">
+        <div class="modal-header">
+            <h2 data-i18n="crawlers.modal.title">Job Output</h2>
+            <button class="btn btn-sm btn-close-embed-log">×</button>
+        </div>
+        <div class="log-tabs">
+            <button class="btn btn-sm log-tab active" data-tab="embed-stdout">stdout</button>
+            <button class="btn btn-sm log-tab" data-tab="embed-stderr">stderr</button>
+        </div>
+        <div class="log-content">
+            <pre id="embed-log-stdout" class="log-pre"></pre>
+            <pre id="embed-log-stderr" class="log-pre log-stderr" style="display:none"></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}

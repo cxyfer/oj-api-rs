@@ -11,7 +11,7 @@ use serde::Deserialize;
 use crate::api::error::ProblemDetail;
 use crate::api::problems::{ListQuery, ListMeta, ListResponse, VALID_SOURCES, validate_list_query};
 use crate::auth::{AdminSecret, AdminSessions};
-use crate::models::{CrawlerJob, CrawlerSource, CrawlerStatus, CrawlerTrigger, Problem};
+use crate::models::{CrawlerJob, CrawlerSource, CrawlerStatus, CrawlerTrigger, EmbeddingJob, Problem};
 use crate::AppState;
 
 // Problem CRUD
@@ -613,4 +613,309 @@ pub async fn set_token_auth_setting(
     } else {
         ProblemDetail::internal("failed to update setting").into_response()
     }
+}
+
+// Embeddings
+
+#[derive(Deserialize)]
+pub struct TriggerEmbeddingRequest {
+    pub source: String,
+    #[serde(default)]
+    pub rebuild: bool,
+    #[serde(default)]
+    pub dry_run: bool,
+    pub batch_size: Option<u16>,
+    pub filter: Option<String>,
+}
+
+pub async fn embedding_stats(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let pool = state.ro_pool.clone();
+    let stats = tokio::task::spawn_blocking(move || {
+        crate::db::embeddings::get_embedding_stats(&pool)
+    })
+    .await
+    .unwrap_or_default();
+
+    Json(stats).into_response()
+}
+
+pub async fn trigger_embedding(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<TriggerEmbeddingRequest>,
+) -> impl IntoResponse {
+    let source = body.source.trim().to_lowercase();
+    if source != "all"
+        && !["leetcode", "atcoder", "codeforces", "luogu", "uva", "spoj"].contains(&source.as_str())
+    {
+        return ProblemDetail::bad_request(format!("invalid source: {}", source)).into_response();
+    }
+
+    if let Some(bs) = body.batch_size {
+        if !(1..=256).contains(&bs) {
+            return ProblemDetail::bad_request("batch_size must be between 1 and 256")
+                .into_response();
+        }
+    }
+
+    if let Some(ref f) = body.filter {
+        if f.trim().is_empty() {
+            return ProblemDetail::bad_request("filter must not be empty").into_response();
+        }
+    }
+
+    let mut lock = state.embedding_lock.lock().await;
+    if let Some(ref job) = *lock {
+        if job.status == CrawlerStatus::Running {
+            return ProblemDetail::conflict("an embedding job is already running").into_response();
+        }
+    }
+
+    let job_id = uuid::Uuid::new_v4().to_string();
+    let started_at = chrono::Utc::now().to_rfc3339();
+
+    let mut args = vec!["--source".to_string(), source.clone()];
+    if body.rebuild {
+        args.push("--rebuild".to_string());
+    } else if body.dry_run {
+        args.push("--dry-run".to_string());
+    } else {
+        args.push("--build".to_string());
+    }
+    if let Some(bs) = body.batch_size {
+        args.push("--batch-size".to_string());
+        args.push(bs.to_string());
+    }
+    if let Some(ref f) = body.filter {
+        args.push("--filter".to_string());
+        args.push(f.clone());
+    }
+    args.push("--job-id".to_string());
+    args.push(job_id.clone());
+
+    let job = EmbeddingJob {
+        job_id: job_id.clone(),
+        source: source.clone(),
+        args: args.clone(),
+        started_at,
+        finished_at: None,
+        status: CrawlerStatus::Running,
+        stdout: None,
+        stderr: None,
+    };
+
+    *lock = Some(job.clone());
+    drop(lock);
+
+    let state_clone = state.clone();
+    let timeout_secs = state.config.embedding.timeout_secs;
+    let job_id_clone = job_id.clone();
+
+    tokio::spawn(async move {
+        let mut cmd = tokio::process::Command::new("uv");
+        cmd.args(["run", "python3", "embedding_cli.py"]);
+        cmd.args(&args);
+        cmd.current_dir("scripts/");
+        cmd.kill_on_drop(true);
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+
+        if let Some(ref cp) = state_clone.config_path {
+            cmd.env("CONFIG_PATH", cp);
+        }
+
+        let child = match cmd.spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!("failed to spawn embedding job: {}", e);
+                let mut lock = state_clone.embedding_lock.lock().await;
+                if let Some(ref mut job) = *lock {
+                    job.status = CrawlerStatus::Failed;
+                    job.finished_at = Some(chrono::Utc::now().to_rfc3339());
+                    let mut history = state_clone.embedding_history.lock().await;
+                    if history.len() >= 50 {
+                        history.pop_front();
+                    }
+                    history.push_back(job.clone());
+                }
+                return;
+            }
+        };
+
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_secs),
+            child.wait_with_output(),
+        )
+        .await;
+
+        let mut lock = state_clone.embedding_lock.lock().await;
+        if let Some(ref mut job) = *lock {
+            job.finished_at = Some(chrono::Utc::now().to_rfc3339());
+            match result {
+                Ok(Ok(output)) => {
+                    if let Err(e) = tokio::fs::create_dir_all("scripts/logs").await {
+                        tracing::warn!("failed to create scripts/logs: {}", e);
+                    }
+                    if !output.stdout.is_empty() {
+                        if let Err(e) = tokio::fs::write(
+                            format!("scripts/logs/{}.stdout.log", job_id_clone),
+                            &output.stdout,
+                        )
+                        .await
+                        {
+                            tracing::warn!("failed to write stdout log: {}", e);
+                        }
+                    }
+                    if !output.stderr.is_empty() {
+                        if let Err(e) = tokio::fs::write(
+                            format!("scripts/logs/{}.stderr.log", job_id_clone),
+                            &output.stderr,
+                        )
+                        .await
+                        {
+                            tracing::warn!("failed to write stderr log: {}", e);
+                        }
+                    }
+
+                    if output.status.success() {
+                        job.status = CrawlerStatus::Completed;
+                    } else {
+                        job.status = CrawlerStatus::Failed;
+                    }
+                    job.set_output(output.stdout, output.stderr);
+                }
+                Ok(Err(e)) => {
+                    tracing::error!("embedding job error: {}", e);
+                    job.status = CrawlerStatus::Failed;
+                }
+                Err(_) => {
+                    job.status = CrawlerStatus::TimedOut;
+                }
+            }
+            let mut history = state_clone.embedding_history.lock().await;
+            if history.len() >= 50 {
+                history.pop_front();
+            }
+            history.push_back(job.clone());
+        }
+    });
+
+    (
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({ "job_id": job_id })),
+    )
+        .into_response()
+}
+
+pub async fn embedding_status(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let lock = state.embedding_lock.lock().await;
+    let history = state.embedding_history.lock().await;
+    let history_vec: Vec<_> = history
+        .iter()
+        .rev()
+        .map(|j| {
+            let mut j = j.clone();
+            j.stdout = None;
+            j.stderr = None;
+            j
+        })
+        .collect();
+
+    match &*lock {
+        Some(job) if job.status == CrawlerStatus::Running => {
+            let mut current = job.clone();
+            current.stdout = None;
+            current.stderr = None;
+            let progress = read_progress_json(&job.job_id).await;
+            Json(serde_json::json!({
+                "running": true,
+                "current_job": current,
+                "progress": progress,
+                "history": history_vec,
+            }))
+            .into_response()
+        }
+        Some(job) => {
+            let mut last = job.clone();
+            last.stdout = None;
+            last.stderr = None;
+            let progress = read_progress_json(&job.job_id).await;
+            Json(serde_json::json!({
+                "running": false,
+                "last_job": last,
+                "progress": progress,
+                "history": history_vec,
+            }))
+            .into_response()
+        }
+        None => {
+            Json(serde_json::json!({
+                "running": false,
+                "last_job": null,
+                "history": history_vec,
+            }))
+            .into_response()
+        }
+    }
+}
+
+async fn read_progress_json(job_id: &str) -> serde_json::Value {
+    let path = format!("scripts/logs/{}.progress.json", job_id);
+    match tokio::fs::read_to_string(&path).await {
+        Ok(content) => serde_json::from_str(&content)
+            .unwrap_or_else(|_| serde_json::json!({ "phase": "unknown" })),
+        Err(_) => serde_json::json!({ "phase": "unknown" }),
+    }
+}
+
+pub async fn embedding_output(
+    State(state): State<Arc<AppState>>,
+    Path(job_id): Path<String>,
+) -> impl IntoResponse {
+    if uuid::Uuid::parse_str(&job_id).is_err() {
+        return ProblemDetail::bad_request("invalid job_id").into_response();
+    }
+
+    let found_in_memory = {
+        let history = state.embedding_history.lock().await;
+        history.iter().find(|j| j.job_id == job_id).map(|job| {
+            serde_json::json!({
+                "stdout": job.stdout,
+                "stderr": job.stderr,
+            })
+        })
+    };
+
+    if let Some(output) = found_in_memory {
+        return Json(output).into_response();
+    }
+
+    let stdout_path = format!("scripts/logs/{}.stdout.log", job_id);
+    let stderr_path = format!("scripts/logs/{}.stderr.log", job_id);
+
+    let stdout = tokio::fs::read_to_string(&stdout_path).await.ok();
+    let stderr = tokio::fs::read_to_string(&stderr_path).await.ok();
+
+    if stdout.is_none() && stderr.is_none() {
+        return ProblemDetail::not_found("job output not found").into_response();
+    }
+
+    Json(serde_json::json!({
+        "stdout": stdout,
+        "stderr": stderr,
+    }))
+    .into_response()
+}
+
+pub async fn embedding_progress(
+    Path(job_id): Path<String>,
+) -> impl IntoResponse {
+    if uuid::Uuid::parse_str(&job_id).is_err() {
+        return ProblemDetail::bad_request("invalid job_id").into_response();
+    }
+
+    Json(read_progress_json(&job_id).await).into_response()
 }

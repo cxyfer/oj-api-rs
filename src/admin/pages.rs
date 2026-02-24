@@ -7,7 +7,7 @@ use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse};
 use serde::Deserialize;
 
-use crate::models::{ApiToken, CrawlerJob, ProblemSummary};
+use crate::models::{ApiToken, CrawlerJob, EmbeddingJob, ProblemSummary};
 use crate::AppState;
 
 #[derive(Template)]
@@ -195,6 +195,39 @@ pub async fn crawlers_page(State(state): State<Arc<AppState>>) -> impl IntoRespo
 
     Html(
         CrawlersTemplate {
+            is_running,
+            current_job,
+            history,
+        }
+        .render()
+        .unwrap_or_default(),
+    )
+    .into_response()
+}
+
+#[derive(Template)]
+#[template(path = "admin/embeddings.html")]
+struct EmbeddingsTemplate {
+    is_running: bool,
+    current_job: Option<EmbeddingJob>,
+    history: Vec<EmbeddingJob>,
+}
+
+pub async fn embeddings_page(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let lock = state.embedding_lock.lock().await;
+    let is_running = lock
+        .as_ref()
+        .map(|j| j.status == crate::models::CrawlerStatus::Running)
+        .unwrap_or(false);
+    let current_job = if is_running { lock.clone() } else { None };
+    drop(lock);
+
+    let history_lock = state.embedding_history.lock().await;
+    let history: Vec<EmbeddingJob> = history_lock.iter().rev().cloned().collect();
+    drop(history_lock);
+
+    Html(
+        EmbeddingsTemplate {
             is_running,
             current_job,
             history,

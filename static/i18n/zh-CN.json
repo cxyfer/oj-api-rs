@@ -3,6 +3,7 @@
     "dashboard": "控制台",
     "problems": "题目管理",
     "crawlers": "爬虫状态",
+    "embeddings": "向量嵌入",
     "tokens": "令牌管理",
     "logout": "登出"
   },
@@ -167,6 +168,33 @@
     "fill_args": "请填写此参数的值：",
     "fill_year_month": "请填写此参数的年份与月份：",
     "failed_load_output": "无法加载输出内容",
-    "failed_load_detail": "无法加载题目详情"
+    "failed_load_detail": "无法加载题目详情",
+    "embedding_triggered": "嵌入任务已启动",
+    "failed_trigger_embedding": "无法启动嵌入任务"
+  },
+  "embeddings": {
+    "title": "向量嵌入",
+    "stats": {
+      "title": "统计信息",
+      "total": "题目总数",
+      "with_content": "有内容",
+      "embedded": "已嵌入",
+      "pending": "待处理"
+    },
+    "control": {
+      "source": "来源",
+      "all_sources": "全部来源",
+      "rebuild": "重建 (删除现有)",
+      "dry_run": "模拟执行",
+      "batch_size": "批次大小",
+      "filter": "筛选",
+      "trigger": "构建嵌入"
+    },
+    "progress": {
+      "rewriting": "改写中",
+      "embedding": "嵌入中",
+      "completed": "已完成",
+      "failed": "失败"
+    }
   }
 }

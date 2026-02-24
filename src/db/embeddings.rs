@@ -3,6 +3,58 @@ use zerocopy::AsBytes;
 
 use super::DbPool;
 
+#[derive(Debug, serde::Serialize)]
+pub struct EmbeddingStats {
+    pub source: String,
+    pub total: u32,
+    pub with_content: u32,
+    pub embedded: u32,
+    pub pending: u32,
+}
+
+pub fn get_embedding_stats(pool: &DbPool) -> Vec<EmbeddingStats> {
+    let conn = match pool.get() {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut stmt = match conn.prepare(
+        "SELECT p.source,
+                COUNT(DISTINCT p.id) AS total,
+                COUNT(DISTINCT CASE
+                    WHEN p.content IS NOT NULL AND p.content != '' THEN p.id
+                END) AS with_content,
+                COUNT(DISTINCT CASE
+                    WHEN pe.problem_id IS NOT NULL THEN p.id
+                END) AS embedded
+         FROM problems p
+         LEFT JOIN problem_embeddings pe
+             ON p.source = pe.source AND p.id = pe.problem_id
+         GROUP BY p.source
+         ORDER BY p.source",
+    ) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+
+    let rows = match stmt.query_map([], |row| {
+        let with_content: u32 = row.get(2)?;
+        let embedded: u32 = row.get(3)?;
+        Ok(EmbeddingStats {
+            source: row.get(0)?,
+            total: row.get(1)?,
+            with_content,
+            embedded,
+            pending: with_content.saturating_sub(embedded),
+        })
+    }) {
+        Ok(r) => r,
+        Err(_) => return Vec::new(),
+    };
+
+    rows.filter_map(|r| r.ok()).collect()
+}
+
 pub fn get_embedding(pool: &DbPool, source: &str, id: &str) -> Option<Vec<f32>> {
     let conn = pool.get().ok()?;
     let raw: Vec<u8> = conn

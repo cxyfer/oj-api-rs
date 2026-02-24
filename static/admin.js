@@ -536,6 +536,239 @@
         }
     }
 
+    // Embeddings Page
+    var embedTriggerBtn = document.getElementById('embedding-trigger-btn');
+    if (embedTriggerBtn) {
+        var embedPollId = null;
+        var currentEmbedJobId = null;
+
+        // Load stats on page load
+        function loadEmbeddingStats() {
+            api('/admin/api/embeddings/stats').then(function(res) {
+                if (!res.ok) return;
+                return res.json();
+            }).then(function(stats) {
+                if (!stats) return;
+                var tbody = document.querySelector('#embedding-stats-table tbody');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+                if (!stats.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">-</td></tr>';
+                    return;
+                }
+                stats.forEach(function(s) {
+                    var tr = document.createElement('tr');
+                    tr.innerHTML =
+                        '<td>' + esc(s.source) + '</td>' +
+                        '<td>' + s.total + '</td>' +
+                        '<td>' + s.with_content + '</td>' +
+                        '<td>' + s.embedded + '</td>' +
+                        '<td>' + s.pending + '</td>';
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+        loadEmbeddingStats();
+
+        // Trigger
+        embedTriggerBtn.addEventListener('click', function() {
+            var sourceSelect = document.getElementById('embedding-source');
+            var rebuildCb = document.getElementById('embedding-rebuild');
+            var dryRunCb = document.getElementById('embedding-dry-run');
+            var batchSizeInput = document.getElementById('embedding-batch-size');
+            var filterInput = document.getElementById('embedding-filter');
+            var source = sourceSelect ? sourceSelect.value : 'all';
+            var rebuild = rebuildCb ? rebuildCb.checked : false;
+            var dryRun = dryRunCb ? dryRunCb.checked : false;
+
+            var payload = { source: source, rebuild: rebuild, dry_run: dryRun };
+            if (batchSizeInput && batchSizeInput.value) {
+                payload.batch_size = parseInt(batchSizeInput.value, 10);
+            }
+            if (filterInput && filterInput.value.trim()) {
+                payload.filter = filterInput.value.trim();
+            }
+
+            embedTriggerBtn.disabled = true;
+            api('/admin/api/embeddings/trigger', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            }).then(function(res) {
+                if (res.ok) {
+                    return res.json().then(function(data) {
+                        toast(i18n.t('messages.embedding_triggered') + ': ' + data.job_id);
+                        currentEmbedJobId = data.job_id;
+                        startEmbedPolling();
+                    });
+                } else {
+                    return res.json().then(function(data) {
+                        toast(data.detail || i18n.t('messages.failed_trigger_embedding'), 'error');
+                        embedTriggerBtn.disabled = false;
+                    });
+                }
+            }).catch(function() {
+                toast(i18n.t('messages.failed_trigger_embedding'), 'error');
+                embedTriggerBtn.disabled = false;
+            });
+        });
+
+        // Polling
+        function startEmbedPolling() {
+            if (embedPollId) return;
+            embedPollId = setInterval(pollEmbedStatus, 3000);
+            pollEmbedStatus();
+        }
+
+        function stopEmbedPolling() {
+            if (embedPollId) {
+                clearInterval(embedPollId);
+                embedPollId = null;
+            }
+        }
+
+        function pollEmbedStatus() {
+            api('/admin/api/embeddings/status').then(function(res) {
+                if (!res.ok) return;
+                return res.json();
+            }).then(function(data) {
+                if (!data) return;
+                updateEmbedStatusCard(data);
+                updateEmbedHistoryTable(data.history || []);
+                if (data.running && data.current_job) {
+                    currentEmbedJobId = data.current_job.job_id;
+                    if (data.progress) updateEmbedProgressBar(data.progress);
+                }
+                if (!data.running) {
+                    stopEmbedPolling();
+                    embedTriggerBtn.disabled = false;
+                    loadEmbeddingStats();
+                }
+            });
+        }
+
+        function updateEmbedProgressBar(prog) {
+            var bar = document.getElementById('embedding-progress-bar');
+            if (!bar) return;
+            var html = '';
+            if (prog.phase === 'rewriting' && prog.rewrite_progress) {
+                var rp = prog.rewrite_progress;
+                var pct = rp.total > 0 ? Math.round((rp.done / rp.total) * 100) : 0;
+                html = '<div class="progress-label">' + i18n.t('embeddings.progress.rewriting') + ': ' + rp.done + '/' + rp.total + ' (' + pct + '%)</div>';
+                html += '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
+            } else if (prog.phase === 'embedding' && prog.embed_progress) {
+                var ep = prog.embed_progress;
+                var pct = ep.total > 0 ? Math.round((ep.done / ep.total) * 100) : 0;
+                html = '<div class="progress-label">' + i18n.t('embeddings.progress.embedding') + ': ' + ep.done + '/' + ep.total + ' (' + pct + '%)</div>';
+                html += '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
+            } else if (prog.phase === 'completed') {
+                html = '<div class="progress-label">' + i18n.t('embeddings.progress.completed') + '</div>';
+            } else if (prog.phase === 'failed') {
+                html = '<div class="progress-label" style="color:var(--color-danger)">' + i18n.t('embeddings.progress.failed') + '</div>';
+            }
+            bar.innerHTML = html;
+        }
+
+        function updateEmbedStatusCard(data) {
+            var card = document.getElementById('embedding-status-card');
+            if (!card) return;
+            if (data.running && data.current_job) {
+                var job = data.current_job;
+                card.style.display = '';
+                card.innerHTML =
+                    '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') + '</div>' +
+                    '<div class="status-details">' +
+                    '<span><strong data-i18n="crawlers.status.job">' + i18n.t('crawlers.status.job') + '</strong>: ' + job.job_id + '</span> ' +
+                    '<span><strong data-i18n="common.source">' + i18n.t('common.source') + '</strong>: ' + job.source + '</span> ' +
+                    '<span><strong data-i18n="crawlers.status.started">' + i18n.t('crawlers.status.started') + '</strong>: ' + job.started_at + '</span>' +
+                    '</div>' +
+                    '<div id="embedding-progress-bar" style="margin-top:0.5rem"></div>';
+            } else {
+                card.style.display = 'none';
+            }
+        }
+
+        function updateEmbedHistoryTable(history) {
+            var tbody = document.querySelector('#embedding-history-table tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            history.forEach(function(job) {
+                var tr = document.createElement('tr');
+                var logBtn = job.status !== 'running'
+                    ? '<button class="btn btn-sm btn-view-embed-log" data-job-id="' + esc(job.job_id) + '" data-i18n="common.view">' + i18n.t('common.view') + '</button>'
+                    : '-';
+                tr.innerHTML =
+                    '<td>' + esc(job.source) + '</td>' +
+                    '<td>' + esc((job.args || []).join(' ')) + '</td>' +
+                    '<td>' + esc(job.started_at) + '</td>' +
+                    '<td>' + esc(job.finished_at || '-') + '</td>' +
+                    '<td><span class="badge badge-crawler-' + esc(job.status) + '">' + esc(job.status) + '</span></td>' +
+                    '<td>' + logBtn + '</td>';
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Log modal for embeddings
+        document.addEventListener('click', function(e) {
+            if (!e.target.classList.contains('btn-view-embed-log')) return;
+            var jobId = e.target.dataset.jobId;
+            if (!jobId) return;
+            var modal = document.getElementById('embed-log-modal');
+            if (!modal) return;
+
+            var stdoutPre = document.getElementById('embed-log-stdout');
+            var stderrPre = document.getElementById('embed-log-stderr');
+            stdoutPre.textContent = i18n.t('common.loading');
+            stderrPre.textContent = '';
+            stderrPre.style.display = 'none';
+            stdoutPre.style.display = '';
+
+            modal.querySelectorAll('.log-tab').forEach(function(t) { t.classList.remove('active'); });
+            modal.querySelector('[data-tab="embed-stdout"]').classList.add('active');
+
+            modal.classList.add('active');
+
+            api('/admin/api/embeddings/' + encodeURIComponent(jobId) + '/output').then(function(res) {
+                if (!res.ok) {
+                    stdoutPre.textContent = i18n.t('messages.failed_load_output') + ' (HTTP ' + res.status + ')';
+                    return;
+                }
+                return res.json();
+            }).then(function(data) {
+                if (!data) return;
+                stdoutPre.textContent = data.stdout || '(empty)';
+                stderrPre.textContent = data.stderr || '(empty)';
+            }).catch(function() {
+                stdoutPre.textContent = i18n.t('messages.failed_load_output');
+            });
+        });
+
+        // Embed log tabs
+        document.addEventListener('click', function(e) {
+            if (!e.target.classList.contains('log-tab') || !e.target.closest('#embed-log-modal')) return;
+            var tab = e.target.dataset.tab;
+            document.getElementById('embed-log-stdout').style.display = tab === 'embed-stdout' ? '' : 'none';
+            document.getElementById('embed-log-stderr').style.display = tab === 'embed-stderr' ? '' : 'none';
+            e.target.closest('.log-tabs').querySelectorAll('.log-tab').forEach(function(t) { t.classList.remove('active'); });
+            e.target.classList.add('active');
+        });
+
+        // Close embed log modal
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-close-embed-log')) {
+                document.getElementById('embed-log-modal').classList.remove('active');
+            }
+            if (e.target.id === 'embed-log-modal') {
+                e.target.classList.remove('active');
+            }
+        });
+
+        // Auto-start polling if already running
+        var embedStatusCard = document.getElementById('embedding-status-card');
+        if (embedStatusCard && embedStatusCard.style.display !== 'none') {
+            startEmbedPolling();
+        }
+    }
+
     // Logout
     var logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {

@@ -353,3 +353,44 @@ pub struct DailyFallbackEntry {
     pub started_at: tokio::time::Instant,
     pub cooldown_until: Option<tokio::time::Instant>,
 }
+
+// Embedding job model (parallel to CrawlerJob)
+
+#[derive(Debug, Clone, Serialize)]
+pub struct EmbeddingJob {
+    pub job_id: String,
+    pub source: String,
+    pub args: Vec<String>,
+    pub started_at: String,
+    pub finished_at: Option<String>,
+    pub status: CrawlerStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stdout: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stderr: Option<String>,
+}
+
+impl EmbeddingJob {
+    pub fn set_output(&mut self, stdout: Vec<u8>, stderr: Vec<u8>) {
+        self.stdout = if stdout.is_empty() {
+            None
+        } else {
+            let s = if stdout.len() > MAX_OUTPUT_BYTES {
+                String::from_utf8_lossy(&stdout[stdout.len() - MAX_OUTPUT_BYTES..]).into_owned()
+            } else {
+                String::from_utf8_lossy(&stdout).into_owned()
+            };
+            Some(s)
+        };
+        self.stderr = if stderr.is_empty() {
+            None
+        } else {
+            let s = if stderr.len() > MAX_OUTPUT_BYTES {
+                String::from_utf8_lossy(&stderr[stderr.len() - MAX_OUTPUT_BYTES..]).into_owned()
+            } else {
+                String::from_utf8_lossy(&stderr).into_owned()
+            };
+            Some(s)
+        };
+    }
+}
