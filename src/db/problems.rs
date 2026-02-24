@@ -1,7 +1,44 @@
 use rusqlite::{params, Row};
+use serde::Serialize;
 
 use super::DbPool;
 use crate::models::{Problem, ProblemSummary};
+
+#[derive(Debug, Serialize)]
+pub struct PlatformStats {
+    pub source: String,
+    pub total: u32,
+    pub missing_content: u32,
+    pub not_embedded: u32,
+}
+
+pub fn platform_stats(pool: &DbPool) -> Vec<PlatformStats> {
+    let conn = match pool.get() {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+    let mut stmt = match conn.prepare(
+        "SELECT p.source, COUNT(*) AS total, \
+         SUM(CASE WHEN p.content IS NULL OR p.content = '' THEN 1 ELSE 0 END) AS missing_content, \
+         SUM(CASE WHEN pe.problem_id IS NULL THEN 1 ELSE 0 END) AS not_embedded \
+         FROM problems p \
+         LEFT JOIN problem_embeddings pe ON pe.source = p.source AND pe.problem_id = p.id \
+         GROUP BY p.source ORDER BY p.source",
+    ) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+    stmt.query_map([], |row| {
+        Ok(PlatformStats {
+            source: row.get(0)?,
+            total: row.get(1)?,
+            missing_content: row.get(2)?,
+            not_embedded: row.get(3)?,
+        })
+    })
+    .map(|rows| rows.filter_map(|r| r.ok()).collect())
+    .unwrap_or_default()
+}
 
 fn parse_json_array(raw: Option<String>) -> Vec<String> {
     match raw {

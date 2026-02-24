@@ -12,6 +12,7 @@ pub mod error;
 pub mod problems;
 pub mod resolve;
 pub mod similar;
+pub mod status;
 
 pub fn public_router() -> Router<Arc<AppState>> {
     let cors = CorsLayer::new()
@@ -39,6 +40,7 @@ pub fn public_router() -> Router<Arc<AppState>> {
             get(similar::similar_by_problem),
         )
         .route("/api/v1/similar", get(similar::similar_by_text))
+        .route("/status", get(status::get_status))
         .route_layer(middleware::from_fn(crate::auth::bearer_auth))
         .layer(cors)
 }
