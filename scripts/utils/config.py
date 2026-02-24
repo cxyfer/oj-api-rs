@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -26,7 +27,6 @@ class ConfigManager:
             self.config_path = Path(env_path) if env_path else Path("../config.toml")
         self._config: Dict[str, Any] = {}
         self._load_config()
-        self._apply_env_overrides()
 
     def _load_config(self) -> None:
         if not self.config_path.exists():
@@ -37,15 +37,6 @@ class ConfigManager:
         with open(self.config_path, "rb") as f:
             self._config = tomllib.load(f)
         logger.info(f"Configuration loaded from {self.config_path}")
-
-    def _apply_env_overrides(self) -> None:
-        env_mappings = {
-            "GEMINI_API_KEY": ("gemini", "api_key"),
-        }
-        for env_var, path in env_mappings.items():
-            val = os.getenv(env_var)
-            if val:
-                self._set_nested(self._config, path, val)
 
     def _set_nested(self, d: Dict[str, Any], path: tuple, value: Any) -> None:
         for key in path[:-1]:
@@ -87,8 +78,76 @@ class ConfigManager:
     def log_level(self) -> str:
         return self.get("logging.level", "INFO")
 
+    @property
+    def llm_provider(self) -> str:
+        return self.get("llm.provider", "gemini")
+
+    @property
+    def _using_legacy_config(self) -> bool:
+        return "llm" not in self._config and "gemini" in self._config
+
+    def _get_llm_model_section(self, capability: str) -> Dict[str, Any]:
+        """Resolve model config section with [llm] -> [gemini] fallback."""
+        if "llm" in self._config:
+            return self.get(f"llm.models.{capability}", {})
+
+        if "gemini" in self._config:
+            warnings.warn(
+                "[gemini] config section is deprecated; migrate to [llm]. "
+                "See config.toml.example for the new structure.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+            return self.get(f"gemini.models.{capability}", {})
+
+        raise ValueError(
+            "No LLM configuration found. "
+            "Please add an [llm] section to config.toml. "
+            "See config.toml.example for the structure."
+        )
+
+    def _get_llm_global(self, key: str, default: Any = None) -> Any:
+        """Get a global LLM setting with [llm] -> [gemini] fallback."""
+        if "llm" in self._config:
+            return self.get(f"llm.{key}", default)
+        return self.get(f"gemini.{key}", default)
+
+    def resolve_api_key(self, capability: str) -> Optional[str]:
+        """Resolve API key per-capability with precedence chain.
+
+        [llm.models.<cap>].api_key -> [llm].api_key -> env var.
+        """
+        section = self._get_llm_model_section(capability)
+        cap_key = section.get("api_key")
+        if cap_key:
+            return cap_key
+
+        global_key = self._get_llm_global("api_key")
+        if global_key:
+            return global_key
+
+        provider = self.get(f"llm.models.{capability}.provider") or self.llm_provider
+        env_names = {
+            "openai": ["OPENAI_API_KEY"],
+            "gemini": ["GOOGLE_API_KEY", "GEMINI_API_KEY", "GOOGLE_GEMINI_API_KEY"],
+        }
+        for env_name in env_names.get(provider, []):
+            val = os.getenv(env_name)
+            if val:
+                return val
+
+        return None
+
+    def resolve_base_url(self, capability: str) -> Optional[str]:
+        """Resolve base_url per-capability with inheritance."""
+        section = self._get_llm_model_section(capability)
+        cap_url = section.get("base_url")
+        if cap_url:
+            return cap_url
+        return self._get_llm_global("base_url")
+
     def get_embedding_model_config(self) -> "EmbeddingModelConfig":
-        section = self.get("gemini.models.embedding", {})
+        section = self._get_llm_model_section("embedding")
         return EmbeddingModelConfig(
             name=section.get("name", "gemini-embedding-001"),
             dim=section.get("dim", 768),
@@ -99,7 +158,7 @@ class ConfigManager:
         )
 
     def get_rewrite_model_config(self) -> "RewriteModelConfig":
-        section = self.get("gemini.models.rewrite", {})
+        section = self._get_llm_model_section("rewrite")
         return RewriteModelConfig(
             name=section.get("name", "gemini-2.0-flash"),
             temperature=section.get("temperature", 0.3),

@@ -16,3 +16,6 @@ dependencies = [
     "tenacity>=8.2.0",
     "tomli>=2.0.1; python_version < '3.11'",
 ]
+
+[project.optional-dependencies]
+openai = ["openai>=1.0.0"]
