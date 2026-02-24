@@ -709,7 +709,6 @@ pub async fn trigger_embedding(
     drop(lock);
 
     let state_clone = state.clone();
-    let timeout_secs = state.config.embedding.timeout_secs;
     let job_id_clone = job_id.clone();
 
     tokio::spawn(async move {
@@ -743,17 +742,13 @@ pub async fn trigger_embedding(
             }
         };
 
-        let result = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_secs),
-            child.wait_with_output(),
-        )
-        .await;
+        let result = child.wait_with_output().await;
 
         let mut lock = state_clone.embedding_lock.lock().await;
         if let Some(ref mut job) = *lock {
             job.finished_at = Some(chrono::Utc::now().to_rfc3339());
             match result {
-                Ok(Ok(output)) => {
+                Ok(output) => {
                     if let Err(e) = tokio::fs::create_dir_all("scripts/logs").await {
                         tracing::warn!("failed to create scripts/logs: {}", e);
                     }
@@ -785,12 +780,9 @@ pub async fn trigger_embedding(
                     }
                     job.set_output(output.stdout, output.stderr);
                 }
-                Ok(Err(e)) => {
+                Err(e) => {
                     tracing::error!("embedding job error: {}", e);
                     job.status = CrawlerStatus::Failed;
-                }
-                Err(_) => {
-                    job.status = CrawlerStatus::TimedOut;
                 }
             }
             let mut history = state_clone.embedding_history.lock().await;

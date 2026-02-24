@@ -71,7 +71,7 @@ timeout_secs = 300
 # https_proxy = "..."
 
 [embedding]
-timeout_secs = 30
+timeout_secs = 30           # per-query embed-text timeout (similar search)
 over_fetch_factor = 4
 concurrency = 4
 
