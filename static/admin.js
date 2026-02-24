@@ -642,6 +642,7 @@
                     stopEmbedPolling();
                     embedTriggerBtn.disabled = false;
                     loadEmbeddingStats();
+                    if (data.progress) updateEmbedProgressBar(data.progress);
                 }
             });
         }
@@ -680,6 +681,18 @@
                     '<span><strong data-i18n="crawlers.status.job">' + i18n.t('crawlers.status.job') + '</strong>: ' + job.job_id + '</span> ' +
                     '<span><strong data-i18n="common.source">' + i18n.t('common.source') + '</strong>: ' + job.source + '</span> ' +
                     '<span><strong data-i18n="crawlers.status.started">' + i18n.t('crawlers.status.started') + '</strong>: ' + job.started_at + '</span>' +
+                    '</div>' +
+                    '<div id="embedding-progress-bar" style="margin-top:0.5rem"></div>';
+            } else if (data.last_job) {
+                var job = data.last_job;
+                card.style.display = '';
+                card.innerHTML =
+                    '<div class="status-header"><span class="badge badge-crawler-' + esc(job.status) + '">' + esc(job.status) + '</span></div>' +
+                    '<div class="status-details">' +
+                    '<span><strong data-i18n="crawlers.status.job">' + i18n.t('crawlers.status.job') + '</strong>: ' + job.job_id + '</span> ' +
+                    '<span><strong data-i18n="common.source">' + i18n.t('common.source') + '</strong>: ' + job.source + '</span> ' +
+                    '<span><strong data-i18n="crawlers.status.started">' + i18n.t('crawlers.status.started') + '</strong>: ' + job.started_at + '</span>' +
+                    (job.finished_at ? ' <span><strong data-i18n="crawlers.status.finished">' + i18n.t('crawlers.status.finished') + '</strong>: ' + job.finished_at + '</span>' : '') +
                     '</div>' +
                     '<div id="embedding-progress-bar" style="margin-top:0.5rem"></div>';
             } else {

@@ -785,6 +785,28 @@ pub async fn trigger_embedding(
                     job.status = CrawlerStatus::Failed;
                 }
             }
+
+            // Ensure progress JSON reflects final status (Python may not have written it)
+            let final_phase = if job.status == CrawlerStatus::Completed {
+                "completed"
+            } else {
+                "failed"
+            };
+            let progress_path = format!("scripts/logs/{}.progress.json", job_id_clone);
+            let final_progress = if let Ok(content) =
+                tokio::fs::read_to_string(&progress_path).await
+            {
+                let mut prog: serde_json::Value =
+                    serde_json::from_str(&content).unwrap_or_default();
+                prog["phase"] = serde_json::json!(final_phase);
+                prog
+            } else {
+                serde_json::json!({"phase": final_phase})
+            };
+            if let Ok(json_str) = serde_json::to_string(&final_progress) {
+                let _ = tokio::fs::write(&progress_path, json_str).await;
+            }
+
             let mut history = state_clone.embedding_history.lock().await;
             if history.len() >= 50 {
                 history.pop_front();
