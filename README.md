@@ -101,9 +101,10 @@ When today's challenge is not yet in the database (domain=com only), the API ret
 ```
 GET /api/v1/similar/{source}/{id}     # Find similar problems by embedding
 GET /api/v1/similar?q=<text>          # Find similar problems by text query
+                                      # ?query=<text> also accepted
 ```
 
-Text query mode delegates to a Python subprocess for real-time Gemini embedding generation.
+Text query mode delegates to a Python subprocess for real-time Gemini embedding generation. Surrounding double quotes in the query value (e.g. `%22two-sum%22`) are automatically stripped.
 
 ### Smart Resolution
 
@@ -111,7 +112,15 @@ Text query mode delegates to a Python subprocess for real-time Gemini embedding 
 GET /api/v1/resolve/{query}           # Auto-detect source from URL, prefix, or ID pattern
 ```
 
-Accepts URLs (`leetcode.com/problems/two-sum`), prefixed IDs (`atcoder:abc321_a`), or bare patterns (`123A` -> Codeforces, pure digits -> LeetCode).
+Accepts URLs (`leetcode.com/problems/two-sum`), prefixed IDs (`atcoder:abc321_a`), or bare patterns (`123A` -> Codeforces, pure digits -> LeetCode). LeetCode URL slugs are automatically resolved to numeric problem IDs via DB lookup.
+
+### System Status
+
+```
+GET /status                           # Requires Bearer token (same as /api/v1/*)
+```
+
+Returns API version and per-platform statistics (total problems, missing content, not-embedded counts).
 
 ### Health Check
 
@@ -186,7 +195,8 @@ src/
 │   ├── problems.rs   # Problem queries with pagination
 │   ├── daily.rs      # Daily challenge + crawler fallback (HTTP 202)
 │   ├── similar.rs    # Vector similarity search (by ID or text)
-│   ├── resolve.rs    # Smart resolution
+│   ├── resolve.rs    # Smart resolution (with LeetCode slug-to-ID lookup)
+│   ├── status.rs     # System status (version + per-platform stats)
 │   └── error.rs      # RFC 7807 error responses
 ├── auth/             # Bearer token (toggleable) + admin session middleware
 ├── admin/            # Dashboard handlers, pages, and API
