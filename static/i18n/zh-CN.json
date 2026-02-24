@@ -33,6 +33,11 @@
       "medium": "中等",
       "hard": "困难"
     },
+    "sources": {
+      "leetcode": "LeetCode",
+      "atcoder": "AtCoder",
+      "codeforces": "Codeforces"
+    },
     "pagination": {
       "first": "« 第一页",
       "prev": "‹ 上一页",
