@@ -37,7 +37,8 @@
     "sources": {
       "leetcode": "LeetCode",
       "atcoder": "AtCoder",
-      "codeforces": "Codeforces"
+      "codeforces": "Codeforces",
+      "luogu": "Luogu"
     },
     "pagination": {
       "first": "« First",
@@ -126,7 +127,9 @@
       "sync_problemset": "Sync Problemset",
       "missing_problems": "Missing Problems",
       "include_gym": "Include Gym",
-      "test": "Test Target"
+      "test": "Test Target",
+      "sync": "Sync",
+      "sync_content": "Sync Content"
     }
   },
   "login": {

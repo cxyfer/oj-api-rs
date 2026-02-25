@@ -243,7 +243,15 @@
                 { flag: '--rate-limit', i18nKey: 'rate_limit', type: 'number', placeholder: 'seconds', step: '0.1' }
             ],
             diag: [
-                { flag: '--test', i18nKey: 'test', type: 'select', options: ['global', 'leetcode', 'atcoder', 'codeforces'] }
+                { flag: '--test', i18nKey: 'test', type: 'select', options: ['global', 'leetcode', 'atcoder', 'codeforces', 'luogu'] }
+            ],
+            luogu: [
+                { flag: '--sync', i18nKey: 'sync', type: 'checkbox' },
+                { flag: '--sync-content', i18nKey: 'sync_content', type: 'checkbox' },
+                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
+                { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' },
+                { flag: '--status', i18nKey: 'status', type: 'checkbox' },
+                { flag: '--rate-limit', i18nKey: 'rate_limit', type: 'number', placeholder: 'seconds', step: '0.1' }
             ]
         };
 
@@ -828,7 +836,7 @@
 
         function parseUrlState() {
             var params = new URLSearchParams(window.location.search);
-            if (params.get('source') && ['leetcode', 'atcoder', 'codeforces'].indexOf(params.get('source')) !== -1) {
+            if (params.get('source') && ['leetcode', 'atcoder', 'codeforces', 'luogu'].indexOf(params.get('source')) !== -1) {
                 currentSource = params.get('source');
             }
             currentPage = parseInt(params.get('page'), 10) || 1;

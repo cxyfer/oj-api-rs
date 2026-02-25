@@ -37,7 +37,8 @@
     "sources": {
       "leetcode": "LeetCode",
       "atcoder": "AtCoder",
-      "codeforces": "Codeforces"
+      "codeforces": "Codeforces",
+      "luogu": "洛谷"
     },
     "pagination": {
       "first": "« 第一页",
@@ -126,7 +127,9 @@
       "sync_problemset": "同步题目集",
       "missing_problems": "缺失题目",
       "include_gym": "包含 Gym",
-      "test": "测试目标"
+      "test": "测试目标",
+      "sync": "同步",
+      "sync_content": "同步内容"
     }
   },
   "login": {
