@@ -255,6 +255,20 @@ static/               # Frontend assets
 └── i18n/             # Translation files (en.json, zh-TW.json, zh-CN.json)
 ```
 
+## Development
+
+### Python Scripts
+
+```bash
+cd scripts && uv sync --dev
+
+# Format
+uv run ruff format .
+
+# Lint
+uv run ruff check .
+```
+
 ## License
 
 MIT
