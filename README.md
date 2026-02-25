@@ -110,8 +110,27 @@ All `/api/v1/*` routes require `Authorization: Bearer <token>` when token auth i
 
 ```
 GET /api/v1/problems/{source}/{id}    # Get a single problem
-GET /api/v1/problems/{source}         # List problems (pagination, filter by difficulty/tags)
+GET /api/v1/problems/{source}         # List problems
+GET /api/v1/tags/{source}             # List all tags for a source
 ```
+
+<details>
+<summary>GET /api/v1/problems/{source} — Query Parameters</summary>
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | integer | `1` | Page number |
+| `per_page` | integer | `20` | Results per page |
+| `difficulty` | string | — | Filter by difficulty |
+| `tags` | string | — | Comma-separated tag filter |
+| `tag_mode` | `any` \| `all` | `any` | Tag matching mode |
+| `search` | string | — | Keyword search |
+| `sort_by` | `id` \| `difficulty` \| `rating` \| `ac_rate` | — | Sort field |
+| `sort_order` | `asc` \| `desc` | — | Sort direction |
+| `rating_min` | float | — | Minimum difficulty rating |
+| `rating_max` | float | — | Maximum difficulty rating |
+
+</details>
 
 ### Daily Challenge
 
@@ -131,6 +150,19 @@ GET /api/v1/similar?q=<text>          # Find similar problems by text query
 ```
 
 Text query mode delegates to a Python subprocess for real-time Gemini embedding generation. Surrounding double quotes in the query value (e.g. `%22two-sum%22`) are automatically stripped.
+
+<details>
+<summary>Query Parameters (both endpoints)</summary>
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | `10` | Max results (max `50`) |
+| `threshold` | float | `0.0` | Minimum similarity score |
+| `source` | string | — | Comma-separated source filter (e.g. `leetcode,atcoder`) |
+
+For `GET /api/v1/similar?q=`, `q` / `query` (3–2000 chars) is required.
+
+</details>
 
 ### Smart Resolution
 
