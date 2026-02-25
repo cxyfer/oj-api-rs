@@ -19,6 +19,7 @@ COPY static/ /app/static/
 COPY scripts/ /app/scripts/
 COPY config.toml.example /app/config.toml.example
 WORKDIR /app
+ENV PYTHONPATH=/app/scripts
 RUN cd scripts && uv sync --frozen --no-dev
 EXPOSE 7856
 CMD ["oj-api-rs"]
