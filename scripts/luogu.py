@@ -24,7 +24,7 @@ RATE_LIMIT_MARKERS = (
     "just a moment...",
     "attention required",
     "captcha",
-    "cloudflare",
+    "checking your browser",
 )
 
 DIFFICULTY_MAP = {
@@ -41,8 +41,17 @@ DIFFICULTY_MAP = {
 
 class LuoguClient(BaseCrawler):
     PROBLEM_LIST_URL = "https://www.luogu.com.cn/problem/list"
-    TAGS_URL = "https://www.luogu.com.cn/_lfe/tags"
+    TAGS_URL = "https://www.luogu.com.cn/_lfe/tags/zh-CN"
     PROBLEM_URL_TEMPLATE = "https://www.luogu.com.cn/problem/{pid}"
+
+    def _headers(self, referer: Optional[str] = None) -> dict:
+        # Don't set User-Agent — let curl_cffi impersonation handle it
+        # to keep UA consistent with TLS fingerprint (same as codeforces.py)
+        headers: dict[str, str] = {}
+        if referer:
+            headers["Referer"] = referer
+        return headers
+
     def __init__(
         self,
         data_dir: str = "data",
@@ -80,8 +89,10 @@ class LuoguClient(BaseCrawler):
             return True
         if any(marker in text for marker in RATE_LIMIT_MARKERS):
             return True
-        # If HTTP 200 but lentille-context missing, likely blocked
-        if "lentille-context" not in html:
+        # Structural check: if neither lentille-context nor known data
+        # containers exist AND the page is suspiciously short, treat as blocked
+        if "lentille-context" not in html and len(html) < 2000:
+            logger.debug("Short page without lentille-context (%d bytes)", len(html))
             return True
         return False
 
@@ -134,7 +145,7 @@ class LuoguClient(BaseCrawler):
     def _extract_lentille_context(self, html: str) -> Optional[dict]:
         soup = BeautifulSoup(html, "html.parser")
         for script in soup.find_all("script", {"type": "application/json"}):
-            if script.get("lentille-context") is not None:
+            if script.get("lentille-context") is not None or script.get("id") == "lentille-context":
                 try:
                     return json.loads(script.string)
                 except (json.JSONDecodeError, TypeError) as exc:
@@ -259,11 +270,10 @@ class LuoguClient(BaseCrawler):
                 pass
     async def sync(self) -> None:
         async with self._create_curl_session(impersonate=CURL_IMPERSONATE) as session:
-            tag_map = await self._fetch_tags_map(session)
             progress = self.get_progress()
             completed_pages = set(progress.get("completed_pages", []))
 
-            # Fetch first page to determine total
+            # Fetch first page to determine total (also establishes session cookies)
             url = f"{self.PROBLEM_LIST_URL}?page=1"
             html = await self._fetch_text(session, url, referer="https://www.luogu.com.cn/")
             if not html:
@@ -279,6 +289,9 @@ class LuoguClient(BaseCrawler):
                 return
             total_pages = math.ceil(total_count / 50)
             logger.info("Total problems: %s, pages: %s", total_count, total_pages)
+
+            # Fetch tags after session is established
+            tag_map = await self._fetch_tags_map(session)
 
             # Process first page if not already done
             if "1" not in completed_pages:
