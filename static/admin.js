@@ -651,20 +651,27 @@
             var bar = document.getElementById('embedding-progress-bar');
             if (!bar) return;
             var html = '';
-            if (prog.phase === 'rewriting' && prog.rewrite_progress) {
-                var rp = prog.rewrite_progress;
-                var pct = rp.total > 0 ? Math.round((rp.done / rp.total) * 100) : 0;
-                html = '<div class="progress-label">' + i18n.t('embeddings.progress.rewriting') + ': ' + rp.done + '/' + rp.total + ' (' + pct + '%)</div>';
-                html += '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
-            } else if (prog.phase === 'embedding' && prog.embed_progress) {
-                var ep = prog.embed_progress;
-                var pct = ep.total > 0 ? Math.round((ep.done / ep.total) * 100) : 0;
-                html = '<div class="progress-label">' + i18n.t('embeddings.progress.embedding') + ': ' + ep.done + '/' + ep.total + ' (' + pct + '%)</div>';
-                html += '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
-            } else if (prog.phase === 'completed') {
+            if (prog.phase === 'completed') {
                 html = '<div class="progress-label">' + i18n.t('embeddings.progress.completed') + '</div>';
             } else if (prog.phase === 'failed') {
                 html = '<div class="progress-label" style="color:var(--color-danger)">' + i18n.t('embeddings.progress.failed') + '</div>';
+            } else {
+                if (prog.rewrite_progress && prog.rewrite_progress.total > 0) {
+                    var rp = prog.rewrite_progress;
+                    var done = Number(rp.done) || 0, total = Number(rp.total) || 0, skipped = Number(rp.skipped) || 0;
+                    var pct = Math.max(0, Math.min(Math.round((done / total) * 100), 100));
+                    var label = i18n.t('embeddings.progress.rewriting') + ': ' + done + '/' + total;
+                    if (skipped > 0) label += ' (' + i18n.t('embeddings.progress.skipped') + ': ' + skipped + ')';
+                    html += '<div class="progress-label">' + label + ' (' + pct + '%)</div>';
+                    html += '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
+                }
+                if (prog.embed_progress && prog.embed_progress.total > 0) {
+                    var ep = prog.embed_progress;
+                    var eDone = Number(ep.done) || 0, eTotal = Number(ep.total) || 0;
+                    var pct2 = Math.max(0, Math.min(Math.round((eDone / eTotal) * 100), 100));
+                    html += '<div class="progress-label">' + i18n.t('embeddings.progress.embedding') + ': ' + eDone + '/' + eTotal + ' (' + pct2 + '%)</div>';
+                    html += '<div class="progress-bar"><div class="progress-fill" style="width:' + pct2 + '%"></div></div>';
+                }
             }
             bar.innerHTML = html;
         }

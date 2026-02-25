@@ -195,7 +195,8 @@
       "rewriting": "Rewriting",
       "embedding": "Embedding",
       "completed": "Completed",
-      "failed": "Failed"
+      "failed": "Failed",
+      "skipped": "Skipped"
     }
   }
 }
