@@ -65,6 +65,7 @@ class LuoguClient(BaseCrawler):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.progress_file = self.data_dir / "luogu_progress.json"
+        self.tags_file = self.data_dir / "luogu_tags.json"
         self.problems_db = ProblemsDatabaseManager(db_path)
         self.rate_limit = max(rate_limit, 2.0)
         self.max_retries = max_retries
@@ -154,6 +155,41 @@ class LuoguClient(BaseCrawler):
         logger.error("lentille-context script tag not found")
         return None
 
+    def _save_tags(self, api_data: dict) -> None:
+        tags = api_data.get("tags", [])
+        payload = {
+            "tags": [
+                {"id": t["id"], "name": t["name"], "type": t.get("type"), "parent": t.get("parent")}
+                for t in tags if "id" in t and "name" in t
+            ],
+            "types": api_data.get("types", []),
+            "tag_map": {str(t["id"]): t["name"] for t in tags if "id" in t and "name" in t},
+            "version": api_data.get("version"),
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+        }
+        tmp_path = self.tags_file.with_suffix(".tmp")
+        try:
+            with tmp_path.open("w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            tmp_path.replace(self.tags_file)
+        except Exception as exc:
+            logger.warning("Failed to write tags file: %s", exc)
+            if tmp_path.exists():
+                tmp_path.unlink(missing_ok=True)
+
+    def _load_cached_tag_map(self) -> dict[str, str]:
+        if not self.tags_file.exists():
+            return {}
+        try:
+            with self.tags_file.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data.get("tag_map", {})
+        except Exception as exc:
+            logger.warning("Failed to read tags file: %s", exc)
+            return {}
+
     async def _fetch_tags_map(self, session) -> dict[str, str]:
         await self._throttle()
         try:
@@ -162,16 +198,22 @@ class LuoguClient(BaseCrawler):
             if response.status_code == 200:
                 data = json.loads(response.text)
                 tags = data.get("tags", [])
-                return {str(t["id"]): t["name"] for t in tags if "id" in t and "name" in t}
+                tag_map = {str(t["id"]): t["name"] for t in tags if "id" in t and "name" in t}
+                self._save_tags(data)
+                return tag_map
         except Exception as exc:
             logger.warning("Failed to fetch tags: %s", exc)
-        # Fallback to cached tags
-        progress = self.get_progress()
-        cached = progress.get("tags_map")
+        cached = self._load_cached_tag_map()
         if cached:
-            logger.info("Using cached tags_map from progress file")
+            logger.info("Using cached tag_map from %s", self.tags_file.name)
             return cached
-        logger.warning("No tags_map available, tags will be raw IDs")
+        # Legacy fallback: old progress file may still have tags_map
+        progress = self.get_progress()
+        legacy = progress.get("tags_map")
+        if legacy:
+            logger.info("Using legacy tags_map from progress file")
+            return legacy
+        logger.warning("No tag_map available, tags will be raw IDs")
         return {}
 
     @staticmethod
@@ -222,7 +264,6 @@ class LuoguClient(BaseCrawler):
                 "completed_pages": [],
                 "last_completed_page": None,
                 "total_count_snapshot": None,
-                "tags_map": None,
                 "last_updated": None,
             }
         try:
@@ -234,14 +275,12 @@ class LuoguClient(BaseCrawler):
                 "completed_pages": [],
                 "last_completed_page": None,
                 "total_count_snapshot": None,
-                "tags_map": None,
                 "last_updated": None,
             }
 
     def save_progress(
         self,
         page: int,
-        tags_map: Optional[dict] = None,
         total_count: Optional[int] = None,
     ) -> None:
         progress = self.get_progress()
@@ -250,10 +289,9 @@ class LuoguClient(BaseCrawler):
         progress["completed_pages"] = sorted(completed, key=lambda x: int(x))
         progress["last_completed_page"] = page
         progress["last_updated"] = datetime.now(timezone.utc).isoformat()
-        if tags_map is not None:
-            progress["tags_map"] = tags_map
         if total_count is not None:
             progress["total_count_snapshot"] = total_count
+        progress.pop("tags_map", None)
         tmp_path = self.progress_file.with_suffix(".tmp")
         try:
             with tmp_path.open("w", encoding="utf-8") as f:
@@ -300,7 +338,7 @@ class LuoguClient(BaseCrawler):
                 if mapped:
                     count = self.problems_db.update_problems(mapped, force_update=overwrite)
                     logger.info("Page 1: upserted %s/%s problems", count, len(mapped))
-                self.save_progress(1, tags_map=tag_map, total_count=total_count)
+                self.save_progress(1, total_count=total_count)
 
             page = 2
             while page <= total_pages:
@@ -335,7 +373,7 @@ class LuoguClient(BaseCrawler):
                         "Page %s/%s: upserted %s/%s problems",
                         page, total_pages, count, len(mapped),
                     )
-                self.save_progress(page, tags_map=tag_map)
+                self.save_progress(page)
                 page += 1
 
         logger.info("Sync completed")
