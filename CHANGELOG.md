@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.3] - 2026-02-25
+
+### Chore
+
+- **server**: change default listen port from 3000 to 7856
+
 ## [0.1.2] - 2026-02-25
 
 ### Features
