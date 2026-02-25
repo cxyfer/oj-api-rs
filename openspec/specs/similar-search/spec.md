@@ -78,3 +78,30 @@ The system SHALL use `over_fetch_factor` (default 4) for KNN `k` calculation: `k
 - **WHEN** `limit=50` and `over_fetch_factor=5` (k would be 250)
 - **THEN** system uses `k=200` (capped)
 
+### Requirement: Similar search response wraps results with rewritten_query
+Both similar search endpoints SHALL return `{ rewritten_query: string | null, results: [...] }` instead of a bare array. For text queries, `rewritten_query` is extracted from Python subprocess output field `rewritten` (trimmed, empty → null). For problem queries, `rewritten_query` is read from `problem_embeddings.rewritten_content` (trimmed, empty/null → null). `rewritten_query` is either null or a non-empty string (never empty string `""`).
+
+#### Scenario: Response is object, not array
+- **INVARIANT** `GET /api/v1/similar?q=...` returns `{ rewritten_query, results }` (object)
+- **INVARIANT** `GET /api/v1/similar/{source}/{id}` returns `{ rewritten_query, results }` (object)
+- **FALSIFICATION** Response JSON starts with `[` instead of `{`
+
+#### Scenario: rewritten_query from text query
+- **WHEN** Python returns `{"embedding": [...], "rewritten": "some text"}`
+- **THEN** response contains `rewritten_query: "some text"`
+- **WHEN** Python returns `rewritten` as null or empty
+- **THEN** response contains `rewritten_query: null`
+
+#### Scenario: rewritten_query from problem query
+- **WHEN** `problem_embeddings.rewritten_content` exists and non-blank
+- **THEN** response contains `rewritten_query: "<content>"`
+- **WHEN** no row or NULL/blank
+- **THEN** response contains `rewritten_query: null`
+
+#### Scenario: Empty results still wrapped
+- **WHEN** query returns no similar problems
+- **THEN** response is `{ rewritten_query: "...", results: [] }` (not bare `[]`)
+
+#### Scenario: Existing error responses unchanged
+- **INVARIANT** 400/404/502/504 error responses remain RFC 7807 format
+

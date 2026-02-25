@@ -1,3 +1,22 @@
+### Requirement: Dual progress bar for embedding pipeline
+The admin embeddings page SHALL render two independent progress bars simultaneously during the embedding pipeline. The rewriting bar SHALL display `Rewriting: {done}/{total} (Skipped: {skipped})` when `rewrite_progress.total > 0`. The embedding bar SHALL display `Embedding: {done}/{total}` when `embed_progress.total > 0`. Both bars SHALL clamp percentage to [0, 100]. Terminal phases (`completed`, `failed`) SHALL render only a status label with no progress bars.
+
+#### Scenario: Both bars render simultaneously during pipeline
+- **WHEN** phase is `rewriting` or `embedding` and `rewrite_progress.total > 0`
+- **THEN** rewriting progress bar is visible with label `Rewriting: {done}/{total} (Skipped: {skipped})`
+- **AND** if `embed_progress.total > 0`, embedding progress bar is also visible
+
+#### Scenario: Percentage clamped to bounds
+- **INVARIANT** `0 <= displayed_percentage <= 100` for both bars
+- **BOUNDARY** `total == 0` → bar not rendered
+
+#### Scenario: Terminal phases show status only
+- **WHEN** phase is `completed` or `failed`
+- **THEN** only status label is rendered (no progress bars)
+
+#### Scenario: i18n key for skipped exists
+- **INVARIANT** `embeddings.progress.skipped` key exists in en, zh-TW, zh-CN locales
+
 ## ADDED Requirements
 
 ### Requirement: Admin embedding page renders with per-source statistics
