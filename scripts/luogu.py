@@ -268,7 +268,7 @@ class LuoguClient(BaseCrawler):
                     tmp_path.unlink()
             except OSError:
                 pass
-    async def sync(self) -> None:
+    async def sync(self, overwrite: bool = False) -> None:
         async with self._create_curl_session(impersonate=CURL_IMPERSONATE) as session:
             progress = self.get_progress()
             completed_pages = set(progress.get("completed_pages", []))
@@ -298,8 +298,8 @@ class LuoguClient(BaseCrawler):
                 result = problems_data.get("result", [])
                 mapped = [p for raw in result if (p := self._map_problem(raw, tag_map))]
                 if mapped:
-                    count = self.problems_db.update_problems(mapped)
-                    logger.info("Page 1: inserted %s/%s problems", count, len(mapped))
+                    count = self.problems_db.update_problems(mapped, force_update=overwrite)
+                    logger.info("Page 1: upserted %s/%s problems", count, len(mapped))
                 self.save_progress(1, tags_map=tag_map, total_count=total_count)
 
             page = 2
@@ -330,9 +330,9 @@ class LuoguClient(BaseCrawler):
                     total_pages = math.ceil(total_count / 50)
                 mapped = [p for raw in result if (p := self._map_problem(raw, tag_map))]
                 if mapped:
-                    count = self.problems_db.update_problems(mapped)
+                    count = self.problems_db.update_problems(mapped, force_update=overwrite)
                     logger.info(
-                        "Page %s/%s: inserted %s/%s problems",
+                        "Page %s/%s: upserted %s/%s problems",
                         page, total_pages, count, len(mapped),
                     )
                 self.save_progress(page, tags_map=tag_map)
@@ -446,6 +446,9 @@ async def main() -> None:
     )
     parser.add_argument("--status", action="store_true", help="Show sync status")
     parser.add_argument(
+        "--overwrite", action="store_true", help="Overwrite existing problems instead of skipping"
+    )
+    parser.add_argument(
         "--rate-limit", type=float, default=2.0, help="Seconds between requests (min 2.0)"
     )
     parser.add_argument("--data-dir", type=str, default=None, help="Data directory")
@@ -469,7 +472,7 @@ async def main() -> None:
     if args.status:
         client.show_status()
     if args.sync:
-        await client.sync()
+        await client.sync(overwrite=args.overwrite)
     if do_sync_content:
         await client.sync_content()
     if args.missing_content_stats:

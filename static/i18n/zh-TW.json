@@ -129,7 +129,8 @@
       "include_gym": "包含 Gym",
       "test": "測試目標",
       "sync": "同步",
-      "sync_content": "同步內容"
+      "sync_content": "同步內容",
+      "overwrite": "覆蓋已存在"
     }
   },
   "login": {

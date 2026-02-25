@@ -423,6 +423,12 @@ pub static LUOGU_ARGS: &[ArgSpec] = &[
         ui_exposed: true,
     },
     ArgSpec {
+        flag: "--overwrite",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
         flag: "--rate-limit",
         arity: 1,
         value_type: ValueType::Float,

@@ -251,6 +251,7 @@
                 { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
                 { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' },
                 { flag: '--status', i18nKey: 'status', type: 'checkbox' },
+                { flag: '--overwrite', i18nKey: 'overwrite', type: 'checkbox' },
                 { flag: '--rate-limit', i18nKey: 'rate_limit', type: 'number', placeholder: 'seconds', step: '0.1' }
             ]
         };
