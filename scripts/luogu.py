@@ -60,6 +60,7 @@ class LuoguClient(BaseCrawler):
         max_retries: int = 3,
         backoff_base: float = 2.0,
         max_backoff: float = 60.0,
+        batch_size: int = 10,
     ) -> None:
         super().__init__(crawler_name="luogu")
         self.data_dir = Path(data_dir)
@@ -67,10 +68,11 @@ class LuoguClient(BaseCrawler):
         self.progress_file = self.data_dir / "luogu_progress.json"
         self.tags_file = self.data_dir / "luogu_tags.json"
         self.problems_db = ProblemsDatabaseManager(db_path)
-        self.rate_limit = max(rate_limit, 2.0)
+        self.rate_limit = max(rate_limit, 1.0)
         self.max_retries = max_retries
         self.backoff_base = backoff_base
         self.max_backoff = max_backoff
+        self.batch_size = max(batch_size, 1)
         self._last_request_at = time.monotonic() - self.rate_limit
 
     async def _throttle(self) -> None:
@@ -433,9 +435,9 @@ class LuoguClient(BaseCrawler):
                     continue
                 batch.append((md, "luogu", pid))
                 fetched += 1
-                if len(batch) >= 10:
+                if len(batch) >= self.batch_size:
                     count, ok = self.problems_db.batch_update_content(
-                        batch, batch_size=10
+                        batch, batch_size=self.batch_size
                     )
                     if not ok:
                         logger.warning("Some content updates failed")
@@ -443,7 +445,7 @@ class LuoguClient(BaseCrawler):
                     logger.info("Updated content for %s problems", count)
                     batch = []
             if batch:
-                count, ok = self.problems_db.batch_update_content(batch, batch_size=10)
+                count, ok = self.problems_db.batch_update_content(batch, batch_size=self.batch_size)
                 if not ok:
                     logger.warning("Some content updates failed")
                     failed = True
@@ -487,7 +489,10 @@ async def main() -> None:
         "--overwrite", action="store_true", help="Overwrite existing problems instead of skipping"
     )
     parser.add_argument(
-        "--rate-limit", type=float, default=2.0, help="Seconds between requests (min 2.0)"
+        "--rate-limit", type=float, default=1.0, help="Seconds between requests (min 1.0)"
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=10, help="DB write batch size for content sync (default: 10)"
     )
     parser.add_argument("--data-dir", type=str, default=None, help="Data directory")
     parser.add_argument("--db-path", type=str, default=None, help="Database path")
@@ -504,7 +509,8 @@ async def main() -> None:
     db_path = args.db_path or str(Path(config.database_path).resolve())
 
     client = LuoguClient(
-        data_dir=data_dir, db_path=db_path, rate_limit=args.rate_limit
+        data_dir=data_dir, db_path=db_path, rate_limit=args.rate_limit,
+        batch_size=args.batch_size,
     )
 
     if args.status:
