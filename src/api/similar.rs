@@ -25,6 +25,12 @@ pub struct SimilarByTextQuery {
 }
 
 #[derive(Serialize)]
+struct SimilarResponse {
+    rewritten_query: Option<String>,
+    results: Vec<SimilarResult>,
+}
+
+#[derive(Serialize)]
 struct SimilarResult {
     source: String,
     id: String,
@@ -32,6 +38,12 @@ struct SimilarResult {
     difficulty: Option<String>,
     link: Option<String>,
     similarity: f32,
+}
+
+#[derive(Deserialize)]
+struct EmbedTextOutput {
+    embedding: Vec<f32>,
+    rewritten: Option<String>,
 }
 
 pub async fn similar_by_problem(
@@ -58,6 +70,9 @@ pub async fn similar_by_problem(
                 Some(e) => e,
                 None => return Err(ProblemDetail::not_found("no embedding found for this problem")),
             };
+
+        let rewritten_query =
+            crate::db::embeddings::get_rewritten_content(&pool, &source, &id);
 
         let k = (limit * over_fetch).min(200);
         let knn_results = crate::db::embeddings::knn_search(&pool, &embedding, k);
@@ -90,7 +105,7 @@ pub async fn similar_by_problem(
             .collect();
 
         results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
-        Ok(results)
+        Ok(SimilarResponse { rewritten_query, results })
     })
     .await
     .unwrap_or(Err(ProblemDetail::internal("task join error")));
@@ -192,21 +207,21 @@ pub async fn similar_by_text(
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let embed_response: serde_json::Value = match serde_json::from_str(&stdout) {
+    let embed_output: EmbedTextOutput = match serde_json::from_str(&stdout) {
         Ok(v) => v,
         Err(_) => {
             return ProblemDetail::bad_gateway("invalid embedding response").into_response();
         }
     };
 
-    let embedding: Vec<f32> = match embed_response.get("embedding").and_then(|v| {
-        serde_json::from_value::<Vec<f32>>(v.clone()).ok()
-    }) {
-        Some(e) => e,
-        None => {
-            return ProblemDetail::bad_gateway("invalid embedding format").into_response();
-        }
-    };
+    let rewritten_query = embed_output
+        .rewritten
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+
+    let embedding = embed_output.embedding;
 
     let pool = state.ro_pool.clone();
     let over_fetch = state.config.embedding.over_fetch_factor;
@@ -247,5 +262,5 @@ pub async fn similar_by_text(
     .await
     .unwrap_or_default();
 
-    Json(result).into_response()
+    Json(SimilarResponse { rewritten_query, results: result }).into_response()
 }

@@ -81,6 +81,19 @@ pub fn get_embedding(pool: &DbPool, source: &str, id: &str) -> Option<Vec<f32>> 
     serde_json::from_str::<Vec<f32>>(&text).ok()
 }
 
+pub fn get_rewritten_content(pool: &DbPool, source: &str, id: &str) -> Option<String> {
+    let conn = pool.get().ok()?;
+    let val: String = conn
+        .query_row(
+            "SELECT rewritten_content FROM problem_embeddings WHERE source = ?1 AND problem_id = ?2",
+            params![source, id],
+            |row| row.get(0),
+        )
+        .ok()?;
+    let trimmed = val.trim();
+    if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+}
+
 pub fn knn_search(
     pool: &DbPool,
     embedding: &[f32],
