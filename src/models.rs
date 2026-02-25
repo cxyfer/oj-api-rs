@@ -391,6 +391,63 @@ pub static CODEFORCES_ARGS: &[ArgSpec] = &[
     },
 ];
 
+pub static LUOGU_ARGS: &[ArgSpec] = &[
+    ArgSpec {
+        flag: "--sync",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--fill-missing-content",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--missing-content-stats",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--status",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--overwrite",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--rate-limit",
+        arity: 1,
+        value_type: ValueType::Float,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--batch-size",
+        arity: 1,
+        value_type: ValueType::Int,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--data-dir",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
+    ArgSpec {
+        flag: "--db-path",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
+];
+
 pub static DIAG_ARGS: &[ArgSpec] = &[ArgSpec {
     flag: "--test",
     arity: 1,
@@ -403,6 +460,7 @@ pub enum CrawlerSource {
     LeetCode,
     AtCoder,
     Codeforces,
+    Luogu,
     Diag,
 }
 
@@ -412,6 +470,7 @@ impl CrawlerSource {
             "leetcode" => Ok(Self::LeetCode),
             "atcoder" => Ok(Self::AtCoder),
             "codeforces" => Ok(Self::Codeforces),
+            "luogu" => Ok(Self::Luogu),
             "diag" => Ok(Self::Diag),
             _ => Err(format!("invalid source: {}", s)),
         }
@@ -422,6 +481,7 @@ impl CrawlerSource {
             Self::LeetCode => "leetcode.py",
             Self::AtCoder => "atcoder.py",
             Self::Codeforces => "codeforces.py",
+            Self::Luogu => "luogu.py",
             Self::Diag => "diag.py",
         }
     }
@@ -431,6 +491,7 @@ impl CrawlerSource {
             Self::LeetCode => LEETCODE_ARGS,
             Self::AtCoder => ATCODER_ARGS,
             Self::Codeforces => CODEFORCES_ARGS,
+            Self::Luogu => LUOGU_ARGS,
             Self::Diag => DIAG_ARGS,
         }
     }

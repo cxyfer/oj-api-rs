@@ -57,6 +57,10 @@ timeout_secs = 300
 # https_proxy = ""                         # HTTPS-specific proxy
 # socks5_proxy = ""                        # SOCKS5 proxy (requires aiohttp-socks)
 
+# Per-source timeout overrides (seconds)
+[crawler.per_source_timeout]
+# luogu = 36000
+
 # Per-crawler overrides (all fields optional, inherit from [crawler])
 # [crawler.leetcode]
 # user_agent = "..."

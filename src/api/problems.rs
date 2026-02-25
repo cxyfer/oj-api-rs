@@ -36,7 +36,7 @@ pub(crate) struct ListResponse<T: Serialize> {
     pub meta: ListMeta,
 }
 
-pub(crate) const VALID_SOURCES: &[&str] = &["atcoder", "leetcode", "codeforces"];
+pub(crate) const VALID_SOURCES: &[&str] = &["atcoder", "leetcode", "codeforces", "luogu"];
 pub(crate) const VALID_SORT_BY: &[&str] = &["id", "difficulty", "rating", "ac_rate"];
 pub(crate) const VALID_SORT_ORDER: &[&str] = &["asc", "desc"];
 pub(crate) const VALID_TAG_MODES: &[&str] = &["any", "all"];

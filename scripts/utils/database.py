@@ -304,16 +304,20 @@ class ProblemsDatabaseManager:
         conn.close()
         logger.debug("Problems table initialized")
 
-    def update_problems(self, problems):
+    def update_problems(self, problems, force_update=False):
         """
-        Insert problem data in batch. If the problem already exists, it will be ignored.
-        Use single SQL execution for batch insertion to improve performance.
+        Insert or update problem data in batch.
+
+        When force_update is False (default), existing problems are skipped
+        (INSERT OR IGNORE). When force_update is True, existing problems are
+        overwritten (upsert via ON CONFLICT DO UPDATE).
 
         Args:
             problems (list[dict]): problem data list
+            force_update (bool): if True, overwrite existing problems
 
         Returns:
-            int: actual inserted data count
+            int: actual inserted/updated data count
         """
         total_count = len(problems)
         if total_count == 0:
@@ -349,28 +353,52 @@ class ProblemsDatabaseManager:
                 )
             )
 
-        try:
-            cursor.executemany(
-                """
+        if force_update:
+            sql = """
+            INSERT INTO problems (
+                id, source, slug, title, title_cn, difficulty, ac_rate,
+                rating, contest, problem_index, tags, link,
+                category, paid_only, content, content_cn, similar_questions
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(source, id) DO UPDATE SET
+                slug=excluded.slug,
+                title=excluded.title,
+                title_cn=excluded.title_cn,
+                difficulty=excluded.difficulty,
+                ac_rate=excluded.ac_rate,
+                rating=excluded.rating,
+                contest=excluded.contest,
+                problem_index=excluded.problem_index,
+                tags=excluded.tags,
+                link=excluded.link,
+                category=excluded.category,
+                paid_only=excluded.paid_only,
+                content=COALESCE(excluded.content, problems.content),
+                content_cn=COALESCE(excluded.content_cn, problems.content_cn),
+                similar_questions=COALESCE(excluded.similar_questions, problems.similar_questions)
+            """
+        else:
+            sql = """
             INSERT OR IGNORE INTO problems (
                 id, source, slug, title, title_cn, difficulty, ac_rate,
                 rating, contest, problem_index, tags, link,
                 category, paid_only, content, content_cn, similar_questions
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-                values,
-            )
+            """
+        try:
+            cursor.executemany(sql, values)
 
             conn.commit()
 
-            # get actual inserted data count
-            inserted_count = cursor.rowcount
+            affected_count = cursor.rowcount
+            verb = "upserted" if force_update else "inserted"
+            skip_verb = "updated" if force_update else "ignored"
 
             logger.info(
-                f"Batch inserted {inserted_count}/{total_count} problems "
-                f"(ignored {total_count - inserted_count} existing problems)"
+                f"Batch {verb} {affected_count}/{total_count} problems "
+                f"({skip_verb} {total_count - affected_count} existing problems)"
             )
-            return inserted_count
+            return affected_count
 
         except Exception as e:
             logger.error(f"Error inserting problems: {e}")
