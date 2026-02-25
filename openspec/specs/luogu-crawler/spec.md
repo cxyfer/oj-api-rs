@@ -19,22 +19,22 @@ The crawler SHALL fetch problem lists from `https://www.luogu.com.cn/problem/lis
 - **THEN** the crawler SHALL treat this as a potential Cloudflare block, trigger retry with backoff, and NOT write progress for this page
 
 ### Requirement: Tags mapping with cache and fallback
-The crawler SHALL fetch the tag list from `https://www.luogu.com.cn/_lfe/tags` once per sync run, parse the response as `{"tags": [...], "types": [...], "version": ...}`, and build a `{tag_id: tag_name}` mapping from all tags regardless of type. This mapping SHALL be cached in `luogu_progress.json` under the `tags_map` key. Each problem's numeric `tags` array SHALL be converted to a string array using this mapping.
+The crawler SHALL fetch the tag list from `https://www.luogu.com.cn/_lfe/tags` once per sync run, parse the response as `{"tags": [...], "types": [...], "version": ...}`, and build a `{tag_id: tag_name}` mapping from all tags regardless of type. This mapping SHALL be cached in `luogu_tags.json`. Each problem's numeric `tags` array SHALL be converted to a string array using this mapping.
 
 #### Scenario: Successful tag resolution
-- **WHEN** a problem has `tags: [185, 42]` and the tags_map contains `{185: "动态规划", 42: "模拟"}`
+- **WHEN** a problem has `tags: [185, 42]` and the cached mapping contains `{185: "动态规划", 42: "模拟"}`
 - **THEN** the mapped tags SHALL be `["动态规划", "模拟"]`
 
 #### Scenario: Unknown tag ID not in mapping
-- **WHEN** a problem has `tags: [185, 99999]` and tag ID 99999 is not in tags_map
+- **WHEN** a problem has `tags: [185, 99999]` and tag ID 99999 is not in the cached mapping
 - **THEN** the mapped tags SHALL be `["动态规划", "99999"]` (raw ID preserved as string)
 
 #### Scenario: Tags API failure with existing cache
-- **WHEN** the `/_lfe/tags` API request fails but `luogu_progress.json` contains a cached `tags_map`
+- **WHEN** the `/_lfe/tags` API request fails but `luogu_tags.json` contains a cached tags mapping
 - **THEN** the crawler SHALL use the cached mapping and log a warning
 
 #### Scenario: Tags API failure without cache
-- **WHEN** the `/_lfe/tags` API request fails and no cached `tags_map` exists
+- **WHEN** the `/_lfe/tags` API request fails and no cached tags mapping exists in `luogu_tags.json`
 - **THEN** the crawler SHALL proceed with sync, mapping all tag IDs to their string representation
 
 ### Requirement: Difficulty conversion
@@ -53,11 +53,11 @@ The crawler SHALL convert the numeric `difficulty` field (0-7) to Chinese text u
 - **THEN** the DB `difficulty` field SHALL be `NULL`
 
 ### Requirement: DB field mapping
-The crawler SHALL write to the `problems` table with `source = "luogu"`. Field mapping: `pid` → `id` and `slug`, `title` → `title` and `title_cn`, converted difficulty → `difficulty`, `totalAccepted/totalSubmit` → `ac_rate`, converted tags → `tags` (as `json.dumps()` string), `https://www.luogu.com.cn/problem/{pid}` → `link`, `"Algorithms"` → `category`, `0` → `paid_only`. Fields `rating`, `contest`, `problem_index`, `content` SHALL be `NULL`.
+The crawler SHALL write to the `problems` table with `source = "luogu"`. Field mapping: `pid` → `id` and `slug`, `title` → `title` and `title_cn`, converted difficulty → `difficulty`, `100 * totalAccepted/totalSubmit` → `ac_rate` (percentage 0–100), converted tags → `tags` (as `json.dumps()` string), `https://www.luogu.com.cn/problem/{pid}` → `link`, `"Algorithms"` → `category`, `0` → `paid_only`. Fields `rating`, `contest`, `problem_index`, `content` SHALL be `NULL`.
 
 #### Scenario: Standard problem mapping
 - **WHEN** a Luogu problem has `pid="P1000"`, `title="A+B Problem"`, `difficulty=1`, `totalAccepted=100`, `totalSubmit=200`, `tags=[185]`
-- **THEN** the DB record SHALL have `id="P1000"`, `source="luogu"`, `slug="P1000"`, `title="A+B Problem"`, `title_cn="A+B Problem"`, `difficulty="入门"`, `ac_rate=0.5`, `tags='["动态规划"]'`, `link="https://www.luogu.com.cn/problem/P1000"`, `category="Algorithms"`, `paid_only=0`
+- **THEN** the DB record SHALL have `id="P1000"`, `source="luogu"`, `slug="P1000"`, `title="A+B Problem"`, `title_cn="A+B Problem"`, `difficulty="入门"`, `ac_rate=50`, `tags='["动态规划"]'`, `link="https://www.luogu.com.cn/problem/P1000"`, `category="Algorithms"`, `paid_only=0`
 
 #### Scenario: Zero submissions
 - **WHEN** a problem has `totalSubmit=0`
@@ -79,15 +79,15 @@ The crawler SHALL use `ProblemsDatabaseManager.update_problems()` (INSERT OR IGN
 - **THEN** the value passed to `update_problems()` for the `tags` field SHALL be the string `'["动态规划", "模拟"]'`
 
 ### Requirement: Rate limiting with minimum floor
-The crawler SHALL enforce a minimum interval of 2.0 seconds between consecutive HTTP requests to Luogu domains. The `__init__` method SHALL clamp the rate_limit parameter: `self.rate_limit = max(rate_limit, 2.0)`. A `_throttle()` method SHALL use `time.monotonic()` to track and enforce this interval.
+The crawler SHALL enforce a minimum interval of 1.0 seconds between consecutive HTTP requests to Luogu domains. The `__init__` method SHALL clamp the rate_limit parameter: `self.rate_limit = max(rate_limit, 1.0)`. A `_throttle()` method SHALL use `time.monotonic()` to track and enforce this interval.
 
 #### Scenario: Rate limit below minimum
 - **WHEN** `--rate-limit 0.5` is passed
-- **THEN** the effective rate limit SHALL be 2.0 seconds
+- **THEN** the effective rate limit SHALL be 1.0 seconds
 
 #### Scenario: Consecutive requests
 - **WHEN** two pages are fetched sequentially
-- **THEN** the elapsed time between the two HTTP requests SHALL be >= 2.0 seconds
+- **THEN** the elapsed time between the two HTTP requests SHALL be >= 1.0 seconds
 
 ### Requirement: Cloudflare challenge detection
 The crawler SHALL implement `_is_rate_limited(html)` that returns `True` when the response matches Cloudflare challenge signatures: title containing "just a moment..." or "attention required! | cloudflare", or body containing markers "too many requests", "captcha", "cloudflare". Additionally, if HTTP status is 200 but the `lentille-context` script tag is absent, this SHALL be treated as a suspected block. Detection SHALL trigger exponential backoff (base=2.0, max=60.0) and SHALL NOT write progress.
@@ -120,19 +120,15 @@ The crawler SHALL maintain `data/luogu_progress.json` with fields: `completed_pa
 - **THEN** `completed_pages` SHALL only grow (set inclusion: S_next ⊇ S_prev)
 
 ### Requirement: CLI interface
-The crawler SHALL provide the following CLI arguments via argparse: `--sync` (sync all problem pages), `--sync-content` (fetch problem content for all problems with NULL content), `--fill-missing-content` (alias for `--sync-content`), `--missing-content-stats` (show count of problems missing content), `--status` (show progress), `--rate-limit <float>` (request interval, default 2.0), `--data-dir <str>` (data directory), `--db-path <str>` (database path). If no action flag is provided, the crawler SHALL print help and exit.
+The crawler SHALL provide the following CLI arguments via argparse: `--sync` (sync all problem pages), `--fill-missing-content` (fetch problem content for all problems with NULL content), `--missing-content-stats` (show count of problems missing content), `--status` (show progress), `--overwrite` (overwrite existing problems instead of skipping), `--rate-limit <float>` (request interval, default 1.0, min 1.0), `--batch-size <int>` (DB write batch size for content sync, default 10), `--data-dir <str>` (data directory), `--db-path <str>` (database path). If no action flag is provided, the crawler SHALL print help and exit.
 
 #### Scenario: Sync invocation
 - **WHEN** `python3 luogu.py --sync` is executed
 - **THEN** the crawler SHALL fetch tags, then iterate all pages writing problems to DB
 
-#### Scenario: Sync content invocation
-- **WHEN** `python3 luogu.py --sync-content` is executed
-- **THEN** the crawler SHALL query DB for problems with NULL content, fetch each problem's detail page, compose markdown, and update the content field
-
-#### Scenario: Fill missing content alias
+#### Scenario: Fill missing content invocation
 - **WHEN** `python3 luogu.py --fill-missing-content` is executed
-- **THEN** the behavior SHALL be identical to `--sync-content`
+- **THEN** the crawler SHALL query DB for problems with NULL content, fetch each problem's detail page, compose markdown, and update the content field
 
 #### Scenario: Missing content stats
 - **WHEN** `python3 luogu.py --missing-content-stats` is executed

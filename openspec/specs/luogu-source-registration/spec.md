@@ -22,16 +22,17 @@ The `CrawlerSource` enum in `src/models.rs` SHALL include a `Luogu` variant. `Cr
 - **THEN** it SHALL return `"luogu.py"`
 
 ### Requirement: LUOGU_ARGS whitelist
-A static `LUOGU_ARGS: &[ArgSpec]` SHALL be defined with exactly 8 entries matching the Python CLI:
+A static `LUOGU_ARGS: &[ArgSpec]` SHALL be defined with exactly 10 entries matching the Python CLI:
 
 | Flag | Arity | ValueType | ui_exposed |
 |---|---|---|---|
 | `--sync` | 0 | None | true |
-| `--sync-content` | 0 | None | true |
 | `--fill-missing-content` | 0 | None | true |
 | `--missing-content-stats` | 0 | None | true |
 | `--status` | 0 | None | true |
+| `--overwrite` | 0 | None | true |
 | `--rate-limit` | 1 | Float | true |
+| `--batch-size` | 1 | Int | true |
 | `--data-dir` | 1 | Str | false |
 | `--db-path` | 1 | Str | false |
 
@@ -39,10 +40,6 @@ A static `LUOGU_ARGS: &[ArgSpec]` SHALL be defined with exactly 8 entries matchi
 
 #### Scenario: Valid sync argument
 - **WHEN** `validate_args(&CrawlerSource::Luogu, &["--sync".into()])` is called
-- **THEN** it SHALL return `Ok` with the args vector
-
-#### Scenario: Valid sync-content argument
-- **WHEN** `validate_args(&CrawlerSource::Luogu, &["--sync-content".into()])` is called
 - **THEN** it SHALL return `Ok` with the args vector
 
 #### Scenario: Valid fill-missing-content argument

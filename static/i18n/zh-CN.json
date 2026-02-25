@@ -129,7 +129,8 @@
       "include_gym": "包含 Gym",
       "test": "测试目标",
       "sync": "同步",
-      "overwrite": "覆盖已存在"
+      "overwrite": "覆盖已存在",
+      "batch_size": "批次大小"
     }
   },
   "login": {

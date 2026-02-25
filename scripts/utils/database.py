@@ -306,8 +306,11 @@ class ProblemsDatabaseManager:
 
     def update_problems(self, problems, force_update=False):
         """
-        Insert problem data in batch. If the problem already exists, it will be ignored.
-        Use single SQL execution for batch insertion to improve performance.
+        Insert or update problem data in batch.
+
+        When force_update is False (default), existing problems are skipped
+        (INSERT OR IGNORE). When force_update is True, existing problems are
+        overwritten (upsert via ON CONFLICT DO UPDATE).
 
         Args:
             problems (list[dict]): problem data list
@@ -389,10 +392,11 @@ class ProblemsDatabaseManager:
 
             affected_count = cursor.rowcount
             verb = "upserted" if force_update else "inserted"
+            skip_verb = "updated" if force_update else "ignored"
 
             logger.info(
                 f"Batch {verb} {affected_count}/{total_count} problems "
-                f"(ignored {total_count - affected_count} existing problems)"
+                f"({skip_verb} {total_count - affected_count} existing problems)"
             )
             return affected_count
 

@@ -129,7 +129,8 @@
       "include_gym": "Include Gym",
       "test": "Test Target",
       "sync": "Sync",
-      "overwrite": "Overwrite Existing"
+      "overwrite": "Overwrite Existing",
+      "batch_size": "Batch Size"
     }
   },
   "login": {

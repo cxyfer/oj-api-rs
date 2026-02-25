@@ -339,7 +339,8 @@ class LuoguClient(BaseCrawler):
                 mapped = [p for raw in result if (p := self._map_problem(raw, tag_map))]
                 if mapped:
                     count = self.problems_db.update_problems(mapped, force_update=overwrite)
-                    logger.info("Page 1: upserted %s/%s problems", count, len(mapped))
+                    verb = "upserted" if overwrite else "inserted"
+                    logger.info("Page 1: %s %s/%s problems", verb, count, len(mapped))
                 self.save_progress(1, total_count=total_count)
 
             page = 2
@@ -371,9 +372,10 @@ class LuoguClient(BaseCrawler):
                 mapped = [p for raw in result if (p := self._map_problem(raw, tag_map))]
                 if mapped:
                     count = self.problems_db.update_problems(mapped, force_update=overwrite)
+                    verb = "upserted" if overwrite else "inserted"
                     logger.info(
-                        "Page %s/%s: upserted %s/%s problems",
-                        page, total_pages, count, len(mapped),
+                        "Page %s/%s: %s %s/%s problems",
+                        page, total_pages, verb, count, len(mapped),
                     )
                 self.save_progress(page)
                 page += 1

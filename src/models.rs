@@ -429,6 +429,12 @@ pub static LUOGU_ARGS: &[ArgSpec] = &[
         ui_exposed: true,
     },
     ArgSpec {
+        flag: "--batch-size",
+        arity: 1,
+        value_type: ValueType::Int,
+        ui_exposed: true,
+    },
+    ArgSpec {
         flag: "--data-dir",
         arity: 1,
         value_type: ValueType::Str,
