@@ -257,6 +257,19 @@ static/               # Frontend assets
 
 ## Development
 
+### Rust
+
+```bash
+# Build
+cargo build --release
+
+# Lint
+cargo clippy
+
+# Format
+cargo fmt
+```
+
 ### Python Scripts
 
 ```bash
