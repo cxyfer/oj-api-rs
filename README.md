@@ -39,11 +39,16 @@ The server starts at `http://0.0.0.0:3000` by default.
 ### Docker
 
 ```bash
+# Pull pre-built image
+docker pull ghcr.io/cxyfer/oj-api-rs:latest
+
+# Or build locally
 docker build -t oj-api-rs .
+
 docker run -p 3000:3000 \
   -v ./config.toml:/app/config.toml:ro \
   -v oj-data:/app/data \
-  oj-api-rs
+  ghcr.io/cxyfer/oj-api-rs:latest
 ```
 
 ## Configuration
@@ -61,19 +66,39 @@ path = "data/data.db"           # resolved relative to config file directory
 pool_max_size = 8
 busy_timeout_ms = 5000
 
-[gemini]
-api_key = ""                    # Gemini API key (Python-only, Rust ignores this section)
+# LLM provider configuration
+# Supported providers: "gemini", "openai"
+[llm]
+provider = "gemini"
+api_key = ""
+# base_url = ""                 # optional, for proxy or custom endpoint
+
+[llm.models.embedding]
+name = "gemini-embedding-001"
+dim = 768
+task_type = "SEMANTIC_SIMILARITY"
+batch_size = 32
+
+[llm.models.rewrite]
+name = "gemini-2.0-flash"
+temperature = 0.3
+timeout = 60
+max_retries = 2
+workers = 8
 
 [crawler]
 timeout_secs = 300
+# user_agent = "Mozilla/5.0 (compatible; OJ-API-Bot/1.0)"
+# proxy = "http://127.0.0.1:7890"
 
 [embedding]
-timeout_secs = 30
+timeout_secs = 30               # per-query embed-text timeout (similar search)
 over_fetch_factor = 4
 concurrency = 4                 # 1..=32
 
 [logging]
 rust_log = "info"
+level = "INFO"
 ```
 
 ## API Endpoints
