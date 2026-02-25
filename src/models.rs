@@ -399,12 +399,6 @@ pub static LUOGU_ARGS: &[ArgSpec] = &[
         ui_exposed: true,
     },
     ArgSpec {
-        flag: "--sync-content",
-        arity: 0,
-        value_type: ValueType::None,
-        ui_exposed: true,
-    },
-    ArgSpec {
         flag: "--fill-missing-content",
         arity: 0,
         value_type: ValueType::None,

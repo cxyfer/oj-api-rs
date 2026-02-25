@@ -477,9 +477,8 @@ class LuoguClient(BaseCrawler):
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Luogu crawler")
     parser.add_argument("--sync", action="store_true", help="Sync problem list")
-    parser.add_argument("--sync-content", action="store_true", help="Sync problem content")
     parser.add_argument(
-        "--fill-missing-content", action="store_true", help="Alias for --sync-content"
+        "--fill-missing-content", action="store_true", help="Fetch content for problems missing it"
     )
     parser.add_argument(
         "--missing-content-stats", action="store_true", help="Show missing content count"
@@ -498,7 +497,7 @@ async def main() -> None:
     parser.add_argument("--db-path", type=str, default=None, help="Database path")
 
     args = parser.parse_args()
-    do_sync_content = args.sync_content or args.fill_missing_content
+    do_sync_content = args.fill_missing_content
 
     if not (args.sync or do_sync_content or args.missing_content_stats or args.status):
         parser.print_help()

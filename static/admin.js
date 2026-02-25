@@ -247,7 +247,6 @@
             ],
             luogu: [
                 { flag: '--sync', i18nKey: 'sync', type: 'checkbox' },
-                { flag: '--sync-content', i18nKey: 'sync_content', type: 'checkbox' },
                 { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
                 { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' },
                 { flag: '--status', i18nKey: 'status', type: 'checkbox' },
