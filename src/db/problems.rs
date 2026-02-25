@@ -215,7 +215,7 @@ pub fn list_problems(pool: &DbPool, params: &ListParams<'_>) -> Option<ListResul
     let total_pages = if total == 0 {
         0
     } else {
-        (total + per_page - 1) / per_page
+        total.div_ceil(per_page)
     };
 
     let order_col = match params.sort_by {

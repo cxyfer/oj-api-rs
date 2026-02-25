@@ -91,7 +91,7 @@ pub async fn similar_by_problem(
             .filter(|(s, _, _)| {
                 source_filter
                     .as_ref()
-                    .map_or(true, |filters| filters.iter().any(|f| f == s))
+                    .is_none_or(|filters| filters.iter().any(|f| f == s))
             })
             .take(limit as usize)
             .map(|(s, pid, similarity)| {
@@ -250,7 +250,7 @@ pub async fn similar_by_text(
             .filter(|(s, _, _)| {
                 source_filter
                     .as_ref()
-                    .map_or(true, |filters| filters.iter().any(|f| f == s))
+                    .is_none_or(|filters| filters.iter().any(|f| f == s))
             })
             .take(limit as usize)
             .map(|(s, pid, similarity)| {

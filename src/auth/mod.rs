@@ -70,9 +70,7 @@ pub fn extract_cookie<'a>(headers: &'a axum::http::HeaderMap, name: &str) -> Opt
         .flat_map(|s| s.split(';'))
         .map(|s| s.trim())
         .find_map(|pair| {
-            let mut parts = pair.splitn(2, '=');
-            let key = parts.next()?;
-            let val = parts.next()?;
+            let (key, val) = pair.split_once('=')?;
             if key == name {
                 Some(val)
             } else {

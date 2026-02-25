@@ -65,8 +65,8 @@ pub fn detect_source(input: &str) -> (&'static str, String) {
         if luogu_pid.starts_with("CF") {
             return ("codeforces", luogu_pid);
         }
-        if luogu_pid.starts_with("AT_") {
-            return ("atcoder", luogu_pid[3..].to_lowercase());
+        if let Some(stripped) = luogu_pid.strip_prefix("AT_") {
+            return ("atcoder", stripped.to_lowercase());
         }
         if luogu_pid.starts_with("AT") {
             return ("atcoder", luogu_pid.to_lowercase());
