@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.4] - 2026-02-25
+
+### Bug Fixes
+
+- **docker**: remove `embeddings/` from `.dockerignore` to fix `ModuleNotFoundError` in container
+
+### Chore
+
+- **docker**: set `PYTHONPATH` to fix `ModuleNotFoundError` for local scripts
+- **scripts**: format Python code with ruff
+- **src**: format Rust code with `cargo fmt` and fix `cargo clippy` warnings
+
+### Docs
+
+- **readme**: add `--restart` and `--name` flags to `docker run` example
+- **readme**: add development section with ruff usage
+- **readme**: add rust development section with cargo commands
+
 ## [0.1.3] - 2026-02-25
 
 ### Chore
