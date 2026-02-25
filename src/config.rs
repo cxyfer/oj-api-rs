@@ -14,7 +14,7 @@ pub struct ServerConfig {
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
-            listen_addr: "0.0.0.0:3000".parse().unwrap(),
+            listen_addr: "0.0.0.0:7856".parse().unwrap(),
             admin_secret: String::new(),
             graceful_shutdown_secs: 10,
         }

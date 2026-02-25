@@ -34,7 +34,7 @@ cp config.toml.example config.toml
 cargo run --release
 ```
 
-The server starts at `http://0.0.0.0:3000` by default.
+The server starts at `http://0.0.0.0:7856` by default.
 
 ### Docker
 
@@ -45,7 +45,7 @@ docker pull ghcr.io/cxyfer/oj-api-rs:latest
 # Or build locally
 docker build -t oj-api-rs .
 
-docker run -p 3000:3000 \
+docker run -p 7856:7856 \
   -v ./config.toml:/app/config.toml:ro \
   -v oj-data:/app/data \
   ghcr.io/cxyfer/oj-api-rs:latest
@@ -57,7 +57,7 @@ All settings are loaded from `config.toml` at the project root (overridable via 
 
 ```toml
 [server]
-listen_addr = "0.0.0.0:3000"
+listen_addr = "0.0.0.0:7856"
 admin_secret = "changeme"       # required — warning emitted if empty or "changeme"
 graceful_shutdown_secs = 10
 

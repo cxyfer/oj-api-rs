@@ -1,7 +1,7 @@
 # OJ API Configuration
 
 [server]
-listen_addr = "0.0.0.0:3000"
+listen_addr = "0.0.0.0:7856"
 admin_secret = "changeme"
 graceful_shutdown_secs = 10
 

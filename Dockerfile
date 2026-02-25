@@ -20,5 +20,5 @@ COPY scripts/ /app/scripts/
 COPY config.toml.example /app/config.toml.example
 WORKDIR /app
 RUN cd scripts && uv sync --frozen --no-dev
-EXPOSE 3000
+EXPOSE 7856
 CMD ["oj-api-rs"]
