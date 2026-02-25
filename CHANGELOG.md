@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.2] - 2026-02-25
+
+### Features
+
+- **embedding**: add LLM provider abstraction with Gemini and OpenAI adapters
+- **admin**: add embedding management page with stats, trigger, and progress
+- **api**: wrap similar endpoints with `rewritten_query` field
+- **admin**: show dual progress bars for embedding pipeline
+
+### Bug Fixes
+
+- **embedding**: ensure progress JSON reflects final status after job completion
+
+### Refactor
+
+- **embedding**: remove rust-side timeout for embedding trigger
+
 ## [0.1.1] - 2026-02-24
 
 ### Features
