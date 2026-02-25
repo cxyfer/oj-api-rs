@@ -237,7 +237,7 @@ class LuoguClient(BaseCrawler):
         total_submit = raw.get("totalSubmit", 0)
         total_accepted = raw.get("totalAccepted", 0)
         ac_rate = (
-            total_accepted / total_submit
+            round(total_accepted * 100 / total_submit, 2)
             if isinstance(total_submit, (int, float)) and total_submit > 0
             else None
         )

@@ -350,18 +350,40 @@ class ProblemsDatabaseManager:
                 )
             )
 
-        strategy = "INSERT OR REPLACE" if force_update else "INSERT OR IGNORE"
-        try:
-            cursor.executemany(
-                f"""
-            {strategy} INTO problems (
+        if force_update:
+            sql = """
+            INSERT INTO problems (
                 id, source, slug, title, title_cn, difficulty, ac_rate,
                 rating, contest, problem_index, tags, link,
                 category, paid_only, content, content_cn, similar_questions
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-                values,
-            )
+            ON CONFLICT(source, id) DO UPDATE SET
+                slug=excluded.slug,
+                title=excluded.title,
+                title_cn=excluded.title_cn,
+                difficulty=excluded.difficulty,
+                ac_rate=excluded.ac_rate,
+                rating=excluded.rating,
+                contest=excluded.contest,
+                problem_index=excluded.problem_index,
+                tags=excluded.tags,
+                link=excluded.link,
+                category=excluded.category,
+                paid_only=excluded.paid_only,
+                content=COALESCE(excluded.content, problems.content),
+                content_cn=COALESCE(excluded.content_cn, problems.content_cn),
+                similar_questions=COALESCE(excluded.similar_questions, problems.similar_questions)
+            """
+        else:
+            sql = """
+            INSERT OR IGNORE INTO problems (
+                id, source, slug, title, title_cn, difficulty, ac_rate,
+                rating, contest, problem_index, tags, link,
+                category, paid_only, content, content_cn, similar_questions
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+        try:
+            cursor.executemany(sql, values)
 
             conn.commit()
 
