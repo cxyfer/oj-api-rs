@@ -45,9 +45,10 @@ docker pull ghcr.io/cxyfer/oj-api-rs:latest
 # Or build locally
 docker build -t oj-api-rs .
 
-docker run -p 7856:7856 \
+docker run -d --name oj-api-rs --restart unless-stopped \
+  -p 7856:7856 \
   -v ./config.toml:/app/config.toml:ro \
-  -v oj-data:/app/data \
+  -v ./data:/app/data \
   ghcr.io/cxyfer/oj-api-rs:latest
 ```
 
