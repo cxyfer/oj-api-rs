@@ -65,14 +65,17 @@ pub async fn similar_by_problem(
     let id_clone = id.clone();
 
     let result = tokio::task::spawn_blocking(move || {
-        let embedding =
-            match crate::db::embeddings::get_embedding(&pool, &source_clone, &id_clone) {
-                Some(e) => e,
-                None => return Err(ProblemDetail::not_found("no embedding found for this problem")),
-            };
+        let embedding = match crate::db::embeddings::get_embedding(&pool, &source_clone, &id_clone)
+        {
+            Some(e) => e,
+            None => {
+                return Err(ProblemDetail::not_found(
+                    "no embedding found for this problem",
+                ))
+            }
+        };
 
-        let rewritten_query =
-            crate::db::embeddings::get_rewritten_content(&pool, &source, &id);
+        let rewritten_query = crate::db::embeddings::get_rewritten_content(&pool, &source, &id);
 
         let k = (limit * over_fetch).min(200);
         let knn_results = crate::db::embeddings::knn_search(&pool, &embedding, k);
@@ -104,8 +107,15 @@ pub async fn similar_by_problem(
             })
             .collect();
 
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
-        Ok(SimilarResponse { rewritten_query, results })
+        results.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        Ok(SimilarResponse {
+            rewritten_query,
+            results,
+        })
     })
     .await
     .unwrap_or(Err(ProblemDetail::internal("task join error")));
@@ -256,11 +266,19 @@ pub async fn similar_by_text(
             })
             .collect();
 
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results
     })
     .await
     .unwrap_or_default();
 
-    Json(SimilarResponse { rewritten_query, results: result }).into_response()
+    Json(SimilarResponse {
+        rewritten_query,
+        results: result,
+    })
+    .into_response()
 }

@@ -104,15 +104,11 @@ impl ProblemDetail {
 
 impl IntoResponse for ProblemDetail {
     fn into_response(self) -> Response {
-        let status =
-            StatusCode::from_u16(self.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        let status = StatusCode::from_u16(self.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
         let body = serde_json::to_string(&self).unwrap_or_default();
         (
             status,
-            [(
-                axum::http::header::CONTENT_TYPE,
-                "application/problem+json",
-            )],
+            [(axum::http::header::CONTENT_TYPE, "application/problem+json")],
             body,
         )
             .into_response()

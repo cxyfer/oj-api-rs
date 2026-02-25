@@ -46,8 +46,7 @@ async fn main() {
     // 3. Init tracing
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 
@@ -118,10 +117,14 @@ async fn main() {
         // Static files
         .nest_service("/static", ServeDir::new("static"))
         // Extensions for auth middleware
-        .layer(Extension(auth::AuthRwPool(Arc::new(
-            db::create_rw_pool(&config.database.path, 2, config.database.busy_timeout_ms),
-        ))))
-        .layer(Extension(auth::AdminSecret(config.server.admin_secret.clone())))
+        .layer(Extension(auth::AuthRwPool(Arc::new(db::create_rw_pool(
+            &config.database.path,
+            2,
+            config.database.busy_timeout_ms,
+        )))))
+        .layer(Extension(auth::AdminSecret(
+            config.server.admin_secret.clone(),
+        )))
         .layer(Extension(auth::AdminSessions(admin_sessions)))
         .layer(Extension(auth::TokenAuthEnabled(token_auth_flag)))
         .with_state(state);
@@ -130,7 +133,10 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(&config.server.listen_addr)
         .await
         .unwrap_or_else(|e| {
-            eprintln!("FATAL: failed to bind to {}: {}", config.server.listen_addr, e);
+            eprintln!(
+                "FATAL: failed to bind to {}: {}",
+                config.server.listen_addr, e
+            );
             std::process::exit(1);
         });
 

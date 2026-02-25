@@ -42,9 +42,7 @@ pub fn platform_stats(pool: &DbPool) -> Vec<PlatformStats> {
 
 fn parse_json_array(raw: Option<String>) -> Vec<String> {
     match raw {
-        Some(s) if !s.is_empty() => {
-            serde_json::from_str::<Vec<String>>(&s).unwrap_or_default()
-        }
+        Some(s) if !s.is_empty() => serde_json::from_str::<Vec<String>>(&s).unwrap_or_default(),
         _ => Vec::new(),
     }
 }
@@ -170,7 +168,11 @@ pub fn list_problems(pool: &DbPool, params: &ListParams<'_>) -> Option<ListResul
     }
 
     if let Some(ref tags) = params.tags {
-        let joiner = if params.tag_mode == "all" { " AND " } else { " OR " };
+        let joiner = if params.tag_mode == "all" {
+            " AND "
+        } else {
+            " OR "
+        };
         let tag_conditions: Vec<String> = tags
             .iter()
             .map(|tag| {
@@ -265,10 +267,7 @@ pub fn list_problems(pool: &DbPool, params: &ListParams<'_>) -> Option<ListResul
 
 pub fn insert_problem(pool: &DbPool, p: &Problem) -> rusqlite::Result<()> {
     let conn = pool.get().map_err(|e| {
-        rusqlite::Error::SqliteFailure(
-            rusqlite::ffi::Error::new(1),
-            Some(e.to_string()),
-        )
+        rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
     })?;
     let tags_json = serde_json::to_string(&p.tags).unwrap_or_default();
     let similar_json = serde_json::to_string(&p.similar_questions).unwrap_or_default();
@@ -285,12 +284,14 @@ pub fn insert_problem(pool: &DbPool, p: &Problem) -> rusqlite::Result<()> {
     Ok(())
 }
 
-pub fn update_problem(pool: &DbPool, source: &str, id: &str, p: &Problem) -> rusqlite::Result<usize> {
+pub fn update_problem(
+    pool: &DbPool,
+    source: &str,
+    id: &str,
+    p: &Problem,
+) -> rusqlite::Result<usize> {
     let conn = pool.get().map_err(|e| {
-        rusqlite::Error::SqliteFailure(
-            rusqlite::ffi::Error::new(1),
-            Some(e.to_string()),
-        )
+        rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
     })?;
     let tags_json = serde_json::to_string(&p.tags).unwrap_or_default();
     let similar_json = serde_json::to_string(&p.similar_questions).unwrap_or_default();
@@ -300,19 +301,30 @@ pub fn update_problem(pool: &DbPool, source: &str, id: &str, p: &Problem) -> rus
          paid_only=?12, content=?13, content_cn=?14, similar_questions=?15 \
          WHERE source=?16 AND id=?17",
         params![
-            p.slug, p.title, p.title_cn, p.difficulty, p.ac_rate, p.rating,
-            p.contest, p.problem_index, tags_json, p.link, p.category, p.paid_only,
-            p.content, p.content_cn, similar_json, source, id
+            p.slug,
+            p.title,
+            p.title_cn,
+            p.difficulty,
+            p.ac_rate,
+            p.rating,
+            p.contest,
+            p.problem_index,
+            tags_json,
+            p.link,
+            p.category,
+            p.paid_only,
+            p.content,
+            p.content_cn,
+            similar_json,
+            source,
+            id
         ],
     )
 }
 
 pub fn delete_problem(pool: &DbPool, source: &str, id: &str) -> rusqlite::Result<bool> {
     let conn = pool.get().map_err(|e| {
-        rusqlite::Error::SqliteFailure(
-            rusqlite::ffi::Error::new(1),
-            Some(e.to_string()),
-        )
+        rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
     })?;
     let tx = conn.unchecked_transaction()?;
     tx.execute(

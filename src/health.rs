@@ -8,9 +8,7 @@ use serde_json::json;
 
 use crate::AppState;
 
-pub async fn health_check(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn health_check(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool = state.ro_pool.clone();
 
     let result = tokio::task::spawn_blocking(move || {
@@ -104,7 +102,10 @@ pub fn startup_self_check(pool: &crate::db::DbPool) {
             tracing::warn!("vec_embeddings is empty, skipping dimension check");
         }
         Err(e) => {
-            tracing::warn!("vec_embeddings not queryable, skipping dimension check: {}", e);
+            tracing::warn!(
+                "vec_embeddings not queryable, skipping dimension check: {}",
+                e
+            );
         }
     }
 }

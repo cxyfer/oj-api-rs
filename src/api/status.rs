@@ -15,11 +15,9 @@ struct StatusResponse {
 
 pub async fn get_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool = state.ro_pool.clone();
-    let platforms = tokio::task::spawn_blocking(move || {
-        crate::db::problems::platform_stats(&pool)
-    })
-    .await
-    .unwrap_or_default();
+    let platforms = tokio::task::spawn_blocking(move || crate::db::problems::platform_stats(&pool))
+        .await
+        .unwrap_or_default();
 
     Json(StatusResponse {
         version: env!("CARGO_PKG_VERSION"),

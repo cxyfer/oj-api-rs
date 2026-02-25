@@ -11,7 +11,10 @@ pub mod pages;
 
 pub fn admin_router() -> Router<Arc<AppState>> {
     let public = Router::new()
-        .route("/admin/login", get(pages::login_page).post(handlers::login_submit))
+        .route(
+            "/admin/login",
+            get(pages::login_page).post(handlers::login_submit),
+        )
         .route("/admin/logout", post(handlers::logout));
 
     let protected = Router::new()
@@ -25,10 +28,7 @@ pub fn admin_router() -> Router<Arc<AppState>> {
             "/admin/api/problems/{source}",
             get(handlers::get_problems_list),
         )
-        .route(
-            "/admin/api/tags/{source}",
-            get(handlers::get_tags_list),
-        )
+        .route("/admin/api/tags/{source}", get(handlers::get_tags_list))
         .route(
             "/admin/api/problems/{source}/{id}",
             get(handlers::get_problem_detail)
@@ -39,10 +39,7 @@ pub fn admin_router() -> Router<Arc<AppState>> {
             "/admin/api/tokens",
             get(handlers::list_tokens).post(handlers::create_token),
         )
-        .route(
-            "/admin/api/tokens/{token}",
-            delete(handlers::revoke_token),
-        )
+        .route("/admin/api/tokens/{token}", delete(handlers::revoke_token))
         .route(
             "/admin/api/settings/token-auth",
             get(handlers::get_token_auth_setting).put(handlers::set_token_auth_setting),
@@ -51,10 +48,7 @@ pub fn admin_router() -> Router<Arc<AppState>> {
             "/admin/api/crawlers/trigger",
             post(handlers::trigger_crawler),
         )
-        .route(
-            "/admin/api/crawlers/status",
-            get(handlers::crawler_status),
-        )
+        .route("/admin/api/crawlers/status", get(handlers::crawler_status))
         .route(
             "/admin/api/crawlers/{job_id}/output",
             get(handlers::crawler_output),

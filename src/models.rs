@@ -185,50 +185,218 @@ pub struct ArgSpec {
 }
 
 pub static LEETCODE_ARGS: &[ArgSpec] = &[
-    ArgSpec { flag: "--init", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--full", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--daily", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--date", arity: 1, value_type: ValueType::Date, ui_exposed: true },
-    ArgSpec { flag: "--monthly", arity: 2, value_type: ValueType::YearMonth, ui_exposed: true },
-    ArgSpec { flag: "--fill-missing-content", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--fill-missing-content-workers", arity: 1, value_type: ValueType::Int, ui_exposed: true },
-    ArgSpec { flag: "--missing-content-stats", arity: 0, value_type: ValueType::None, ui_exposed: true },
+    ArgSpec {
+        flag: "--init",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--full",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--daily",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--date",
+        arity: 1,
+        value_type: ValueType::Date,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--monthly",
+        arity: 2,
+        value_type: ValueType::YearMonth,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--fill-missing-content",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--fill-missing-content-workers",
+        arity: 1,
+        value_type: ValueType::Int,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--missing-content-stats",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
 ];
 
 pub static ATCODER_ARGS: &[ArgSpec] = &[
-    ArgSpec { flag: "--sync-kenkoooo", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--sync-history", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--fetch-all", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--resume", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--contest", arity: 1, value_type: ValueType::Str, ui_exposed: true },
-    ArgSpec { flag: "--status", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--fill-missing-content", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--missing-content-stats", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--reprocess-content", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--rate-limit", arity: 1, value_type: ValueType::Float, ui_exposed: true },
-    ArgSpec { flag: "--data-dir", arity: 1, value_type: ValueType::Str, ui_exposed: false },
-    ArgSpec { flag: "--db-path", arity: 1, value_type: ValueType::Str, ui_exposed: false },
+    ArgSpec {
+        flag: "--sync-kenkoooo",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--sync-history",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--fetch-all",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--resume",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--contest",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--status",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--fill-missing-content",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--missing-content-stats",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--reprocess-content",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--rate-limit",
+        arity: 1,
+        value_type: ValueType::Float,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--data-dir",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
+    ArgSpec {
+        flag: "--db-path",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
 ];
 
 pub static CODEFORCES_ARGS: &[ArgSpec] = &[
-    ArgSpec { flag: "--sync-problemset", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--fetch-all", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--resume", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--contest", arity: 1, value_type: ValueType::Int, ui_exposed: true },
-    ArgSpec { flag: "--status", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--fill-missing-content", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--missing-content-stats", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--missing-problems", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--reprocess-content", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--include-gym", arity: 0, value_type: ValueType::None, ui_exposed: true },
-    ArgSpec { flag: "--rate-limit", arity: 1, value_type: ValueType::Float, ui_exposed: true },
-    ArgSpec { flag: "--data-dir", arity: 1, value_type: ValueType::Str, ui_exposed: false },
-    ArgSpec { flag: "--db-path", arity: 1, value_type: ValueType::Str, ui_exposed: false },
+    ArgSpec {
+        flag: "--sync-problemset",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--fetch-all",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--resume",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--contest",
+        arity: 1,
+        value_type: ValueType::Int,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--status",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--fill-missing-content",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--missing-content-stats",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--missing-problems",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--reprocess-content",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--include-gym",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--rate-limit",
+        arity: 1,
+        value_type: ValueType::Float,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--data-dir",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
+    ArgSpec {
+        flag: "--db-path",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
 ];
 
-pub static DIAG_ARGS: &[ArgSpec] = &[
-    ArgSpec { flag: "--test", arity: 1, value_type: ValueType::Str, ui_exposed: true },
-];
+pub static DIAG_ARGS: &[ArgSpec] = &[ArgSpec {
+    flag: "--test",
+    arity: 1,
+    value_type: ValueType::Str,
+    ui_exposed: true,
+}];
 
 #[derive(Debug, Clone, Copy)]
 pub enum CrawlerSource {
@@ -298,7 +466,10 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
             ValueType::Date => {
                 let v = &raw_args[i + 1];
                 if chrono::NaiveDate::parse_from_str(v, "%Y-%m-%d").is_err() {
-                    return Err(format!("{}: invalid date '{}', expected YYYY-MM-DD", token, v));
+                    return Err(format!(
+                        "{}: invalid date '{}', expected YYYY-MM-DD",
+                        token, v
+                    ));
                 }
             }
             ValueType::Int => {
@@ -331,8 +502,12 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
             ValueType::YearMonth => {
                 let yv = &raw_args[i + 1];
                 let mv = &raw_args[i + 2];
-                let year: u16 = yv.parse().map_err(|_| format!("{}: invalid year '{}'", token, yv))?;
-                let month: u8 = mv.parse().map_err(|_| format!("{}: invalid month '{}'", token, mv))?;
+                let year: u16 = yv
+                    .parse()
+                    .map_err(|_| format!("{}: invalid year '{}'", token, yv))?;
+                let month: u8 = mv
+                    .parse()
+                    .map_err(|_| format!("{}: invalid month '{}'", token, mv))?;
                 if !(2000..=2100).contains(&year) {
                     return Err(format!("{}: year must be between 2000 and 2100", token));
                 }

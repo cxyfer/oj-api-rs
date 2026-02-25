@@ -33,8 +33,7 @@ pub async fn resolve(
             && id_for_closure.contains(|c: char| !c.is_ascii_digit())
         {
             let slug = id_for_closure.to_lowercase();
-            crate::db::problems::get_problem_id_by_slug(&pool, "leetcode", &slug)
-                .unwrap_or(slug)
+            crate::db::problems::get_problem_id_by_slug(&pool, "leetcode", &slug).unwrap_or(slug)
         } else {
             id_for_closure
         };

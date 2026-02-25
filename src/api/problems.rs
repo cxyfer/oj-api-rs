@@ -74,11 +74,10 @@ pub async fn get_problem(
     }
 
     let pool = state.ro_pool.clone();
-    let result = tokio::task::spawn_blocking(move || {
-        crate::db::problems::get_problem(&pool, &source, &id)
-    })
-    .await
-    .unwrap_or(None);
+    let result =
+        tokio::task::spawn_blocking(move || crate::db::problems::get_problem(&pool, &source, &id))
+            .await
+            .unwrap_or(None);
 
     match result {
         Some(p) => Json(p).into_response(),
@@ -100,10 +99,12 @@ pub async fn list_problems(
 
     let pool = state.ro_pool.clone();
     let result = tokio::task::spawn_blocking(move || {
-        let tags: Option<Vec<&str>> = query
-            .tags
-            .as_ref()
-            .map(|t| t.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect());
+        let tags: Option<Vec<&str>> = query.tags.as_ref().map(|t| {
+            t.split(',')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect()
+        });
 
         let params = crate::db::problems::ListParams {
             source: &source,
@@ -147,11 +148,10 @@ pub async fn list_tags(
     }
 
     let pool = state.ro_pool.clone();
-    let result = tokio::task::spawn_blocking(move || {
-        crate::db::problems::list_tags(&pool, &source)
-    })
-    .await
-    .unwrap_or(None);
+    let result =
+        tokio::task::spawn_blocking(move || crate::db::problems::list_tags(&pool, &source))
+            .await
+            .unwrap_or(None);
 
     match result {
         Some(tags) => Json(tags).into_response(),

@@ -50,11 +50,10 @@ pub async fn bearer_auth(
     };
 
     let pool = auth_pool.0.clone();
-    let valid = tokio::task::spawn_blocking(move || {
-        crate::db::tokens::validate_token(&pool, &token)
-    })
-    .await
-    .unwrap_or(false);
+    let valid =
+        tokio::task::spawn_blocking(move || crate::db::tokens::validate_token(&pool, &token))
+            .await
+            .unwrap_or(false);
 
     if !valid {
         return ProblemDetail::unauthorized("missing or invalid token").into_response();
@@ -74,7 +73,11 @@ pub fn extract_cookie<'a>(headers: &'a axum::http::HeaderMap, name: &str) -> Opt
             let mut parts = pair.splitn(2, '=');
             let key = parts.next()?;
             let val = parts.next()?;
-            if key == name { Some(val) } else { None }
+            if key == name {
+                Some(val)
+            } else {
+                None
+            }
         })
 }
 

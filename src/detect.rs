@@ -1,9 +1,8 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-static ATCODER_URL_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)atcoder\.jp/contests/([^/]+)/tasks/([^/?#]+)").unwrap()
-});
+static ATCODER_URL_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)atcoder\.jp/contests/([^/]+)/tasks/([^/?#]+)").unwrap());
 
 static LEETCODE_URL_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)leetcode\.(?:com|cn)/(?:contest/[^/]+/)?problems/([^/?#]+)").unwrap()
@@ -16,17 +15,14 @@ static CODEFORCES_URL_RE: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
-static LUOGU_URL_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)luogu\.com\.cn/problem/([A-Z0-9_]+)").unwrap()
-});
+static LUOGU_URL_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)luogu\.com\.cn/problem/([A-Z0-9_]+)").unwrap());
 
-static ATCODER_ID_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^(abc|arc|agc|ahc)\d+_[a-z]\d*$").unwrap()
-});
+static ATCODER_ID_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^(abc|arc|agc|ahc)\d+_[a-z]\d*$").unwrap());
 
-static CF_ID_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^(?:CF)?\d+[A-Z]\d*$").unwrap()
-});
+static CF_ID_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^(?:CF)?\d+[A-Z]\d*$").unwrap());
 
 static LUOGU_ID_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)^([PBTU]\d+|CF\d+[A-Z]|AT_(?:abc|arc|agc|ahc)\d+_[a-z]\d*|UVA\d+|SP\d+)$")
@@ -59,7 +55,10 @@ pub fn detect_source(input: &str) -> (&'static str, String) {
             .or_else(|| caps.get(4))
             .map(|m| m.as_str())
             .unwrap_or("");
-        return ("codeforces", format!("{}{}", contest_id, index).to_uppercase());
+        return (
+            "codeforces",
+            format!("{}{}", contest_id, index).to_uppercase(),
+        );
     }
     if let Some(caps) = LUOGU_URL_RE.captures(pid) {
         let luogu_pid = caps[1].to_uppercase();

@@ -91,14 +91,14 @@ pub fn get_rewritten_content(pool: &DbPool, source: &str, id: &str) -> Option<St
         )
         .ok()?;
     let trimmed = val.trim();
-    if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
 }
 
-pub fn knn_search(
-    pool: &DbPool,
-    embedding: &[f32],
-    k: u32,
-) -> Vec<(String, String, f32)> {
+pub fn knn_search(pool: &DbPool, embedding: &[f32], k: u32) -> Vec<(String, String, f32)> {
     let conn = match pool.get() {
         Ok(c) => c,
         Err(_) => return Vec::new(),

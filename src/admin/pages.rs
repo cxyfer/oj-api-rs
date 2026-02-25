@@ -48,8 +48,10 @@ pub async fn index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool = state.ro_pool.clone();
     let total_problems = tokio::task::spawn_blocking(move || {
         let conn = pool.get().ok()?;
-        conn.query_row("SELECT COUNT(*) FROM problems", [], |row| row.get::<_, u32>(0))
-            .ok()
+        conn.query_row("SELECT COUNT(*) FROM problems", [], |row| {
+            row.get::<_, u32>(0)
+        })
+        .ok()
     })
     .await
     .unwrap_or(None)

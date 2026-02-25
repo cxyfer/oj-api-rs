@@ -9,9 +9,11 @@ use rand::Rng;
 use serde::Deserialize;
 
 use crate::api::error::ProblemDetail;
-use crate::api::problems::{ListQuery, ListMeta, ListResponse, VALID_SOURCES, validate_list_query};
+use crate::api::problems::{validate_list_query, ListMeta, ListQuery, ListResponse, VALID_SOURCES};
 use crate::auth::{AdminSecret, AdminSessions};
-use crate::models::{CrawlerJob, CrawlerSource, CrawlerStatus, CrawlerTrigger, EmbeddingJob, Problem};
+use crate::models::{
+    CrawlerJob, CrawlerSource, CrawlerStatus, CrawlerTrigger, EmbeddingJob, Problem,
+};
 use crate::AppState;
 
 // Problem CRUD
@@ -70,16 +72,13 @@ pub async fn create_problem(
     let problem: Problem = body.into();
     let pool = state.rw_pool.clone();
 
-    let result = tokio::task::spawn_blocking(move || {
-        crate::db::problems::insert_problem(&pool, &problem)
-    })
-    .await;
+    let result =
+        tokio::task::spawn_blocking(move || crate::db::problems::insert_problem(&pool, &problem))
+            .await;
 
     match result {
         Ok(Ok(())) => StatusCode::CREATED.into_response(),
-        Ok(Err(e)) => {
-            ProblemDetail::internal(format!("database error: {}", e)).into_response()
-        }
+        Ok(Err(e)) => ProblemDetail::internal(format!("database error: {}", e)).into_response(),
         Err(_) => ProblemDetail::internal("task join error").into_response(),
     }
 }
@@ -100,9 +99,7 @@ pub async fn update_problem(
     match result {
         Ok(Ok(n)) if n > 0 => StatusCode::OK.into_response(),
         Ok(Ok(_)) => ProblemDetail::not_found("problem not found").into_response(),
-        Ok(Err(e)) => {
-            ProblemDetail::internal(format!("database error: {}", e)).into_response()
-        }
+        Ok(Err(e)) => ProblemDetail::internal(format!("database error: {}", e)).into_response(),
         Err(_) => ProblemDetail::internal("task join error").into_response(),
     }
 }
@@ -121,9 +118,7 @@ pub async fn delete_problem(
     match result {
         Ok(Ok(true)) => StatusCode::NO_CONTENT.into_response(),
         Ok(Ok(false)) => ProblemDetail::not_found("problem not found").into_response(),
-        Ok(Err(e)) => {
-            ProblemDetail::internal(format!("database error: {}", e)).into_response()
-        }
+        Ok(Err(e)) => ProblemDetail::internal(format!("database error: {}", e)).into_response(),
         Err(_) => ProblemDetail::internal("task join error").into_response(),
     }
 }
@@ -142,10 +137,12 @@ pub async fn get_problems_list(
 
     let pool = state.ro_pool.clone();
     let result = tokio::task::spawn_blocking(move || {
-        let tags: Option<Vec<&str>> = query
-            .tags
-            .as_ref()
-            .map(|t| t.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect());
+        let tags: Option<Vec<&str>> = query.tags.as_ref().map(|t| {
+            t.split(',')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect()
+        });
 
         let params = crate::db::problems::ListParams {
             source: &source,
@@ -188,11 +185,10 @@ pub async fn get_tags_list(
     }
 
     let pool = state.ro_pool.clone();
-    let result = tokio::task::spawn_blocking(move || {
-        crate::db::problems::list_tags(&pool, &source)
-    })
-    .await
-    .unwrap_or(None);
+    let result =
+        tokio::task::spawn_blocking(move || crate::db::problems::list_tags(&pool, &source))
+            .await
+            .unwrap_or(None);
 
     match result {
         Some(tags) => Json(tags).into_response(),
@@ -209,10 +205,9 @@ pub async fn get_problem_detail(
     }
 
     let pool = state.ro_pool.clone();
-    let result = tokio::task::spawn_blocking(move || {
-        crate::db::problems::get_problem(&pool, &source, &id)
-    })
-    .await;
+    let result =
+        tokio::task::spawn_blocking(move || crate::db::problems::get_problem(&pool, &source, &id))
+            .await;
 
     match result {
         Ok(Some(problem)) => Json(problem).into_response(),
@@ -228,15 +223,11 @@ pub struct CreateTokenRequest {
     pub label: Option<String>,
 }
 
-pub async fn list_tokens(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn list_tokens(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool = state.rw_pool.clone();
-    let tokens = tokio::task::spawn_blocking(move || {
-        crate::db::tokens::list_tokens(&pool)
-    })
-    .await
-    .unwrap_or_default();
+    let tokens = tokio::task::spawn_blocking(move || crate::db::tokens::list_tokens(&pool))
+        .await
+        .unwrap_or_default();
 
     Json(tokens).into_response()
 }
@@ -266,11 +257,10 @@ pub async fn revoke_token(
 ) -> impl IntoResponse {
     let pool = state.rw_pool.clone();
 
-    let result = tokio::task::spawn_blocking(move || {
-        crate::db::tokens::revoke_token(&pool, &token)
-    })
-    .await
-    .unwrap_or(None);
+    let result =
+        tokio::task::spawn_blocking(move || crate::db::tokens::revoke_token(&pool, &token))
+            .await
+            .unwrap_or(None);
 
     match result {
         Some(true) => StatusCode::NO_CONTENT.into_response(),
@@ -430,9 +420,7 @@ pub async fn trigger_crawler(
         .into_response()
 }
 
-pub async fn crawler_status(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn crawler_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let lock = state.crawler_lock.lock().await;
     let history = state.crawler_history.lock().await;
     let history_vec: Vec<_> = history
@@ -469,14 +457,12 @@ pub async fn crawler_status(
             }))
             .into_response()
         }
-        None => {
-            Json(serde_json::json!({
-                "running": false,
-                "last_job": null,
-                "history": history_vec,
-            }))
-            .into_response()
-        }
+        None => Json(serde_json::json!({
+            "running": false,
+            "last_job": null,
+            "history": history_vec,
+        }))
+        .into_response(),
     }
 }
 
@@ -552,10 +538,7 @@ pub async fn login_submit(
 
     (
         StatusCode::SEE_OTHER,
-        [
-            ("location", "/admin/"),
-            ("set-cookie", &cookie),
-        ],
+        [("location", "/admin/"), ("set-cookie", &cookie)],
     )
         .into_response()
 }
@@ -572,10 +555,7 @@ pub async fn logout(
 
     (
         StatusCode::SEE_OTHER,
-        [
-            ("location", "/admin/login"),
-            ("set-cookie", cookie),
-        ],
+        [("location", "/admin/login"), ("set-cookie", cookie)],
     )
         .into_response()
 }
@@ -587,9 +567,7 @@ pub struct TokenAuthSettingRequest {
     pub enabled: bool,
 }
 
-pub async fn get_token_auth_setting(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn get_token_auth_setting(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let enabled = state.token_auth_enabled.load(Ordering::Acquire);
     Json(serde_json::json!({ "enabled": enabled }))
 }
@@ -608,7 +586,9 @@ pub async fn set_token_auth_setting(
     .unwrap_or(false);
 
     if ok {
-        state.token_auth_enabled.store(body.enabled, Ordering::Release);
+        state
+            .token_auth_enabled
+            .store(body.enabled, Ordering::Release);
         Json(serde_json::json!({ "enabled": body.enabled })).into_response()
     } else {
         ProblemDetail::internal("failed to update setting").into_response()
@@ -628,15 +608,12 @@ pub struct TriggerEmbeddingRequest {
     pub filter: Option<String>,
 }
 
-pub async fn embedding_stats(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn embedding_stats(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool = state.ro_pool.clone();
-    let stats = tokio::task::spawn_blocking(move || {
-        crate::db::embeddings::get_embedding_stats(&pool)
-    })
-    .await
-    .unwrap_or_default();
+    let stats =
+        tokio::task::spawn_blocking(move || crate::db::embeddings::get_embedding_stats(&pool))
+            .await
+            .unwrap_or_default();
 
     Json(stats).into_response()
 }
@@ -793,16 +770,15 @@ pub async fn trigger_embedding(
                 "failed"
             };
             let progress_path = format!("scripts/logs/{}.progress.json", job_id_clone);
-            let final_progress = if let Ok(content) =
-                tokio::fs::read_to_string(&progress_path).await
-            {
-                let mut prog: serde_json::Value =
-                    serde_json::from_str(&content).unwrap_or_default();
-                prog["phase"] = serde_json::json!(final_phase);
-                prog
-            } else {
-                serde_json::json!({"phase": final_phase})
-            };
+            let final_progress =
+                if let Ok(content) = tokio::fs::read_to_string(&progress_path).await {
+                    let mut prog: serde_json::Value =
+                        serde_json::from_str(&content).unwrap_or_default();
+                    prog["phase"] = serde_json::json!(final_phase);
+                    prog
+                } else {
+                    serde_json::json!({"phase": final_phase})
+                };
             if let Ok(json_str) = serde_json::to_string(&final_progress) {
                 let _ = tokio::fs::write(&progress_path, json_str).await;
             }
@@ -822,9 +798,7 @@ pub async fn trigger_embedding(
         .into_response()
 }
 
-pub async fn embedding_status(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn embedding_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let lock = state.embedding_lock.lock().await;
     let history = state.embedding_history.lock().await;
     let history_vec: Vec<_> = history
@@ -865,14 +839,12 @@ pub async fn embedding_status(
             }))
             .into_response()
         }
-        None => {
-            Json(serde_json::json!({
-                "running": false,
-                "last_job": null,
-                "history": history_vec,
-            }))
-            .into_response()
-        }
+        None => Json(serde_json::json!({
+            "running": false,
+            "last_job": null,
+            "history": history_vec,
+        }))
+        .into_response(),
     }
 }
 
@@ -924,9 +896,7 @@ pub async fn embedding_output(
     .into_response()
 }
 
-pub async fn embedding_progress(
-    Path(job_id): Path<String>,
-) -> impl IntoResponse {
+pub async fn embedding_progress(Path(job_id): Path<String>) -> impl IntoResponse {
     if uuid::Uuid::parse_str(&job_id).is_err() {
         return ProblemDetail::bad_request("invalid job_id").into_response();
     }

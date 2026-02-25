@@ -137,10 +137,7 @@ impl Config {
         // Resolve database.path relative to config file directory
         let db_path = Path::new(&config.database.path);
         if db_path.is_relative() {
-            config.database.path = config_dir
-                .join(db_path)
-                .to_string_lossy()
-                .into_owned();
+            config.database.path = config_dir.join(db_path).to_string_lossy().into_owned();
         }
 
         config.config_path = std::fs::canonicalize(&path).unwrap_or(path);

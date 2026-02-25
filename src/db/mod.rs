@@ -13,9 +13,7 @@ pub type DbPool = Pool<SqliteConnectionManager>;
 
 pub fn register_sqlite_vec() {
     unsafe {
-        sqlite3_auto_extension(Some(std::mem::transmute(
-            sqlite3_vec_init as *const (),
-        )));
+        sqlite3_auto_extension(Some(std::mem::transmute(sqlite3_vec_init as *const ())));
     }
 }
 
@@ -53,7 +51,10 @@ pub fn create_rw_pool(path: &str, max_size: u32, busy_timeout_ms: u64) -> DbPool
 pub fn ensure_data_dir(path: &str) {
     if let Some(parent) = std::path::Path::new(path).parent() {
         std::fs::create_dir_all(parent).unwrap_or_else(|e| {
-            eprintln!("FATAL: failed to create database directory {:?}: {}", parent, e);
+            eprintln!(
+                "FATAL: failed to create database directory {:?}: {}",
+                parent, e
+            );
             std::process::exit(1);
         });
     }
