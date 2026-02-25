@@ -320,7 +320,13 @@ pub async fn trigger_crawler(
 
     let script = source.script_name();
     let state_clone = state.clone();
-    let timeout_secs = state.config.crawler.timeout_secs;
+    let timeout_secs = state
+        .config
+        .crawler
+        .per_source_timeout
+        .get(&body.source)
+        .copied()
+        .unwrap_or(state.config.crawler.timeout_secs);
     let job_id_clone = job_id.clone();
 
     tokio::spawn(async move {

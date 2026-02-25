@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
@@ -43,11 +44,13 @@ impl Default for DatabaseConfig {
 #[serde(default)]
 pub struct CrawlerConfig {
     pub timeout_secs: u64,
+    #[serde(default)]
+    pub per_source_timeout: HashMap<String, u64>,
 }
 
 impl Default for CrawlerConfig {
     fn default() -> Self {
-        Self { timeout_secs: 300 }
+        Self { timeout_secs: 300, per_source_timeout: HashMap::new() }
     }
 }
 

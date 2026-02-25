@@ -154,7 +154,13 @@ pub async fn get_daily(
     // Spawn background task
     let state_clone = state.clone();
     let key_clone = key.clone();
-    let timeout_secs = state.config.crawler.timeout_secs;
+    let timeout_secs = state
+        .config
+        .crawler
+        .per_source_timeout
+        .get("leetcode")
+        .copied()
+        .unwrap_or(state.config.crawler.timeout_secs);
     let job_id = uuid::Uuid::new_v4().to_string();
 
     tokio::spawn(async move {
