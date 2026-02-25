@@ -61,7 +61,9 @@ class GeminiProvider(LLMProvider):
 
         logger.debug(
             "GeminiProvider(%s): model=%s, base_url=%s",
-            capability, self._model, base_url,
+            capability,
+            self._model,
+            base_url,
         )
 
     def _build_embed_config(self, mc: Any) -> Any:

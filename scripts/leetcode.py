@@ -175,7 +175,10 @@ class LeetCodeClient(BaseCrawler):
                 async with self._create_aiohttp_session() as session:
                     async with session.get(
                         url,
-                        headers={**self._headers(), "X-Requested-With": "XMLHttpRequest"},
+                        headers={
+                            **self._headers(),
+                            "X-Requested-With": "XMLHttpRequest",
+                        },
                         proxy=self._get_aiohttp_request_proxy("https"),
                     ) as res:
                         if res.status != 200:
@@ -191,11 +194,15 @@ class LeetCodeClient(BaseCrawler):
                         return problems
             except Exception as e:
                 attempt += 1
-                logger.error(f"Failed to fetch {category} (attempt {attempt}/{self.max_retries}): {e}")
+                logger.error(
+                    f"Failed to fetch {category} (attempt {attempt}/{self.max_retries}): {e}"
+                )
                 if attempt < self.max_retries:
                     await asyncio.sleep(self.retry_delay)
                 else:
-                    logger.error(f"Giving up on {category} after {self.max_retries} attempts.")
+                    logger.error(
+                        f"Giving up on {category} after {self.max_retries} attempts."
+                    )
                     return []
 
     def _parse_problems(self, json_data, category):
@@ -208,7 +215,9 @@ class LeetCodeClient(BaseCrawler):
         Returns:
             list: Parsed problems
         """
-        total_problems = json_data.get("num_total", len(json_data.get("stat_status_pairs", [])))
+        total_problems = json_data.get(
+            "num_total", len(json_data.get("stat_status_pairs", []))
+        )
         problems = []
         for p in json_data.get("stat_status_pairs", []):
             if p.get("stat", {}).get("question__hide", False):
@@ -222,7 +231,9 @@ class LeetCodeClient(BaseCrawler):
                 "slug": slug,
                 "title": stat.get("question__title"),
                 "title_cn": "",
-                "difficulty": self._level_to_name(p.get("difficulty", {}).get("level", 0)),
+                "difficulty": self._level_to_name(
+                    p.get("difficulty", {}).get("level", 0)
+                ),
                 "ac_rate": ac_rate,
                 "link": f"https://leetcode.com/problems/{slug}/",
                 "category": category.title(),
@@ -236,7 +247,9 @@ class LeetCodeClient(BaseCrawler):
                 "similar_questions": None,  # reserve
             }
             problems.append(problem)
-        logger.debug(f"Downloaded {len(problems)}/{total_problems} problems in {category} category.")
+        logger.debug(
+            f"Downloaded {len(problems)}/{total_problems} problems in {category} category."
+        )
         return problems
 
     def _level_to_name(self, level):
@@ -254,7 +267,9 @@ class LeetCodeClient(BaseCrawler):
         while attempt < self.max_retries:
             try:
                 async with self._create_aiohttp_session() as session:
-                    async with session.get(self.RATINGS_URL, proxy=self._get_aiohttp_request_proxy("https")) as res:
+                    async with session.get(
+                        self.RATINGS_URL, proxy=self._get_aiohttp_request_proxy("https")
+                    ) as res:
                         if res.status != 200:
                             raise Exception(f"HTTP {res.status}")
                         text = await res.text()
@@ -283,11 +298,15 @@ class LeetCodeClient(BaseCrawler):
                         return ratings_data
             except Exception as e:
                 attempt += 1
-                logger.error(f"Failed to fetch ratings (attempt {attempt}/{self.max_retries}): {e}")
+                logger.error(
+                    f"Failed to fetch ratings (attempt {attempt}/{self.max_retries}): {e}"
+                )
                 if attempt < self.max_retries:
                     await asyncio.sleep(self.retry_delay)
                 else:
-                    logger.error(f"Giving up on ratings after {self.max_retries} attempts.")
+                    logger.error(
+                        f"Giving up on ratings after {self.max_retries} attempts."
+                    )
                     return {}
 
     async def fetch_problem_detail(self, slug):
@@ -340,7 +359,12 @@ class LeetCodeClient(BaseCrawler):
         while attempt < self.max_retries:
             try:
                 async with self._create_aiohttp_session() as session:
-                    async with session.post(url, headers=headers, json=payload, proxy=self._get_aiohttp_request_proxy("https")) as res:
+                    async with session.post(
+                        url,
+                        headers=headers,
+                        json=payload,
+                        proxy=self._get_aiohttp_request_proxy("https"),
+                    ) as res:
                         if res.status != 200:
                             raise Exception(f"HTTP {res.status}")
                         text = await res.text()
@@ -365,17 +389,23 @@ class LeetCodeClient(BaseCrawler):
                             "content": q.get("content"),
                             "content_cn": q.get("translatedContent"),
                             "stats": q.get("stats"),
-                            "similar_questions": json.loads(q.get("similarQuestions", "[]")),
+                            "similar_questions": json.loads(
+                                q.get("similarQuestions", "[]")
+                            ),
                             "tags": [tag["name"] for tag in q.get("topicTags", [])],
                             "paid_only": 1 if q.get("isPaidOnly") else 0,
                         }
             except Exception as e:
                 attempt += 1
-                logger.error(f"Failed to fetch problem '{slug}' (attempt {attempt}/{self.max_retries}): {e}")
+                logger.error(
+                    f"Failed to fetch problem '{slug}' (attempt {attempt}/{self.max_retries}): {e}"
+                )
                 if attempt < self.max_retries:
                     await asyncio.sleep(self.retry_delay)
                 else:
-                    logger.error(f"Giving up on problem '{slug}' after {self.max_retries} attempts.")
+                    logger.error(
+                        f"Giving up on problem '{slug}' after {self.max_retries} attempts."
+                    )
                     return None
 
     async def get_problem(self, problem_id=None, slug=None):
@@ -389,21 +419,31 @@ class LeetCodeClient(BaseCrawler):
         Returns:
             dict: Problem information if found, None otherwise
         """
-        problem = self.problems_db.get_problem(id=problem_id, slug=slug, source="leetcode")
+        problem = self.problems_db.get_problem(
+            id=problem_id, slug=slug, source="leetcode"
+        )
 
         # If problem not found, fetch all problems from LeetCode API to initialize
         if not problem:
-            logger.info(f"Problem {problem_id or slug} not found, fetching all problems from LeetCode API...")
+            logger.info(
+                f"Problem {problem_id or slug} not found, fetching all problems from LeetCode API..."
+            )
             await self.init_all_problems()
-            problem = self.problems_db.get_problem(id=problem_id, slug=slug, source="leetcode")
+            problem = self.problems_db.get_problem(
+                id=problem_id, slug=slug, source="leetcode"
+            )
             # If problem still not found, return None
             if not problem:
-                logger.error(f"Problem {problem_id or slug} still not found in database after fetching all problems.")
+                logger.error(
+                    f"Problem {problem_id or slug} still not found in database after fetching all problems."
+                )
                 return None
 
         # If problem found, update problem detail and rating if needed
         problem_id_for_log = problem.get("id")
-        logger.debug(f"Problem {problem_id_for_log} found in database: {problem['rating']}")
+        logger.debug(
+            f"Problem {problem_id_for_log} found in database: {problem['rating']}"
+        )
         if problem["slug"] and (not problem.get("tags") or not problem.get("content")):
             logger.debug(
                 f"Problem {problem_id_for_log} still not have detail information, "
@@ -416,9 +456,13 @@ class LeetCodeClient(BaseCrawler):
                 self.problems_db.update_problem(problem)
 
         if not problem["rating"]:
-            logger.debug(f"Problem {problem_id_for_log} still not have rating, fetching rating from LeetCode API...")
+            logger.debug(
+                f"Problem {problem_id_for_log} still not have rating, fetching rating from LeetCode API..."
+            )
             await self.get_problem_rating(problem_id_for_log)
-            problem = self.problems_db.get_problem(problem_id_for_log, source="leetcode")
+            problem = self.problems_db.get_problem(
+                problem_id_for_log, source="leetcode"
+            )
 
         return problem
 
@@ -434,19 +478,25 @@ class LeetCodeClient(BaseCrawler):
         """
         try:
             # Make sure problem_id is an integer
-            problem_id = int(problem_id) if not isinstance(problem_id, int) else problem_id
+            problem_id = (
+                int(problem_id) if not isinstance(problem_id, int) else problem_id
+            )
 
             # 1. Try to get problem data from database
             problem = self.problems_db.get_problem(problem_id, source="leetcode")
             if problem and problem.get("rating") and float(problem["rating"]) > 0:
-                logger.info(f"Found rating for problem {problem_id} in database: {problem['rating']}")
+                logger.info(
+                    f"Found rating for problem {problem_id} in database: {problem['rating']}"
+                )
                 return float(problem["rating"])
 
             def _update_problem_data(problem, info):
                 for key, value in info.items():
                     problem[key] = problem.get(key, value) or value
                 self.problems_db.update_problem(problem)
-                logger.info(f"Updated problem {problem_id} in database: {problem['rating']}")
+                logger.info(
+                    f"Updated problem {problem_id} in database: {problem['rating']}"
+                )
                 return float(problem["rating"])
 
             # 2. Check if cache is expired
@@ -457,14 +507,18 @@ class LeetCodeClient(BaseCrawler):
             if not cache_expired and len(self.ratings) > 0:
                 if problem_id in self.ratings:
                     info = self.ratings[problem_id]
-                    logger.info(f"Found rating for problem {problem_id} in memory cache: {info['rating']}")
+                    logger.info(
+                        f"Found rating for problem {problem_id} in memory cache: {info['rating']}"
+                    )
                     _update_problem_data(problem, info)
                     return float(info["rating"])
                 else:
                     logger.info(f"Problem {problem_id} not found in existing cache")
                     return 0
             else:
-                logger.info(f"Ratings cache expired (last update: {self.ratings_last_update}), updating...")
+                logger.info(
+                    f"Ratings cache expired (last update: {self.ratings_last_update}), updating..."
+                )
 
             # 4. Cache is expired or empty, update all ratings
             updated = await self.fetch_ratings()
@@ -472,11 +526,15 @@ class LeetCodeClient(BaseCrawler):
                 # Replace the entire ratings dict instead of updating
                 self.ratings = updated
                 self.ratings_last_update = current_time
-                logger.info(f"Ratings cache updated at {self.ratings_last_update} with {len(updated)} entries")
+                logger.info(
+                    f"Ratings cache updated at {self.ratings_last_update} with {len(updated)} entries"
+                )
 
                 if problem_id in self.ratings:
                     info = self.ratings[problem_id]
-                    logger.info(f"Found rating for problem {problem_id} in updated cache: {info['rating']}")
+                    logger.info(
+                        f"Found rating for problem {problem_id} in updated cache: {info['rating']}"
+                    )
                     _update_problem_data(problem, info)
                     return float(info["rating"])
 
@@ -564,7 +622,12 @@ class LeetCodeClient(BaseCrawler):
         logger.info(f"Fetching daily challenge from LeetCode {domain.upper()} API...")
 
         async with self._create_aiohttp_session() as session:
-            async with session.post(api_endpoint, headers=headers, json=payload, proxy=self._get_aiohttp_request_proxy("https")) as res:
+            async with session.post(
+                api_endpoint,
+                headers=headers,
+                json=payload,
+                proxy=self._get_aiohttp_request_proxy("https"),
+            ) as res:
                 if res.status != 200:
                     error_msg = f"API request failed, status code: {res.status}, response: {await res.text()}"
                     logger.error(error_msg)
@@ -577,7 +640,9 @@ class LeetCodeClient(BaseCrawler):
                     question = question_info["question"]
                     link = f"{base_url}/problems/{question['titleSlug']}/"
                 else:
-                    question_info = raw_data["data"]["activeDailyCodingChallengeQuestion"]
+                    question_info = raw_data["data"][
+                        "activeDailyCodingChallengeQuestion"
+                    ]
                     question = question_info["question"]
                     link = f"{base_url}{question_info['link']}"
 
@@ -593,7 +658,9 @@ class LeetCodeClient(BaseCrawler):
                     title_cn=question.get("titleCn", ""),
                     difficulty=question["difficulty"],
                     rating=None,  # This will be fetched from get_problem
-                    ac_rate=question["acRate"] if domain == "com" else question["acRate"] * 100,
+                    ac_rate=question["acRate"]
+                    if domain == "com"
+                    else question["acRate"] * 100,
                     slug=slug,
                     link=link,
                     tags=[tag["name"] for tag in question["topicTags"]],
@@ -606,7 +673,9 @@ class LeetCodeClient(BaseCrawler):
                         daily[key] = daily.get(key, value) or value
                     # Update database
                     self.daily_db.update_daily(daily)
-                    logger.info(f"Daily challenge for {daily['date']} (domain: {domain}) written to database")
+                    logger.info(
+                        f"Daily challenge for {daily['date']} (domain: {domain}) written to database"
+                    )
 
                 return daily
 
@@ -626,7 +695,11 @@ class LeetCodeClient(BaseCrawler):
         if domain is None:
             domain = self.domain
 
-        tz = pytz.timezone("Asia/Shanghai") if self.domain == "cn" else pytz.timezone("UTC")
+        tz = (
+            pytz.timezone("Asia/Shanghai")
+            if self.domain == "cn"
+            else pytz.timezone("UTC")
+        )
         today = datetime.now(tz).strftime("%Y-%m-%d")
 
         # If date_str is not provided, use today's date
@@ -665,13 +738,17 @@ class LeetCodeClient(BaseCrawler):
             info["domain"] = info.get("domain", domain) or domain
 
             # Get problem detail
-            problem = await self.get_problem(problem_id=info["qid"], slug=info.get("slug", None))
+            problem = await self.get_problem(
+                problem_id=info["qid"], slug=info.get("slug", None)
+            )
             if problem:
                 for key, value in problem.items():
                     info[key] = info.get(key, value) or value
                 # Update database
                 self.daily_db.update_daily(info)
-                logger.info(f"Daily challenge for {info['date']} (domain: {domain}) written to database")
+                logger.info(
+                    f"Daily challenge for {info['date']} (domain: {domain}) written to database"
+                )
             return info
 
         # If no valid file is found, fetch the data
@@ -682,15 +759,21 @@ class LeetCodeClient(BaseCrawler):
 
         # If still no data found and domain is 'com', try fetching monthly data
         if info is None and domain == "com":
-            logger.info(f"No data found for {date_str}, attempting to fetch monthly data...")
+            logger.info(
+                f"No data found for {date_str}, attempting to fetch monthly data..."
+            )
             year, month, _ = date_str.split("-")
             year_int = int(year)
             month_int = int(month)
 
-            monthly_data = await self.fetch_monthly_daily_challenges(year_int, month_int)
+            monthly_data = await self.fetch_monthly_daily_challenges(
+                year_int, month_int
+            )
 
             if monthly_data and "challenges" in monthly_data:
-                logger.info(f"Fetched {len(monthly_data['challenges'])} daily challenges for {year}-{month}")
+                logger.info(
+                    f"Fetched {len(monthly_data['challenges'])} daily challenges for {year}-{month}"
+                )
 
                 # First, find and process the requested date
                 requested_challenge = None
@@ -709,7 +792,9 @@ class LeetCodeClient(BaseCrawler):
                     slug = requested_challenge.get("slug")
 
                     if question_id and slug:
-                        problem = await self.get_problem(problem_id=question_id, slug=slug)
+                        problem = await self.get_problem(
+                            problem_id=question_id, slug=slug
+                        )
                         if problem:
                             # Prepare daily challenge data
                             info = {
@@ -730,7 +815,9 @@ class LeetCodeClient(BaseCrawler):
                                 "paid_only": problem.get("paid_only"),
                                 "content": problem.get("content"),
                                 "content_cn": problem.get("content_cn"),
-                                "similar_questions": problem.get("similar_questions", []),
+                                "similar_questions": problem.get(
+                                    "similar_questions", []
+                                ),
                             }
 
                             # Store in database immediately
@@ -740,18 +827,24 @@ class LeetCodeClient(BaseCrawler):
                 # Create a background task to process other challenges
                 if other_challenges and info:
                     task = asyncio.create_task(
-                        self._process_remaining_monthly_challenges(other_challenges, domain, year, month)
+                        self._process_remaining_monthly_challenges(
+                            other_challenges, domain, year, month
+                        )
                     )
                     # Track the background task
                     self._background_tasks.add(task)
                     task.add_done_callback(self._background_tasks.discard)
-                    logger.info(f"Started background task to process {len(other_challenges)} remaining challenges")
+                    logger.info(
+                        f"Started background task to process {len(other_challenges)} remaining challenges"
+                    )
 
                 # Return the requested date's challenge if found
                 if info:
                     return info
                 else:
-                    logger.warning(f"Requested date {date_str} not found in monthly data for domain {domain}.")
+                    logger.warning(
+                        f"Requested date {date_str} not found in monthly data for domain {domain}."
+                    )
 
         return None
 
@@ -768,7 +861,9 @@ class LeetCodeClient(BaseCrawler):
         async def fetch_date(date_str: str):
             async with semaphore:
                 try:
-                    return await self.get_daily_challenge(date_str=date_str, domain=self.domain)
+                    return await self.get_daily_challenge(
+                        date_str=date_str, domain=self.domain
+                    )
                 except Exception as exc:
                     logger.warning(f"Failed to fetch history for {date_str}: {exc}")
                     return None
@@ -839,10 +934,17 @@ class LeetCodeClient(BaseCrawler):
             logger.info(f"Fetching recent AC submissions for user: {username}")
 
             async with self._create_aiohttp_session() as session:
-                async with session.post(self.graphql_url, headers=headers, json=payload, proxy=self._get_aiohttp_request_proxy("https")) as response:
+                async with session.post(
+                    self.graphql_url,
+                    headers=headers,
+                    json=payload,
+                    proxy=self._get_aiohttp_request_proxy("https"),
+                ) as response:
                     if response.status != 200:
                         error_text = await response.text()
-                        logger.error(f"API request failed: {response.status} - {error_text}")
+                        logger.error(
+                            f"API request failed: {response.status} - {error_text}"
+                        )
                         return []
 
                     data = await response.json()
@@ -862,9 +964,9 @@ class LeetCodeClient(BaseCrawler):
                             "title": submission["title"],
                             "slug": submission["titleSlug"],
                             "timestamp": submission["timestamp"],
-                            "submission_time": datetime.fromtimestamp(int(submission["timestamp"])).strftime(
-                                "%Y-%m-%d %H:%M:%S"
-                            ),
+                            "submission_time": datetime.fromtimestamp(
+                                int(submission["timestamp"])
+                            ).strftime("%Y-%m-%d %H:%M:%S"),
                         }
                         basic_submissions.append(basic_submission)
 
@@ -888,7 +990,9 @@ class LeetCodeClient(BaseCrawler):
             dict: Monthly challenge data with challenges and weekly challenges
         """
         if self.domain != "com":
-            logger.warning("Monthly daily challenges are only available on leetcode.com")
+            logger.warning(
+                "Monthly daily challenges are only available on leetcode.com"
+            )
             return {}
 
         # Check if the requested date is before April 2020
@@ -948,10 +1052,17 @@ class LeetCodeClient(BaseCrawler):
             logger.info(f"Fetching monthly daily challenges for {year}-{month}")
 
             async with self._create_aiohttp_session() as session:
-                async with session.post(self.graphql_url, headers=headers, json=payload, proxy=self._get_aiohttp_request_proxy("https")) as response:
+                async with session.post(
+                    self.graphql_url,
+                    headers=headers,
+                    json=payload,
+                    proxy=self._get_aiohttp_request_proxy("https"),
+                ) as response:
                     if response.status != 200:
                         error_text = await response.text()
-                        logger.error(f"API request failed: {response.status} - {error_text}")
+                        logger.error(
+                            f"API request failed: {response.status} - {error_text}"
+                        )
                         return {}
 
                     data = await response.json()
@@ -959,7 +1070,9 @@ class LeetCodeClient(BaseCrawler):
                         logger.error(f"GraphQL errors: {data['errors']}")
                         return {}
 
-                    monthly_data = data.get("data", {}).get("dailyCodingChallengeV2", {})
+                    monthly_data = data.get("data", {}).get(
+                        "dailyCodingChallengeV2", {}
+                    )
                     challenges = monthly_data.get("challenges", [])
                     weekly_challenges = monthly_data.get("weeklyChallenges", [])
 
@@ -1009,7 +1122,9 @@ class LeetCodeClient(BaseCrawler):
             logger.error(f"Error fetching monthly challenges: {str(e)}", exc_info=True)
             return {}
 
-    async def _process_remaining_monthly_challenges(self, challenges, domain, year, month):
+    async def _process_remaining_monthly_challenges(
+        self, challenges, domain, year, month
+    ):
         """
         Process remaining monthly challenges in the background
 
@@ -1020,7 +1135,9 @@ class LeetCodeClient(BaseCrawler):
             month (str): Month
         """
         try:
-            logger.info(f"Background task: Processing {len(challenges)} remaining challenges for {year}-{month}")
+            logger.info(
+                f"Background task: Processing {len(challenges)} remaining challenges for {year}-{month}"
+            )
             processed_count = 0
 
             for challenge in challenges:
@@ -1036,7 +1153,9 @@ class LeetCodeClient(BaseCrawler):
                     if question_id and slug:
                         # Use semaphore to limit concurrent API requests
                         async with self._fetch_semaphore:
-                            problem = await self.get_problem(problem_id=question_id, slug=slug)
+                            problem = await self.get_problem(
+                                problem_id=question_id, slug=slug
+                            )
                         if problem:
                             # Prepare daily challenge data
                             daily_data = {
@@ -1057,7 +1176,9 @@ class LeetCodeClient(BaseCrawler):
                                 "paid_only": problem.get("paid_only"),
                                 "content": problem.get("content"),
                                 "content_cn": problem.get("content_cn"),
-                                "similar_questions": problem.get("similar_questions", []),
+                                "similar_questions": problem.get(
+                                    "similar_questions", []
+                                ),
                             }
 
                             # Store in database
@@ -1169,7 +1290,9 @@ def html_to_text(html):
         def display_repl(match: re.Match) -> str:
             return latex_to_plain(match.group(1))
 
-        raw_text = re.sub(r"\$\$\s*(.+?)\s*\$\$", display_repl, raw_text, flags=re.DOTALL)
+        raw_text = re.sub(
+            r"\$\$\s*(.+?)\s*\$\$", display_repl, raw_text, flags=re.DOTALL
+        )
 
         def inline_repl(match: re.Match) -> str:
             content = match.group(1)
@@ -1191,15 +1314,21 @@ def html_to_text(html):
 
         return re.sub(pattern, repl, raw_text, flags=re.DOTALL), blocks
 
-    def restore_markdown_blocks(raw_text: str, blocks: list[str], token_prefix: str) -> str:
+    def restore_markdown_blocks(
+        raw_text: str, blocks: list[str], token_prefix: str
+    ) -> str:
         for idx, block in enumerate(blocks):
             raw_text = raw_text.replace(f"__{token_prefix}_{idx}__", block)
         return raw_text
 
     def markdown_to_text(raw_text: str) -> str:
         text = normalize_math_delimiters(raw_text)
-        text, fenced_blocks = extract_markdown_blocks(text, r"```[\s\S]*?```", "MD_CODE_BLOCK")
-        text, inline_blocks = extract_markdown_blocks(text, r"`[^`]+`", "MD_INLINE_CODE")
+        text, fenced_blocks = extract_markdown_blocks(
+            text, r"```[\s\S]*?```", "MD_CODE_BLOCK"
+        )
+        text, inline_blocks = extract_markdown_blocks(
+            text, r"`[^`]+`", "MD_INLINE_CODE"
+        )
         text = convert_latex_delimiters(text, inline_strict=True)
         text = replace_latex_tokens(text)
         text = restore_markdown_blocks(text, inline_blocks, "MD_INLINE_CODE")
@@ -1298,7 +1427,9 @@ async def main():
         help="Show missing content count (Algorithms, free)",
     )
     parser.add_argument("--daily", action="store_true", help="Fetch daily challenge")
-    parser.add_argument("--date", type=str, help="Fetch daily challenge for a specific date")
+    parser.add_argument(
+        "--date", type=str, help="Fetch daily challenge for a specific date"
+    )
     parser.add_argument(
         "--monthly",
         nargs=2,
@@ -1318,7 +1449,9 @@ async def main():
     except Exception as e:
         import sys
 
-        sys.stderr.write(f"Warning: Failed to load config, using defaults. Error: {e}\n")
+        sys.stderr.write(
+            f"Warning: Failed to load config, using defaults. Error: {e}\n"
+        )
         db_path = fallback_db
         data_dir = fallback_data
 
@@ -1335,7 +1468,9 @@ async def main():
             problems[i] = await client.get_problem(problem["id"])
 
     if args.fill_missing_content:
-        missing_ids = client.problems_db.get_problem_ids_missing_content(source="leetcode")
+        missing_ids = client.problems_db.get_problem_ids_missing_content(
+            source="leetcode"
+        )
         if not missing_ids:
             logger.info("No problems missing content.")
         else:
@@ -1376,7 +1511,9 @@ async def main():
                         try:
                             await client.get_problem(problem_id=problem_id)
                         except Exception as exc:
-                            logger.error("Failed to fetch problem %s: %s", problem_id, exc)
+                            logger.error(
+                                "Failed to fetch problem %s: %s", problem_id, exc
+                            )
                         finally:
                             queue.task_done()
                         async with progress_lock:
@@ -1411,8 +1548,12 @@ async def main():
         logger.info(f"Fetching monthly daily challenges for {year}-{month:02d}...")
         # Validate date range
         if year < 2020 or (year == 2020 and month < 4):
-            logger.error("Monthly daily challenges are only available from April 2020 onwards.")
-            print("Error: Monthly daily challenges are only available from April 2020 onwards.")
+            logger.error(
+                "Monthly daily challenges are only available from April 2020 onwards."
+            )
+            print(
+                "Error: Monthly daily challenges are only available from April 2020 onwards."
+            )
             return
         monthly_data = await client.fetch_monthly_daily_challenges(year, month)
         print(json.dumps(monthly_data, indent=4, ensure_ascii=False))

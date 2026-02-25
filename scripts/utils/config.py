@@ -179,7 +179,11 @@ class ConfigManager:
     def get_crawler_config(self, crawler_name: str) -> "CrawlerHttpConfig":
         _FIELDS = ("user_agent", "proxy", "http_proxy", "https_proxy", "socks5_proxy")
         global_section = self._config.get("crawler", {})
-        per_crawler = global_section.get(crawler_name, {}) if isinstance(global_section, dict) else {}
+        per_crawler = (
+            global_section.get(crawler_name, {})
+            if isinstance(global_section, dict)
+            else {}
+        )
 
         def _norm(val: Any) -> Optional[str]:
             if val is None:
@@ -189,7 +193,9 @@ class ConfigManager:
 
         merged = {}
         for field in _FIELDS:
-            value = _norm(per_crawler.get(field)) if isinstance(per_crawler, dict) else None
+            value = (
+                _norm(per_crawler.get(field)) if isinstance(per_crawler, dict) else None
+            )
             if value is None:
                 value = _norm(global_section.get(field))
             merged[field] = value

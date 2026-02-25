@@ -48,7 +48,9 @@ class OpenAICompatProvider(LLMProvider):
 
         logger.debug(
             "OpenAICompatProvider(%s): model=%s, base_url=%s",
-            capability, self._model, base_url,
+            capability,
+            self._model,
+            base_url,
         )
 
     def _map_error(self, exc: Exception) -> Exception:

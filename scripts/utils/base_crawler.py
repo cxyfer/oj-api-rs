@@ -13,7 +13,9 @@ _DEFAULT_UA = "Mozilla/5.0 (compatible; OJ-API-Bot/1.0)"
 class BaseCrawler:
     def __init__(self, crawler_name: str) -> None:
         self._crawler_name = crawler_name
-        self._http_config: CrawlerHttpConfig = get_config().get_crawler_config(crawler_name)
+        self._http_config: CrawlerHttpConfig = get_config().get_crawler_config(
+            crawler_name
+        )
 
     def _headers(self, referer: Optional[str] = None) -> dict:
         ua = self._http_config.user_agent or _DEFAULT_UA

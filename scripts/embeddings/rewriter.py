@@ -59,7 +59,9 @@ class EmbeddingRewriter:
     async def rewrite(self, content: str) -> str:
         return await self.rewrite_with_executor(content, None)
 
-    async def rewrite_with_executor(self, content: str, executor: Optional[Executor]) -> str:
+    async def rewrite_with_executor(
+        self, content: str, executor: Optional[Executor]
+    ) -> str:
         if not content or not content.strip():
             return ""
         prompt = self._build_prompt(content)

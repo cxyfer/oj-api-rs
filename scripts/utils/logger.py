@@ -52,7 +52,9 @@ class ColoredFormatter(logging.Formatter):
         # Add color to the level name
         levelname = record.levelname
         if levelname in self.COLORS:
-            record.levelname = f"{self.COLORS[levelname]}{levelname}{self.COLORS['RESET']}"
+            record.levelname = (
+                f"{self.COLORS[levelname]}{levelname}{self.COLORS['RESET']}"
+            )
 
         # Call parent format method
         result = super().format(record)
@@ -119,7 +121,9 @@ class Logger:
 
             config = get_config()
             logger_config = config.get_section("logging")
-            GLOBAL_LOG_LEVEL = _resolve_log_level(logger_config.get("level", "INFO"), logging.INFO)
+            GLOBAL_LOG_LEVEL = _resolve_log_level(
+                logger_config.get("level", "INFO"), logging.INFO
+            )
             GLOBAL_LOG_DIR = logger_config.get("directory", "./logs")
             GLOBAL_MODULE_LEVELS = {
                 module: _resolve_log_level(level, logging.INFO)
@@ -154,7 +158,9 @@ class Logger:
 
         # Set up file handler with daily rotating files
         current_date = datetime.now().strftime("%Y-%m-%d")
-        file_handler = logging.FileHandler(filename=f"{GLOBAL_LOG_DIR}/{current_date}.log", encoding="utf-8")
+        file_handler = logging.FileHandler(
+            filename=f"{GLOBAL_LOG_DIR}/{current_date}.log", encoding="utf-8"
+        )
         file_handler.setFormatter(file_formatter)
 
         # Configure root logger

@@ -12,7 +12,11 @@ from bs4 import BeautifulSoup
 from utils.base_crawler import BaseCrawler
 from utils.config import get_config
 from utils.database import ProblemsDatabaseManager
-from utils.html_converter import fix_relative_urls_in_soup, normalize_newlines, table_to_markdown
+from utils.html_converter import (
+    fix_relative_urls_in_soup,
+    normalize_newlines,
+    table_to_markdown,
+)
 from utils.logger import get_leetcode_logger
 
 logger = get_leetcode_logger()
@@ -46,7 +50,9 @@ class AtCoderClient(BaseCrawler):
 
     def _headers(self, referer: Optional[str] = None) -> dict:
         headers = super()._headers(referer)
-        headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        headers["Accept"] = (
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        )
         headers["Accept-Language"] = "en-US,en;q=0.9,ja;q=0.8"
         return headers
 
@@ -72,12 +78,18 @@ class AtCoderClient(BaseCrawler):
                     proxy=self._get_aiohttp_request_proxy("https"),
                 ) as response:
                     if response.status == 429:
-                        backoff = min(self.max_backoff, self.backoff_base * (2 ** (attempt - 1)))
-                        logger.warning("Rate limited (%s). Backing off %.1fs", url, backoff)
+                        backoff = min(
+                            self.max_backoff, self.backoff_base * (2 ** (attempt - 1))
+                        )
+                        logger.warning(
+                            "Rate limited (%s). Backing off %.1fs", url, backoff
+                        )
                         await asyncio.sleep(backoff)
                         continue
                     if response.status >= 400:
-                        logger.warning("HTTP %s while fetching %s", response.status, url)
+                        logger.warning(
+                            "HTTP %s while fetching %s", response.status, url
+                        )
                         return None
                     return await response.text()
             except asyncio.CancelledError:
@@ -86,7 +98,9 @@ class AtCoderClient(BaseCrawler):
                 if attempt >= self.max_retries:
                     logger.error("Failed to fetch %s: %s", url, exc)
                     return None
-                backoff = min(self.max_backoff, self.backoff_base * (2 ** (attempt - 1)))
+                backoff = min(
+                    self.max_backoff, self.backoff_base * (2 ** (attempt - 1))
+                )
                 logger.warning("Fetch failed (%s), retry in %.1fs", exc, backoff)
                 await asyncio.sleep(backoff)
         return None
@@ -145,7 +159,9 @@ class AtCoderClient(BaseCrawler):
                     "contest": contest_id,
                     "problem_index": index_text,
                     "tags": None,
-                    "link": self.PROBLEM_URL_TEMPLATE.format(contest_id=contest_id, problem_id=problem_id),
+                    "link": self.PROBLEM_URL_TEMPLATE.format(
+                        contest_id=contest_id, problem_id=problem_id
+                    ),
                     "category": "Algorithms",
                     "paid_only": 0,
                     "content": None,
@@ -156,7 +172,9 @@ class AtCoderClient(BaseCrawler):
             seen.add(problem_id)
         return problems
 
-    def _clean_problem_markdown(self, html: str, base_url: str = "https://atcoder.jp") -> str:
+    def _clean_problem_markdown(
+        self, html: str, base_url: str = "https://atcoder.jp"
+    ) -> str:
         if not html:
             return ""
 
@@ -166,7 +184,9 @@ class AtCoderClient(BaseCrawler):
                 raw_lines.pop(0)
             while raw_lines and not raw_lines[-1].strip():
                 raw_lines.pop()
-            indents = [len(line) - len(line.lstrip()) for line in raw_lines if line.strip()]
+            indents = [
+                len(line) - len(line.lstrip()) for line in raw_lines if line.strip()
+            ]
             min_indent = min(indents) if indents else 0
             return "\n".join(line[min_indent:] for line in raw_lines)
 
@@ -266,7 +286,9 @@ class AtCoderClient(BaseCrawler):
             "contest": contest_id,
             "problem_index": item.get("problem_index"),
             "tags": None,
-            "link": self.PROBLEM_URL_TEMPLATE.format(contest_id=contest_id, problem_id=problem_id),
+            "link": self.PROBLEM_URL_TEMPLATE.format(
+                contest_id=contest_id, problem_id=problem_id
+            ),
             "category": "Algorithms",
             "paid_only": 0,
             "content": None,
@@ -317,7 +339,9 @@ class AtCoderClient(BaseCrawler):
         logger.info("Fetched %s contests", len(contests))
         return contests
 
-    async def fetch_contest_problems(self, contest_id: str, session: aiohttp.ClientSession) -> list[dict]:
+    async def fetch_contest_problems(
+        self, contest_id: str, session: aiohttp.ClientSession
+    ) -> list[dict]:
         url = self.CONTEST_TASKS_URL_TEMPLATE.format(contest_id=contest_id)
         contest_url = f"https://atcoder.jp/contests/{contest_id}"
         html = await self._fetch_text(session, url, referer=contest_url)
@@ -328,7 +352,9 @@ class AtCoderClient(BaseCrawler):
     async def fetch_problem_content(
         self, session: aiohttp.ClientSession, contest_id: str, problem_id: str
     ) -> Optional[str]:
-        base_url = self.PROBLEM_URL_TEMPLATE.format(contest_id=contest_id, problem_id=problem_id)
+        base_url = self.PROBLEM_URL_TEMPLATE.format(
+            contest_id=contest_id, problem_id=problem_id
+        )
         referer = self.CONTEST_TASKS_URL_TEMPLATE.format(contest_id=contest_id)
         html = await self._fetch_text(session, f"{base_url}?lang=en", referer=referer)
         if not html:
@@ -347,7 +373,9 @@ class AtCoderClient(BaseCrawler):
             return None
         return self._extract_statement(html, prefer_lang="ja")
 
-    async def fetch_content_by_url(self, session: aiohttp.ClientSession, url: str) -> Optional[str]:
+    async def fetch_content_by_url(
+        self, session: aiohttp.ClientSession, url: str
+    ) -> Optional[str]:
         """Fetch problem content directly from URL."""
         html = await self._fetch_text(session, f"{url}?lang=en")
         if not html:
@@ -368,13 +396,21 @@ class AtCoderClient(BaseCrawler):
 
     def get_progress(self) -> dict:
         if not self.progress_file.exists():
-            return {"fetched_contests": [], "last_updated": None, "last_contest_id": None}
+            return {
+                "fetched_contests": [],
+                "last_updated": None,
+                "last_contest_id": None,
+            }
         try:
             with self.progress_file.open("r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as exc:
             logger.warning("Failed to read progress file: %s", exc)
-            return {"fetched_contests": [], "last_updated": None, "last_contest_id": None}
+            return {
+                "fetched_contests": [],
+                "last_updated": None,
+                "last_contest_id": None,
+            }
 
     def save_progress(self, contest_id: str) -> None:
         progress = self.get_progress()
@@ -392,7 +428,9 @@ class AtCoderClient(BaseCrawler):
             if not problems:
                 return 0
             for problem in problems:
-                content = await self.fetch_problem_content(session, contest_id, problem["id"])
+                content = await self.fetch_problem_content(
+                    session, contest_id, problem["id"]
+                )
                 if content:
                     problem["content"] = content
                 self.problems_db.update_problem(problem)
@@ -411,7 +449,9 @@ class AtCoderClient(BaseCrawler):
                 if not problems:
                     continue
                 for problem in problems:
-                    content = await self.fetch_problem_content(session, contest_id, problem["id"])
+                    content = await self.fetch_problem_content(
+                        session, contest_id, problem["id"]
+                    )
                     if content:
                         problem["content"] = content
                     self.problems_db.update_problem(problem)
@@ -488,7 +528,9 @@ class AtCoderClient(BaseCrawler):
                 updates.clear()
 
             if index % 50 == 0 or index == total:
-                logger.info("Processed %s/%s, updated so far: %s", index, total, total_updated)
+                logger.info(
+                    "Processed %s/%s, updated so far: %s", index, total, total_updated
+                )
 
         if updates:
             count, ok = self.problems_db.batch_update_content(updates)
@@ -504,10 +546,16 @@ class AtCoderClient(BaseCrawler):
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description="AtCoder CLI tool")
-    parser.add_argument("--sync-kenkoooo", action="store_true", help="Sync from Kenkoooo")
-    parser.add_argument("--sync-history", action="store_true", help="Alias for --sync-kenkoooo")
+    parser.add_argument(
+        "--sync-kenkoooo", action="store_true", help="Sync from Kenkoooo"
+    )
+    parser.add_argument(
+        "--sync-history", action="store_true", help="Alias for --sync-kenkoooo"
+    )
     parser.add_argument("--fetch-all", action="store_true", help="Fetch all contests")
-    parser.add_argument("--resume", action="store_true", help="Resume from progress file")
+    parser.add_argument(
+        "--resume", action="store_true", help="Resume from progress file"
+    )
     parser.add_argument("--contest", type=str, help="Fetch a single contest")
     parser.add_argument("--status", action="store_true", help="Show progress status")
     parser.add_argument(
@@ -525,7 +573,9 @@ async def main() -> None:
         action="store_true",
         help="Reprocess AtCoder problem content with new cleaning rules",
     )
-    parser.add_argument("--rate-limit", type=float, default=1.0, help="Rate limit in seconds")
+    parser.add_argument(
+        "--rate-limit", type=float, default=1.0, help="Rate limit in seconds"
+    )
     parser.add_argument("--data-dir", type=str, default=None, help="Data directory")
     parser.add_argument("--db-path", type=str, default=None, help="Database path")
 

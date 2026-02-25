@@ -15,7 +15,9 @@ logger = get_llm_logger()
 class EmbeddingGenerator:
     def __init__(self, config: ConfigManager | None = None):
         self.config = config or get_config()
-        self.model_config: EmbeddingModelConfig = self.config.get_embedding_model_config()
+        self.model_config: EmbeddingModelConfig = (
+            self.config.get_embedding_model_config()
+        )
         self._provider = create_provider(self.config, "embedding")
 
     async def embed(self, content: str) -> List[float]:

@@ -111,7 +111,9 @@ class CodeforcesClient(BaseCrawler):
                 response = await session.get(url, headers=headers, timeout=30)
 
                 if response.status_code in {429, 403, 503}:
-                    backoff = min(self.max_backoff, self.backoff_base * (2 ** (attempt - 1)))
+                    backoff = min(
+                        self.max_backoff, self.backoff_base * (2 ** (attempt - 1))
+                    )
                     logger.warning(
                         "Blocked or Rate limited (%s, status=%s). Backing off %.1fs",
                         url,
@@ -122,7 +124,9 @@ class CodeforcesClient(BaseCrawler):
                     continue
 
                 if response.status_code >= 400:
-                    logger.warning("HTTP %s while fetching %s", response.status_code, url)
+                    logger.warning(
+                        "HTTP %s while fetching %s", response.status_code, url
+                    )
                     return None
 
                 text = response.text
@@ -132,14 +136,22 @@ class CodeforcesClient(BaseCrawler):
                 if attempt >= self.max_retries:
                     logger.error("Failed to fetch %s: %s", url, exc)
                     return None
-                backoff = min(self.max_backoff, self.backoff_base * (2 ** (attempt - 1)))
+                backoff = min(
+                    self.max_backoff, self.backoff_base * (2 ** (attempt - 1))
+                )
                 logger.warning("Fetch failed (%s), retry in %.1fs", exc, backoff)
                 await asyncio.sleep(backoff)
                 continue
 
             if self._is_rate_limited(text):
-                backoff = min(self.max_backoff, self.backoff_base * (2 ** (attempt - 1)))
-                logger.warning("Rate limited page content detected (%s). Backing off %.1fs", url, backoff)
+                backoff = min(
+                    self.max_backoff, self.backoff_base * (2 ** (attempt - 1))
+                )
+                logger.warning(
+                    "Rate limited page content detected (%s). Backing off %.1fs",
+                    url,
+                    backoff,
+                )
                 await asyncio.sleep(backoff)
                 continue
             return text
@@ -155,7 +167,9 @@ class CodeforcesClient(BaseCrawler):
             logger.error("Invalid JSON from %s: %s", url, exc)
             return None
 
-    def _build_problem_from_api(self, problem: dict, stats: dict, contest_name: Optional[str] = None) -> Optional[dict]:
+    def _build_problem_from_api(
+        self, problem: dict, stats: dict, contest_name: Optional[str] = None
+    ) -> Optional[dict]:
         contest_id = problem.get("contestId")
         index = problem.get("index")
         title = problem.get("name")
@@ -174,7 +188,9 @@ class CodeforcesClient(BaseCrawler):
             "contest": contest_name if contest_name else str(contest_id),
             "problem_index": index,
             "tags": problem.get("tags", []),
-            "link": self.PROBLEM_URL_TEMPLATE.format(contest_id=contest_id, index=index),
+            "link": self.PROBLEM_URL_TEMPLATE.format(
+                contest_id=contest_id, index=index
+            ),
             "category": "Algorithms",
             "paid_only": 0,
             "content": None,
@@ -194,11 +210,15 @@ class CodeforcesClient(BaseCrawler):
         return json.dumps(list(tags))
 
     def _merge_problemset(self, problems: list[dict], stats: list[dict]) -> list[dict]:
-        stats_map = {(item.get("contestId"), item.get("index")): item for item in stats or []}
+        stats_map = {
+            (item.get("contestId"), item.get("index")): item for item in stats or []
+        }
         merged: list[dict] = []
         for problem in problems or []:
             key = (problem.get("contestId"), problem.get("index"))
-            merged_problem = self._build_problem_from_api(problem, stats_map.get(key, {}))
+            merged_problem = self._build_problem_from_api(
+                problem, stats_map.get(key, {})
+            )
             if merged_problem:
                 merged.append(merged_problem)
         return merged
@@ -213,11 +233,16 @@ class CodeforcesClient(BaseCrawler):
             return []
 
         result = payload.get("result") or {}
-        problems = self._merge_problemset(result.get("problems", []), result.get("problemStatistics", []))
+        problems = self._merge_problemset(
+            result.get("problems", []), result.get("problemStatistics", [])
+        )
         if not problems:
             return []
 
-        problems_for_insert = [{**problem, "tags": self._serialize_tags(problem.get("tags"))} for problem in problems]
+        problems_for_insert = [
+            {**problem, "tags": self._serialize_tags(problem.get("tags"))}
+            for problem in problems
+        ]
         inserted = self.problems_db.update_problems(problems_for_insert)
         logger.info(
             "Problemset sync: %s problems fetched, %s inserted, %s skipped (existing)",
@@ -239,21 +264,29 @@ class CodeforcesClient(BaseCrawler):
             return []
 
         contests = payload.get("result", [])
-        finished = [contest for contest in contests if contest.get("phase") == "FINISHED"]
+        finished = [
+            contest for contest in contests if contest.get("phase") == "FINISHED"
+        ]
         filtered = finished
         if not include_gym:
             filtered = [contest for contest in finished if contest.get("type") != "GYM"]
-        contest_ids = [contest.get("id") for contest in filtered if contest.get("id") is not None]
+        contest_ids = [
+            contest.get("id") for contest in filtered if contest.get("id") is not None
+        ]
         contest_ids.sort(reverse=True)
         return contest_ids
 
-    async def fetch_contest_problems(self, contest_id: int, session: AsyncSession) -> list[dict]:
+    async def fetch_contest_problems(
+        self, contest_id: int, session: AsyncSession
+    ) -> list[dict]:
         url = f"{self.CONTEST_STANDINGS_API}?contestId={contest_id}&from=1&count=1"
         payload = await self._fetch_json(session, url)
         if not payload:
             return []
         if payload.get("status") != "OK":
-            logger.warning("Contest %s standings API error: %s", contest_id, payload.get("comment"))
+            logger.warning(
+                "Contest %s standings API error: %s", contest_id, payload.get("comment")
+            )
             return []
 
         result = payload.get("result") or {}
@@ -275,7 +308,9 @@ class CodeforcesClient(BaseCrawler):
         fix_relative_urls_in_soup(soup, base_url)
         return str(soup)
 
-    def _clean_problem_markdown(self, html: str, base_url: str = "https://codeforces.com") -> str:
+    def _clean_problem_markdown(
+        self, html: str, base_url: str = "https://codeforces.com"
+    ) -> str:
         if not html:
             return ""
 
@@ -297,7 +332,9 @@ class CodeforcesClient(BaseCrawler):
             else:
                 script.replace_with(f"${latex}$")
 
-        for tag in soup.select("span.MathJax, span.MathJax_Preview, div.MathJax_Display"):
+        for tag in soup.select(
+            "span.MathJax, span.MathJax_Preview, div.MathJax_Display"
+        ):
             tag.decompose()
 
         for selector in (
@@ -375,9 +412,13 @@ class CodeforcesClient(BaseCrawler):
         statement = soup.select_one("div.problem-statement")
         if not statement:
             return None
-        return self._clean_problem_markdown(str(statement), base_url="https://codeforces.com")
+        return self._clean_problem_markdown(
+            str(statement), base_url="https://codeforces.com"
+        )
 
-    async def fetch_problem_content(self, session: AsyncSession, contest_id: int, index: str) -> Optional[str]:
+    async def fetch_problem_content(
+        self, session: AsyncSession, contest_id: int, index: str
+    ) -> Optional[str]:
         base_url = self.PROBLEM_URL_TEMPLATE.format(contest_id=contest_id, index=index)
         referer = f"https://codeforces.com/contest/{contest_id}"
         html = await self._fetch_text(session, f"{base_url}?locale=en", referer=referer)
@@ -389,9 +430,13 @@ class CodeforcesClient(BaseCrawler):
             logger.warning("Problem statement missing for %s", base_url)
         return content
 
-    async def fetch_content_by_url(self, session: AsyncSession, url: str) -> Optional[str]:
+    async def fetch_content_by_url(
+        self, session: AsyncSession, url: str
+    ) -> Optional[str]:
         separator = "&" if "?" in url else "?"
-        html = await self._fetch_text(session, f"{url}{separator}locale=en", referer=url)
+        html = await self._fetch_text(
+            session, f"{url}{separator}locale=en", referer=url
+        )
         if not html:
             return None
         if "/enter" in html.lower():
@@ -408,17 +453,23 @@ class CodeforcesClient(BaseCrawler):
             if not problems:
                 return 0
             for problem in problems:
-                content = await self.fetch_problem_content(session, contest_id, problem["problem_index"])
+                content = await self.fetch_problem_content(
+                    session, contest_id, problem["problem_index"]
+                )
                 if content:
                     problem["content"] = content
                 self.problems_db.update_problem(problem)
             logger.info("Fetched contest %s: %s problems", contest_id, len(problems))
             return len(problems)
 
-    async def fetch_all_problems(self, resume: bool = True, include_gym: bool = False) -> int:
+    async def fetch_all_problems(
+        self, resume: bool = True, include_gym: bool = False
+    ) -> int:
         contests = await self.fetch_contest_list(include_gym=include_gym)
         progress = self.get_progress() if resume else {"fetched_contests": []}
-        fetched = {str(contest_id) for contest_id in progress.get("fetched_contests", [])}
+        fetched = {
+            str(contest_id) for contest_id in progress.get("fetched_contests", [])
+        }
         remaining = [c for c in contests if str(c) not in fetched]
         logger.info(
             "Contest list: %s available, %s fetched, %s remaining",
@@ -435,13 +486,17 @@ class CodeforcesClient(BaseCrawler):
                 if not problems:
                     continue
                 for problem in problems:
-                    content = await self.fetch_problem_content(session, contest_id, problem["problem_index"])
+                    content = await self.fetch_problem_content(
+                        session, contest_id, problem["problem_index"]
+                    )
                     if content:
                         problem["content"] = content
                     self.problems_db.update_problem(problem)
                 total += len(problems)
                 self.save_progress(contest_id)
-                logger.info("Fetched contest %s: %s problems", contest_id, len(problems))
+                logger.info(
+                    "Fetched contest %s: %s problems", contest_id, len(problems)
+                )
         logger.info("Total fetched: %s problems", total)
         return total
 
@@ -459,7 +514,9 @@ class CodeforcesClient(BaseCrawler):
             for index, (problem_id, link) in enumerate(missing, start=1):
                 content = await self.fetch_content_by_url(session, link)
                 if content:
-                    self.problems_db.update_problem({"id": problem_id, "source": "codeforces", "content": content})
+                    self.problems_db.update_problem(
+                        {"id": problem_id, "source": "codeforces", "content": content}
+                    )
                     filled += 1
                 if index % 50 == 0 or index == total:
                     logger.info("Processed %s/%s, filled %s", index, total, filled)
@@ -494,7 +551,9 @@ class CodeforcesClient(BaseCrawler):
                 updates.clear()
 
             if index % 50 == 0 or index == total:
-                logger.info("Processed %s/%s, updated so far: %s", index, total, total_updated)
+                logger.info(
+                    "Processed %s/%s, updated so far: %s", index, total, total_updated
+                )
 
         if updates:
             count, ok = self.problems_db.batch_update_content(updates)
@@ -521,13 +580,21 @@ class CodeforcesClient(BaseCrawler):
 
     def get_progress(self) -> dict:
         if not self.progress_file.exists():
-            return {"fetched_contests": [], "last_updated": None, "last_contest_id": None}
+            return {
+                "fetched_contests": [],
+                "last_updated": None,
+                "last_contest_id": None,
+            }
         try:
             with self.progress_file.open("r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as exc:
             logger.warning("Failed to read progress file: %s", exc)
-            return {"fetched_contests": [], "last_updated": None, "last_contest_id": None}
+            return {
+                "fetched_contests": [],
+                "last_updated": None,
+                "last_contest_id": None,
+            }
 
     def save_progress(self, contest_id: Union[int, str]) -> None:
         progress = self.get_progress()
@@ -535,7 +602,9 @@ class CodeforcesClient(BaseCrawler):
         if contest_id is not None:
             fetched.add(str(contest_id))
         progress["fetched_contests"] = sorted(fetched)
-        progress["last_contest_id"] = str(contest_id) if contest_id is not None else None
+        progress["last_contest_id"] = (
+            str(contest_id) if contest_id is not None else None
+        )
         progress["last_updated"] = datetime.now(timezone.utc).isoformat()
 
         tmp_path = self.progress_file.with_suffix(".tmp")
@@ -563,7 +632,9 @@ async def main() -> None:
         help="Sync from Codeforces problemset API",
     )
     parser.add_argument("--fetch-all", action="store_true", help="Fetch all contests")
-    parser.add_argument("--resume", action="store_true", help="Resume from progress file")
+    parser.add_argument(
+        "--resume", action="store_true", help="Resume from progress file"
+    )
     parser.add_argument("--contest", type=int, help="Fetch a single contest by ID")
     parser.add_argument("--status", action="store_true", help="Show progress status")
     parser.add_argument(
@@ -631,7 +702,9 @@ async def main() -> None:
         await client.sync_problemset()
 
     if args.fetch_all:
-        await client.fetch_all_problems(resume=args.resume, include_gym=args.include_gym)
+        await client.fetch_all_problems(
+            resume=args.resume, include_gym=args.include_gym
+        )
 
     if args.contest:
         await client.fetch_single_contest(args.contest)

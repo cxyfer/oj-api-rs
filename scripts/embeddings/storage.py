@@ -43,7 +43,9 @@ class EmbeddingStorage:
         }
 
     async def get_embedding_meta(self, source: str, problem_id: str) -> Optional[dict]:
-        return await asyncio.to_thread(self._get_embedding_meta_sync, source, problem_id)
+        return await asyncio.to_thread(
+            self._get_embedding_meta_sync, source, problem_id
+        )
 
     def _get_vector_sync(self, source: str, problem_id: str) -> Optional[List[float]]:
         row = self.db.execute(
@@ -57,7 +59,9 @@ class EmbeddingStorage:
         data = row[0]
 
         # Handle empty data
-        if data is None or (isinstance(data, (bytes, bytearray, memoryview)) and len(data) == 0):
+        if data is None or (
+            isinstance(data, (bytes, bytearray, memoryview)) and len(data) == 0
+        ):
             logger.warning(f"Empty vector data for {source}:{problem_id}")
             return None
 
@@ -269,8 +273,16 @@ class EmbeddingStorage:
         )
         return int(row[0]) if row else 0
 
-    async def count_embeddings(self, source: Optional[str] = None, filter_pattern: Optional[str] = None) -> int:
-        return await asyncio.to_thread(self._count_table_sync, "vec_embeddings", source, filter_pattern)
+    async def count_embeddings(
+        self, source: Optional[str] = None, filter_pattern: Optional[str] = None
+    ) -> int:
+        return await asyncio.to_thread(
+            self._count_table_sync, "vec_embeddings", source, filter_pattern
+        )
 
-    async def count_metadata(self, source: Optional[str] = None, filter_pattern: Optional[str] = None) -> int:
-        return await asyncio.to_thread(self._count_table_sync, "problem_embeddings", source, filter_pattern)
+    async def count_metadata(
+        self, source: Optional[str] = None, filter_pattern: Optional[str] = None
+    ) -> int:
+        return await asyncio.to_thread(
+            self._count_table_sync, "problem_embeddings", source, filter_pattern
+        )

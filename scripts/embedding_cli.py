@@ -189,17 +189,25 @@ async def build_embeddings(
         await storage.delete_all_embeddings(source)
 
     if not rebuild and not db.check_dimension_consistency(embedding_config.dim):
-        raise ValueError("Embedding dimension mismatch. Please run with --rebuild to reset the index.")
+        raise ValueError(
+            "Embedding dimension mismatch. Please run with --rebuild to reset the index."
+        )
 
-    total_problems = await asyncio.to_thread(_count_problems_with_content_sync, db, source, filter_pattern)
-    existing_metadata = await storage.get_existing_ids(source, embedding_config.name, embedding_config.dim)
+    total_problems = await asyncio.to_thread(
+        _count_problems_with_content_sync, db, source, filter_pattern
+    )
+    existing_metadata = await storage.get_existing_ids(
+        source, embedding_config.name, embedding_config.dim
+    )
     existing_vectors = await storage.get_existing_vector_ids(source)
     existing_ids = existing_metadata.intersection(existing_vectors)
 
     if filter_pattern:
-        filtered_ids = set(await asyncio.to_thread(
-            _fetch_problem_ids_with_content_sync, db, source, filter_pattern
-        ))
+        filtered_ids = set(
+            await asyncio.to_thread(
+                _fetch_problem_ids_with_content_sync, db, source, filter_pattern
+            )
+        )
         pending_count = len(filtered_ids - existing_ids)
     else:
         pending_count = max(total_problems - len(existing_ids), 0)
@@ -219,7 +227,9 @@ async def build_embeddings(
     if rewriter is None or generator is None:
         raise ValueError("Embedding generator not initialized")
 
-    problems = await asyncio.to_thread(_fetch_problems_with_content_sync, db, source, filter_pattern)
+    problems = await asyncio.to_thread(
+        _fetch_problems_with_content_sync, db, source, filter_pattern
+    )
     pending = [(pid, content) for pid, content in problems if pid not in existing_ids]
 
     if not pending:
@@ -230,10 +240,14 @@ async def build_embeddings(
     total_pending = len(pending)
     report.total_pending = total_pending
     effective_batch_size = max(1, batch_size or 1)
-    rewrite_workers = max(1, min(getattr(rewriter.model_config, "workers", 1), total_pending))
+    rewrite_workers = max(
+        1, min(getattr(rewriter.model_config, "workers", 1), total_pending)
+    )
     logger.info(
         "Starting rewrite pipeline: %s problems, workers=%s, batch_size=%s",
-        total_pending, rewrite_workers, effective_batch_size,
+        total_pending,
+        rewrite_workers,
+        effective_batch_size,
     )
     executor = ThreadPoolExecutor(max_workers=rewrite_workers)
 
@@ -254,12 +268,22 @@ async def build_embeddings(
             if not job_id:
                 return
             try:
-                _write_progress(job_id, {
-                    "phase": phase,
-                    "rewrite_progress": {"done": rewrite_done, "total": total_pending, "skipped": rewrite_skipped},
-                    "embed_progress": {"done": embed_done, "total": total_pending - rewrite_skipped},
-                    "started_at": wall_start,
-                })
+                _write_progress(
+                    job_id,
+                    {
+                        "phase": phase,
+                        "rewrite_progress": {
+                            "done": rewrite_done,
+                            "total": total_pending,
+                            "skipped": rewrite_skipped,
+                        },
+                        "embed_progress": {
+                            "done": embed_done,
+                            "total": total_pending - rewrite_skipped,
+                        },
+                        "started_at": wall_start,
+                    },
+                )
             except Exception:
                 pass
 
@@ -286,7 +310,8 @@ async def build_embeddings(
                 except asyncio.TimeoutError:
                     logger.error(
                         "Problem %s: rewrite_timeout after %ss",
-                        problem_id, rewriter.model_config.timeout,
+                        problem_id,
+                        rewriter.model_config.timeout,
                     )
                     async with progress_lock:
                         rewrite_skipped += 1
@@ -319,7 +344,9 @@ async def build_embeddings(
                     if rewrite_done % 50 == 0 or rewrite_done == total_pending:
                         logger.info(
                             "Rewrite progress %s/%s (skipped %s)",
-                            rewrite_done, total_pending, rewrite_skipped,
+                            rewrite_done,
+                            total_pending,
+                            rewrite_skipped,
                         )
                     _update_progress("rewriting")
                 rewrite_queue.task_done()
@@ -335,8 +362,13 @@ async def build_embeddings(
                 buffer.append(item)
                 if len(buffer) >= effective_batch_size:
                     await _flush_with_bisect(
-                        buffer, storage, generator, embedding_config,
-                        source, report, progress_lock,
+                        buffer,
+                        storage,
+                        generator,
+                        embedding_config,
+                        source,
+                        report,
+                        progress_lock,
                     )
                     async with progress_lock:
                         embed_done += len(buffer)
@@ -345,15 +377,22 @@ async def build_embeddings(
                 embed_queue.task_done()
             if buffer:
                 await _flush_with_bisect(
-                    buffer, storage, generator, embedding_config,
-                    source, report, progress_lock,
+                    buffer,
+                    storage,
+                    generator,
+                    embedding_config,
+                    source,
+                    report,
+                    progress_lock,
                 )
                 async with progress_lock:
                     embed_done += len(buffer)
                     _update_progress("embedding")
             logger.info("Embedding pipeline complete (%s succeeded)", report.succeeded)
 
-        rewrite_tasks = [asyncio.create_task(rewrite_worker(i)) for i in range(rewrite_workers)]
+        rewrite_tasks = [
+            asyncio.create_task(rewrite_worker(i)) for i in range(rewrite_workers)
+        ]
         embed_task = asyncio.create_task(embed_worker())
 
         await rewrite_queue.join()
@@ -390,7 +429,14 @@ async def _flush_with_bisect(
                     f"Batch size mismatch: expected {len(problem_ids)} got {len(embeddings)}"
                 )
             for pid, rewritten, emb in zip(problem_ids, rewritten_texts, embeddings):
-                await storage.save_embedding(source, pid, rewritten, embedding_config.name, embedding_config.dim, emb)
+                await storage.save_embedding(
+                    source,
+                    pid,
+                    rewritten,
+                    embedding_config.name,
+                    embedding_config.dim,
+                    emb,
+                )
                 async with progress_lock:
                     report.add_succeeded()
             return
@@ -419,8 +465,26 @@ async def _flush_with_bisect(
         return
 
     mid = len(batch) // 2
-    await _flush_with_bisect(batch[:mid], storage, generator, embedding_config, source, report, progress_lock, max_retries)
-    await _flush_with_bisect(batch[mid:], storage, generator, embedding_config, source, report, progress_lock, max_retries)
+    await _flush_with_bisect(
+        batch[:mid],
+        storage,
+        generator,
+        embedding_config,
+        source,
+        report,
+        progress_lock,
+        max_retries,
+    )
+    await _flush_with_bisect(
+        batch[mid:],
+        storage,
+        generator,
+        embedding_config,
+        source,
+        report,
+        progress_lock,
+        max_retries,
+    )
 
 
 async def query_similar(
@@ -443,7 +507,9 @@ async def query_similar(
     await _prepare_db(db, embedding_config.dim, rebuild=False)
 
     if not db.check_dimension_consistency(embedding_config.dim):
-        raise ValueError("Embedding dimension mismatch. Please run with --rebuild to reset the index.")
+        raise ValueError(
+            "Embedding dimension mismatch. Please run with --rebuild to reset the index."
+        )
 
     total_vectors = await storage.count_embeddings(source)
     if total_vectors == 0:
@@ -481,7 +547,9 @@ async def show_stats(
 
     await _prepare_db(db, embedding_config.dim, rebuild=False)
 
-    total_problems = await asyncio.to_thread(_count_problems_with_content_sync, db, source, filter_pattern)
+    total_problems = await asyncio.to_thread(
+        _count_problems_with_content_sync, db, source, filter_pattern
+    )
     total_vectors = await storage.count_embeddings(source, filter_pattern)
     total_metadata = await storage.count_metadata(source, filter_pattern)
 
@@ -499,14 +567,29 @@ async def main() -> None:
     parser.add_argument("--rebuild", action="store_true", help="Rebuild embeddings")
     parser.add_argument("--query", type=str, help="Query similar problems")
     parser.add_argument("--stats", action="store_true", help="Show embedding stats")
-    parser.add_argument("--dry-run", action="store_true", help="Estimate embedding cost")
-    parser.add_argument("--embed-text", type=str, help="Generate embedding for given text", default=None)
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Estimate embedding cost"
+    )
+    parser.add_argument(
+        "--embed-text", type=str, help="Generate embedding for given text", default=None
+    )
     parser.add_argument("--source", type=str, help="Problem source", default="all")
     parser.add_argument("--top-k", type=int, help="Top-k results", default=None)
-    parser.add_argument("--min-similarity", type=float, help="Minimum similarity threshold", default=None)
-    parser.add_argument("--batch-size", type=int, help="Embedding batch size", default=None)
-    parser.add_argument("--filter", type=str, help="Filter problems by ID substring", default=None)
-    parser.add_argument("--job-id", type=str, help="Job ID for progress tracking", default=None)
+    parser.add_argument(
+        "--min-similarity",
+        type=float,
+        help="Minimum similarity threshold",
+        default=None,
+    )
+    parser.add_argument(
+        "--batch-size", type=int, help="Embedding batch size", default=None
+    )
+    parser.add_argument(
+        "--filter", type=str, help="Filter problems by ID substring", default=None
+    )
+    parser.add_argument(
+        "--job-id", type=str, help="Job ID for progress tracking", default=None
+    )
 
     args = parser.parse_args()
     config = get_config()
@@ -515,7 +598,11 @@ async def main() -> None:
 
     source = args.source.strip().lower()
     top_k = args.top_k or similar_config.top_k
-    min_similarity = args.min_similarity if args.min_similarity is not None else similar_config.min_similarity
+    min_similarity = (
+        args.min_similarity
+        if args.min_similarity is not None
+        else similar_config.min_similarity
+    )
     batch_size = args.batch_size or embedding_config.batch_size
     filter_pattern = args.filter
     job_id = args.job_id or str(uuid.uuid4())
@@ -560,8 +647,14 @@ async def main() -> None:
     if args.query:
         query_source = None if source == "all" else source
         await query_similar(
-            db, storage, rewriter, generator,
-            query_source, args.query, top_k, min_similarity,
+            db,
+            storage,
+            rewriter,
+            generator,
+            query_source,
+            args.query,
+            top_k,
+            min_similarity,
         )
 
     if args.build or args.rebuild:
@@ -576,27 +669,55 @@ async def main() -> None:
                     await _prepare_db(db, embedding_config.dim, rebuild=True)
                     await storage.delete_all_embeddings(None)
                 for index, src in enumerate(sources, start=1):
-                    logger.info("Building embeddings for source '%s' (%d/%d)", src, index, len(sources))
+                    logger.info(
+                        "Building embeddings for source '%s' (%d/%d)",
+                        src,
+                        index,
+                        len(sources),
+                    )
                     try:
                         r = await build_embeddings(
-                            db, storage, rewriter, generator, src,
-                            batch_size, rebuild=False, dry_run=args.dry_run,
-                            filter_pattern=filter_pattern, job_id=job_id,
+                            db,
+                            storage,
+                            rewriter,
+                            generator,
+                            src,
+                            batch_size,
+                            rebuild=False,
+                            dry_run=args.dry_run,
+                            filter_pattern=filter_pattern,
+                            job_id=job_id,
                         )
                         combined_report.total_pending += r.total_pending
                         combined_report.succeeded += r.succeeded
                         for k, v in r.skipped.items():
-                            combined_report.skipped[k] = combined_report.skipped.get(k, 0) + v
+                            combined_report.skipped[k] = (
+                                combined_report.skipped.get(k, 0) + v
+                            )
                         for k, v in r.failed.items():
-                            combined_report.failed[k] = combined_report.failed.get(k, 0) + v
+                            combined_report.failed[k] = (
+                                combined_report.failed.get(k, 0) + v
+                            )
                     except Exception as exc:
-                        logger.error("Failed to build embeddings for source '%s': %s", src, exc, exc_info=True)
+                        logger.error(
+                            "Failed to build embeddings for source '%s': %s",
+                            src,
+                            exc,
+                            exc_info=True,
+                        )
                         combined_report.add_failed(f"source_fatal:{src}", src)
             else:
                 combined_report = await build_embeddings(
-                    db, storage, rewriter, generator, source,
-                    batch_size, args.rebuild, args.dry_run,
-                    filter_pattern, job_id,
+                    db,
+                    storage,
+                    rewriter,
+                    generator,
+                    source,
+                    batch_size,
+                    args.rebuild,
+                    args.dry_run,
+                    filter_pattern,
+                    job_id,
                 )
         finally:
             combined_report.duration_secs = time.monotonic() - start_time

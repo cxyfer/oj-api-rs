@@ -81,7 +81,9 @@ class SettingsDatabaseManager:
             }
         return None
 
-    def set_server_settings(self, server_id, channel_id, role_id=None, post_time="00:00", timezone="UTC"):
+    def set_server_settings(
+        self, server_id, channel_id, role_id=None, post_time="00:00", timezone="UTC"
+    ):
         """Set or update server settings
 
         Args:
@@ -117,7 +119,9 @@ class SettingsDatabaseManager:
             logger.error(f"Error setting server settings: {e}")
             return False
         finally:
-            logger.debug(f"Server {server_id} settings updated: ({channel_id}, {role_id}, {post_time}, {timezone})")
+            logger.debug(
+                f"Server {server_id} settings updated: ({channel_id}, {role_id}, {post_time}, {timezone})"
+            )
             conn.close()
 
     def set_channel(self, server_id, channel_id):
@@ -214,7 +218,9 @@ class SettingsDatabaseManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("SELECT server_id, channel_id, role_id, post_time, timezone FROM server_settings")
+        cursor.execute(
+            "SELECT server_id, channel_id, role_id, post_time, timezone FROM server_settings"
+        )
         results = cursor.fetchall()
         conn.close()
 
@@ -245,7 +251,9 @@ class SettingsDatabaseManager:
         cursor = conn.cursor()
 
         try:
-            cursor.execute("DELETE FROM server_settings WHERE server_id = ?", (server_id,))
+            cursor.execute(
+                "DELETE FROM server_settings WHERE server_id = ?", (server_id,)
+            )
             conn.commit()
             return cursor.rowcount > 0
         except Exception as e:
@@ -400,7 +408,9 @@ class ProblemsDatabaseManager:
             if existing_problem:
                 # Merge update: if new data field is empty, keep old data
                 for key in existing_problem:
-                    if key != "id" and (key not in problem or problem[key] is None or problem[key] == ""):
+                    if key != "id" and (
+                        key not in problem or problem[key] is None or problem[key] == ""
+                    ):
                         problem[key] = existing_problem[key]
 
         conn = sqlite3.connect(self.db_path)
@@ -470,7 +480,9 @@ class ProblemsDatabaseManager:
             problem = self._row_to_dict(row)
             problem["tags"] = json.loads(problem["tags"]) if problem["tags"] else []
             problem["similar_questions"] = (
-                json.loads(problem["similar_questions"]) if problem["similar_questions"] else []
+                json.loads(problem["similar_questions"])
+                if problem["similar_questions"]
+                else []
             )
             return problem
         return None
@@ -494,7 +506,9 @@ class ProblemsDatabaseManager:
         conn.close()
         return [(str(row[0]), row[1]) for row in rows] if rows else []
 
-    def batch_update_content(self, updates: list[tuple[str, str, str]], batch_size: int = 100) -> tuple[int, bool]:
+    def batch_update_content(
+        self, updates: list[tuple[str, str, str]], batch_size: int = 100
+    ) -> tuple[int, bool]:
         """
         Batch update problem content.
 
@@ -726,7 +740,9 @@ class LLMTranslateDatabaseManager:
         self.expire_seconds = expire_seconds
         Path(os.path.dirname(db_path)).mkdir(parents=True, exist_ok=True)
         self._init_db()
-        logger.info(f"LLMTranslate DB manager initialized with database at {db_path}, expire_seconds={expire_seconds}")
+        logger.info(
+            f"LLMTranslate DB manager initialized with database at {db_path}, expire_seconds={expire_seconds}"
+        )
 
     def _init_db(self):
         """建立 llm_translate_results 資料表"""
@@ -798,7 +814,9 @@ class LLMTranslateDatabaseManager:
         )
         conn.commit()
         conn.close()
-        logger.info(f"Saved LLM translation for problem_id={problem_id}, domain={domain}, model={model_name}")
+        logger.info(
+            f"Saved LLM translation for problem_id={problem_id}, domain={domain}, model={model_name}"
+        )
 
 
 class LLMInspireDatabaseManager:
@@ -811,7 +829,9 @@ class LLMInspireDatabaseManager:
         self.expire_seconds = expire_seconds
         Path(os.path.dirname(db_path)).mkdir(parents=True, exist_ok=True)
         self._init_db()
-        logger.info(f"LLMInspire DB manager initialized with database at {db_path}, expire_seconds={expire_seconds}")
+        logger.info(
+            f"LLMInspire DB manager initialized with database at {db_path}, expire_seconds={expire_seconds}"
+        )
 
     def _init_db(self):
         """建立 llm_inspire_results 資料表"""
@@ -918,7 +938,9 @@ class LLMInspireDatabaseManager:
         )
         conn.commit()
         conn.close()
-        logger.info(f"Saved LLM inspire for problem_id={problem_id}, domain={domain}, model={model_name}")
+        logger.info(
+            f"Saved LLM inspire for problem_id={problem_id}, domain={domain}, model={model_name}"
+        )
 
     def _row_to_dict(self, row):
         keys = [
@@ -1022,7 +1044,9 @@ class DailyChallengeDatabaseManager:
                 ),
             )
             conn.commit()
-            logger.info(f"Inserted/updated daily challenge for {daily.get('date')} {daily.get('domain')}")
+            logger.info(
+                f"Inserted/updated daily challenge for {daily.get('date')} {daily.get('domain')}"
+            )
             return True
         except Exception as e:
             logger.error(f"Error inserting/updating daily challenge: {e}")
@@ -1062,7 +1086,11 @@ class DailyChallengeDatabaseManager:
             ]
             result = dict(zip(keys, row))
             result["tags"] = json.loads(result["tags"]) if result["tags"] else []
-            result["similar_questions"] = json.loads(result["similar_questions"]) if result["similar_questions"] else []
+            result["similar_questions"] = (
+                json.loads(result["similar_questions"])
+                if result["similar_questions"]
+                else []
+            )
             return result
         return None
 
@@ -1070,7 +1098,11 @@ class DailyChallengeDatabaseManager:
 if __name__ == "__main__":
     # Example usage
     db_manager = SettingsDatabaseManager()
-    db_manager.set_server_settings(123456789, 987654321, role_id=111222333, post_time="12:00", timezone="UTC")
+    db_manager.set_server_settings(
+        123456789, 987654321, role_id=111222333, post_time="12:00", timezone="UTC"
+    )
     settings = db_manager.get_server_settings(123456789)
     logger.debug(settings)
-    db_manager.delete_server_settings(123456789)  # Delete settings for server ID 123456789
+    db_manager.delete_server_settings(
+        123456789
+    )  # Delete settings for server ID 123456789
