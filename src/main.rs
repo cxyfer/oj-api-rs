@@ -17,6 +17,7 @@ mod db;
 mod detect;
 mod health;
 mod models;
+mod utils;
 
 pub struct AppState {
     pub ro_pool: db::DbPool,
@@ -26,6 +27,8 @@ pub struct AppState {
     pub crawler_history: tokio::sync::Mutex<VecDeque<models::CrawlerJob>>,
     pub embedding_lock: tokio::sync::Mutex<Option<models::EmbeddingJob>>,
     pub embedding_history: tokio::sync::Mutex<VecDeque<models::EmbeddingJob>>,
+    pub active_crawler_pid: tokio::sync::Mutex<Option<u32>>,
+    pub active_embedding_pid: tokio::sync::Mutex<Option<u32>>,
     pub daily_fallback: tokio::sync::Mutex<HashMap<String, models::DailyFallbackEntry>>,
     pub embed_semaphore: Semaphore,
     pub token_auth_enabled: Arc<AtomicBool>,
@@ -93,6 +96,8 @@ async fn main() {
         crawler_history: tokio::sync::Mutex::new(VecDeque::new()),
         embedding_lock: tokio::sync::Mutex::new(None),
         embedding_history: tokio::sync::Mutex::new(VecDeque::new()),
+        active_crawler_pid: tokio::sync::Mutex::new(None),
+        active_embedding_pid: tokio::sync::Mutex::new(None),
         daily_fallback: tokio::sync::Mutex::new(HashMap::new()),
         embed_semaphore: Semaphore::new(config.embedding.concurrency as usize),
         token_auth_enabled: token_auth_flag.clone(),

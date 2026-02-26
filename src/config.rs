@@ -58,6 +58,7 @@ impl Default for CrawlerConfig {
 #[serde(default)]
 pub struct EmbeddingConfig {
     pub timeout_secs: u64,
+    pub batch_timeout_secs: u64,
     pub over_fetch_factor: u32,
     pub concurrency: u32,
 }
@@ -66,6 +67,7 @@ impl Default for EmbeddingConfig {
     fn default() -> Self {
         Self {
             timeout_secs: 30,
+            batch_timeout_secs: 600,
             over_fetch_factor: 4,
             concurrency: 4,
         }

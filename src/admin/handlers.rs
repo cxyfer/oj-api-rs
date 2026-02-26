@@ -342,7 +342,7 @@ pub async fn trigger_crawler(
             cmd.env("CONFIG_PATH", cp);
         }
 
-        let child = match cmd.spawn() {
+        let child = match crate::utils::spawn_with_pgid(cmd) {
             Ok(c) => c,
             Err(e) => {
                 tracing::error!("failed to spawn crawler: {}", e);
@@ -360,55 +360,72 @@ pub async fn trigger_crawler(
             }
         };
 
-        let result = tokio::time::timeout(
+        let pid = child.id().expect("child should have a pid");
+        *state_clone.active_crawler_pid.lock().await = Some(pid);
+
+        let mut wait_task = tokio::spawn(async move { child.wait_with_output().await });
+        let timed = tokio::time::timeout(
             std::time::Duration::from_secs(timeout_secs),
-            child.wait_with_output(),
+            &mut wait_task,
         )
         .await;
 
         let mut lock = state_clone.crawler_lock.lock().await;
-        if let Some(ref mut job) = *lock {
-            job.finished_at = Some(chrono::Utc::now().to_rfc3339());
-            match result {
-                Ok(Ok(output)) => {
-                    // Write log files
-                    if let Err(e) = tokio::fs::create_dir_all("scripts/logs").await {
-                        tracing::warn!("failed to create scripts/logs: {}", e);
-                    }
-                    if !output.stdout.is_empty() {
-                        if let Err(e) = tokio::fs::write(
-                            format!("scripts/logs/{}.stdout.log", job_id_clone),
-                            &output.stdout,
-                        )
-                        .await
-                        {
-                            tracing::warn!("failed to write stdout log: {}", e);
-                        }
-                    }
-                    if !output.stderr.is_empty() {
-                        if let Err(e) = tokio::fs::write(
-                            format!("scripts/logs/{}.stderr.log", job_id_clone),
-                            &output.stderr,
-                        )
-                        .await
-                        {
-                            tracing::warn!("failed to write stderr log: {}", e);
-                        }
-                    }
+        // Clear pid under job lock to close the cancel race window
+        *state_clone.active_crawler_pid.lock().await = None;
 
-                    if output.status.success() {
-                        job.status = CrawlerStatus::Completed;
-                    } else {
+        if let Some(ref mut job) = *lock {
+            // Only update if not already set to Cancelled
+            if job.status == CrawlerStatus::Running {
+                job.finished_at = Some(chrono::Utc::now().to_rfc3339());
+                match timed {
+                    Ok(Ok(Ok(output))) => {
+                        // Write log files
+                        if let Err(e) = tokio::fs::create_dir_all("scripts/logs").await {
+                            tracing::warn!("failed to create scripts/logs: {}", e);
+                        }
+                        if !output.stdout.is_empty() {
+                            if let Err(e) = tokio::fs::write(
+                                format!("scripts/logs/{}.stdout.log", job_id_clone),
+                                &output.stdout,
+                            )
+                            .await
+                            {
+                                tracing::warn!("failed to write stdout log: {}", e);
+                            }
+                        }
+                        if !output.stderr.is_empty() {
+                            if let Err(e) = tokio::fs::write(
+                                format!("scripts/logs/{}.stderr.log", job_id_clone),
+                                &output.stderr,
+                            )
+                            .await
+                            {
+                                tracing::warn!("failed to write stderr log: {}", e);
+                            }
+                        }
+
+                        if output.status.success() {
+                            job.status = CrawlerStatus::Completed;
+                        } else {
+                            job.status = CrawlerStatus::Failed;
+                        }
+                        job.set_output(output.stdout, output.stderr);
+                    }
+                    Ok(Ok(Err(e))) => {
+                        tracing::error!("crawler error: {}", e);
                         job.status = CrawlerStatus::Failed;
                     }
-                    job.set_output(output.stdout, output.stderr);
-                }
-                Ok(Err(e)) => {
-                    tracing::error!("crawler error: {}", e);
-                    job.status = CrawlerStatus::Failed;
-                }
-                Err(_) => {
-                    job.status = CrawlerStatus::TimedOut;
+                    Ok(Err(e)) => {
+                        tracing::error!("crawler join error: {}", e);
+                        job.status = CrawlerStatus::Failed;
+                    }
+                    Err(_) => {
+                        tracing::warn!("crawler job {} timed out", job_id_clone);
+                        crate::utils::kill_pgid(pid);
+                        let _ = wait_task.await;
+                        job.status = CrawlerStatus::TimedOut;
+                    }
                 }
             }
             let mut history = state_clone.crawler_history.lock().await;
@@ -424,6 +441,24 @@ pub async fn trigger_crawler(
         Json(serde_json::json!({ "job_id": job_id })),
     )
         .into_response()
+}
+
+pub async fn cancel_crawler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let mut lock = state.crawler_lock.lock().await;
+    if let Some(ref mut job) = *lock {
+        if job.status == CrawlerStatus::Running {
+            let mut pid_lock = state.active_crawler_pid.lock().await;
+            if let Some(pid) = pid_lock.take() {
+                crate::utils::kill_pgid(pid);
+            }
+            job.status = CrawlerStatus::Cancelled;
+            job.finished_at = Some(chrono::Utc::now().to_rfc3339());
+
+            return StatusCode::OK.into_response();
+        }
+    }
+
+    ProblemDetail::conflict("no running crawler to cancel").into_response()
 }
 
 pub async fn crawler_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
@@ -693,6 +728,7 @@ pub async fn trigger_embedding(
 
     let state_clone = state.clone();
     let job_id_clone = job_id.clone();
+    let timeout_secs = state.config.embedding.batch_timeout_secs;
 
     tokio::spawn(async move {
         let mut cmd = tokio::process::Command::new("uv");
@@ -707,7 +743,7 @@ pub async fn trigger_embedding(
             cmd.env("CONFIG_PATH", cp);
         }
 
-        let child = match cmd.spawn() {
+        let child = match crate::utils::spawn_with_pgid(cmd) {
             Ok(c) => c,
             Err(e) => {
                 tracing::error!("failed to spawn embedding job: {}", e);
@@ -725,53 +761,81 @@ pub async fn trigger_embedding(
             }
         };
 
-        let result = child.wait_with_output().await;
+        let pid = child.id().expect("child should have a pid");
+        *state_clone.active_embedding_pid.lock().await = Some(pid);
+
+        let mut wait_task = tokio::spawn(async move { child.wait_with_output().await });
+        let timed = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_secs),
+            &mut wait_task,
+        )
+        .await;
 
         let mut lock = state_clone.embedding_lock.lock().await;
-        if let Some(ref mut job) = *lock {
-            job.finished_at = Some(chrono::Utc::now().to_rfc3339());
-            match result {
-                Ok(output) => {
-                    if let Err(e) = tokio::fs::create_dir_all("scripts/logs").await {
-                        tracing::warn!("failed to create scripts/logs: {}", e);
-                    }
-                    if !output.stdout.is_empty() {
-                        if let Err(e) = tokio::fs::write(
-                            format!("scripts/logs/{}.stdout.log", job_id_clone),
-                            &output.stdout,
-                        )
-                        .await
-                        {
-                            tracing::warn!("failed to write stdout log: {}", e);
-                        }
-                    }
-                    if !output.stderr.is_empty() {
-                        if let Err(e) = tokio::fs::write(
-                            format!("scripts/logs/{}.stderr.log", job_id_clone),
-                            &output.stderr,
-                        )
-                        .await
-                        {
-                            tracing::warn!("failed to write stderr log: {}", e);
-                        }
-                    }
+        // Clear pid under job lock to close the cancel race window
+        *state_clone.active_embedding_pid.lock().await = None;
 
-                    if output.status.success() {
-                        job.status = CrawlerStatus::Completed;
-                    } else {
+        if let Some(ref mut job) = *lock {
+            // Only update if not already set to Cancelled
+            if job.status == CrawlerStatus::Running {
+                job.finished_at = Some(chrono::Utc::now().to_rfc3339());
+                match timed {
+                    Ok(Ok(Ok(output))) => {
+                        if let Err(e) = tokio::fs::create_dir_all("scripts/logs").await {
+                            tracing::warn!("failed to create scripts/logs: {}", e);
+                        }
+                        if !output.stdout.is_empty() {
+                            if let Err(e) = tokio::fs::write(
+                                format!("scripts/logs/{}.stdout.log", job_id_clone),
+                                &output.stdout,
+                            )
+                            .await
+                            {
+                                tracing::warn!("failed to write stdout log: {}", e);
+                            }
+                        }
+                        if !output.stderr.is_empty() {
+                            if let Err(e) = tokio::fs::write(
+                                format!("scripts/logs/{}.stderr.log", job_id_clone),
+                                &output.stderr,
+                            )
+                            .await
+                            {
+                                tracing::warn!("failed to write stderr log: {}", e);
+                            }
+                        }
+
+                        if output.status.success() {
+                            job.status = CrawlerStatus::Completed;
+                        } else {
+                            job.status = CrawlerStatus::Failed;
+                        }
+                        job.set_output(output.stdout, output.stderr);
+                    }
+                    Ok(Ok(Err(e))) => {
+                        tracing::error!("embedding job error: {}", e);
                         job.status = CrawlerStatus::Failed;
                     }
-                    job.set_output(output.stdout, output.stderr);
-                }
-                Err(e) => {
-                    tracing::error!("embedding job error: {}", e);
-                    job.status = CrawlerStatus::Failed;
+                    Ok(Err(e)) => {
+                        tracing::error!("embedding job join error: {}", e);
+                        job.status = CrawlerStatus::Failed;
+                    }
+                    Err(_) => {
+                        tracing::warn!("embedding job {} timed out", job_id_clone);
+                        crate::utils::kill_pgid(pid);
+                        let _ = wait_task.await;
+                        job.status = CrawlerStatus::TimedOut;
+                    }
                 }
             }
 
             // Ensure progress JSON reflects final status (Python may not have written it)
             let final_phase = if job.status == CrawlerStatus::Completed {
                 "completed"
+            } else if job.status == CrawlerStatus::Cancelled {
+                "cancelled"
+            } else if job.status == CrawlerStatus::TimedOut {
+                "timed_out"
             } else {
                 "failed"
             };
@@ -802,6 +866,24 @@ pub async fn trigger_embedding(
         Json(serde_json::json!({ "job_id": job_id })),
     )
         .into_response()
+}
+
+pub async fn cancel_embedding(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let mut lock = state.embedding_lock.lock().await;
+    if let Some(ref mut job) = *lock {
+        if job.status == CrawlerStatus::Running {
+            let mut pid_lock = state.active_embedding_pid.lock().await;
+            if let Some(pid) = pid_lock.take() {
+                crate::utils::kill_pgid(pid);
+            }
+            job.status = CrawlerStatus::Cancelled;
+            job.finished_at = Some(chrono::Utc::now().to_rfc3339());
+
+            return StatusCode::OK.into_response();
+        }
+    }
+
+    ProblemDetail::conflict("no running embedding job to cancel").into_response()
 }
 
 pub async fn embedding_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
