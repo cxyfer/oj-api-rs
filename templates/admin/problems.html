@@ -21,9 +21,6 @@
         <div class="filter-field" id="difficulty-filter-field">
             <select id="problem-difficulty" class="filter-select" aria-label="Filter by difficulty">
                 <option value="" data-i18n="problems.difficulty_all">All Difficulties</option>
-                <option value="easy" data-i18n="problems.difficulty.easy">Easy</option>
-                <option value="medium" data-i18n="problems.difficulty.medium">Medium</option>
-                <option value="hard" data-i18n="problems.difficulty.hard">Hard</option>
             </select>
         </div>
         <div class="filter-field" id="rating-range-field" style="display:none">
@@ -68,13 +65,12 @@
                 <th data-i18n="problems.table.title">Title</th>
                 <th class="col-tags" data-i18n="problems.detail.tags">Tags</th>
                 <th class="col-difficulty" data-sort="difficulty" data-i18n="problems.table.difficulty">Difficulty</th>
-                <th class="col-rating" data-sort="rating" data-i18n="problems.table.rating">Rating</th>
                 <th class="col-ac-rate" data-sort="ac_rate" data-i18n="problems.table.ac_rate">AC Rate</th>
                 <th data-i18n="common.actions">Actions</th>
             </tr>
         </thead>
         <tbody>
-            <tr><td colspan="8" style="text-align:center" data-i18n="common.loading">Loading...</td></tr>
+            <tr><td colspan="7" style="text-align:center" data-i18n="common.loading">Loading...</td></tr>
         </tbody>
     </table>
 </div>
