@@ -909,7 +909,7 @@
             currentSource = source || currentSource;
             currentPage = page || 1;
             var tbody = problemsTable.querySelector('tbody');
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center">' + i18n.t('common.loading') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center">' + i18n.t('common.loading') + '</td></tr>';
             setSourceBtnsDisabled(true);
 
             var url = '/admin/api/problems/' + currentSource + '?page=' + currentPage + '&per_page=' + currentPerPage;
@@ -937,7 +937,7 @@
                 })
                 .catch(function(err) {
                     console.error('failed to load problems', err);
-                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--color-danger)">' + i18n.t('messages.failed_load_problems') + '</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--color-danger)">' + i18n.t('messages.failed_load_problems') + '</td></tr>';
                     toast(i18n.t('messages.failed_load_problems'), 'error');
                     setSourceBtnsDisabled(false);
                 });
@@ -997,6 +997,51 @@
                     else if (currentSortOrder === 'desc') th.classList.add('sort-desc');
                 }
             });
+        }
+
+        var LUOGU_DIFFICULTY_TIERS = [
+            '暂无评定', '入门', '普及−', '普及/提高−',
+            '普及+/提高', '提高+/省选−', '省选/NOI−', 'NOI/NOI+/CTSC'
+        ];
+
+        function renderDifficultyBadge(source, difficulty) {
+            if (!difficulty) return '';
+            if (source === 'luogu') {
+                var tier = LUOGU_DIFFICULTY_TIERS.indexOf(difficulty);
+                var badgeClass = tier >= 0 ? 'badge badge-luogu-' + tier : 'badge';
+                var i18nKey = tier >= 0 ? 'problems.difficulty.luogu_' + tier : null;
+                var label = i18nKey ? i18n.t(i18nKey) : difficulty;
+                if (i18nKey && label === i18nKey) label = difficulty;
+                return '<span class="' + badgeClass + '">' + label + '</span>';
+            }
+            var lower = difficulty.toLowerCase();
+            var i18nKey = 'problems.difficulty.' + lower;
+            var label = i18n.t(i18nKey);
+            if (label === i18nKey) label = difficulty;
+            return '<span class="badge badge-' + lower + '">' + label + '</span>';
+        }
+
+        function syncDifficultyFilterOptions(source) {
+            var diffSelect = document.getElementById('problem-difficulty');
+            if (!diffSelect) return;
+            var current = diffSelect.value;
+            while (diffSelect.options.length > 1) diffSelect.remove(1);
+            if (source === 'leetcode') {
+                [['easy', 'problems.difficulty.easy'], ['medium', 'problems.difficulty.medium'], ['hard', 'problems.difficulty.hard']].forEach(function(pair) {
+                    var opt = document.createElement('option');
+                    opt.value = pair[0];
+                    opt.textContent = i18n.t(pair[1]);
+                    diffSelect.appendChild(opt);
+                });
+            } else if (source === 'luogu') {
+                LUOGU_DIFFICULTY_TIERS.forEach(function(val, idx) {
+                    var opt = document.createElement('option');
+                    opt.value = val;
+                    opt.textContent = i18n.t('problems.difficulty.luogu_' + idx);
+                    diffSelect.appendChild(opt);
+                });
+            }
+            diffSelect.value = current;
         }
 
         // Tags multi-select dropdown
@@ -1084,12 +1129,13 @@
             var tagsSelect = document.getElementById('tags-select');
             var tagModeContainer = document.querySelector('.tag-mode-container');
             var showRating = source === 'leetcode' || source === 'codeforces';
-            if (diffField) diffField.style.display = source === 'leetcode' ? '' : 'none';
+            if (diffField) diffField.style.display = (source === 'leetcode' || source === 'luogu') ? '' : 'none';
             if (ratingField) ratingField.style.display = showRating ? '' : 'none';
             if (tagsSelect) tagsSelect.parentElement.style.display = source === 'atcoder' ? 'none' : '';
             if (tagModeContainer) tagModeContainer.style.display = source === 'atcoder' ? 'none' : '';
             problemsTable.classList.remove('source-leetcode', 'source-atcoder', 'source-codeforces');
             problemsTable.classList.add('source-' + source);
+            syncDifficultyFilterOptions(source);
         }
 
         // Sortable headers
@@ -1119,20 +1165,12 @@
             var tbody = problemsTable.querySelector('tbody');
             tbody.innerHTML = '';
             if (!problems.length) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--color-muted)">' + i18n.t('problems.no_results') + '</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--color-muted)">' + i18n.t('problems.no_results') + '</td></tr>';
                 return;
             }
             problems.forEach(function(p) {
                 var tr = document.createElement('tr');
-                var difficultyBadge = '';
-                if (p.difficulty) {
-                    var lower = p.difficulty.toLowerCase();
-                    var badgeClass = 'badge-' + lower;
-                    var i18nKey = 'problems.difficulty.' + lower;
-                    var label = i18n.t(i18nKey);
-                    if (label === i18nKey) label = p.difficulty;
-                    difficultyBadge = '<span class="badge ' + badgeClass + '">' + label + '</span>';
-                }
+                var difficultyBadge = renderDifficultyBadge(p.source, p.difficulty);
 
                 var title = p.title || '-';
                 if (i18n.getLanguage() !== 'en' && p.title_cn) {
@@ -1146,18 +1184,12 @@
                     }).join(' ');
                 }
 
-                var ratingDisplay = '-';
-                if (p.rating != null) {
-                    ratingDisplay = currentSource === 'leetcode' ? p.rating.toFixed(2) : String(p.rating);
-                }
-
                 tr.innerHTML =
                     '<td>' + esc(p.source) + '</td>' +
                     '<td>' + esc(p.id) + '</td>' +
                     '<td>' + esc(title) + '</td>' +
                     '<td class="col-tags">' + tagsHtml + '</td>' +
                     '<td class="col-difficulty">' + difficultyBadge + '</td>' +
-                    '<td class="col-rating">' + ratingDisplay + '</td>' +
                     '<td class="col-ac-rate">' + (p.ac_rate ? p.ac_rate.toFixed(1) + '%' : '-') + '</td>' +
                     '<td>' +
                     '<button class="btn btn-sm btn-primary btn-view-detail" data-source="' + esc(p.source) + '" data-id="' + esc(p.id) + '" style="margin-right:0.4rem">' + i18n.t('common.detail') + '</button>' +
@@ -1279,20 +1311,14 @@
 
                     // Meta: source/id + difficulty badge
                     var metaHtml = '<span class="detail-source-id">' + esc(p.source) + ' ' + esc(p.id) + '</span>';
-                    if (p.difficulty) {
-                        var lower = p.difficulty.toLowerCase();
-                        var dKey = 'problems.difficulty.' + lower;
-                        var dLabel = i18n.t(dKey);
-                        if (dLabel === dKey) dLabel = p.difficulty;
-                        metaHtml += ' <span class="badge badge-' + lower + '">' + dLabel + '</span>';
-                    }
+                    if (p.difficulty) metaHtml += ' ' + renderDifficultyBadge(p.source, p.difficulty);
                     if (p.paid_only) metaHtml += ' <span class="badge badge-paid">' + esc(i18n.t('problems.detail.paid_only')) + '</span>';
                     metaEl.innerHTML = metaHtml;
 
                     // Fields
                     var rows = '';
                     if (p.slug) rows += '<div class="detail-row"><dt>Slug</dt><dd>' + esc(p.slug) + '</dd></div>';
-                    if (p.rating) rows += '<div class="detail-row"><dt>' + esc(i18n.t('problems.table.rating')) + '</dt><dd>' + p.rating + '</dd></div>';
+                    if (p.rating && p.source !== 'luogu') rows += '<div class="detail-row"><dt>' + esc(i18n.t('problems.table.rating')) + '</dt><dd>' + p.rating + '</dd></div>';
                     if (p.ac_rate != null) rows += '<div class="detail-row"><dt>' + esc(i18n.t('problems.table.ac_rate')) + '</dt><dd>' + p.ac_rate.toFixed(1) + '%</dd></div>';
                     if (p.contest) rows += '<div class="detail-row"><dt>' + esc(i18n.t('problems.detail.contest')) + '</dt><dd>' + esc(p.contest) + (p.problem_index ? ' / ' + esc(p.problem_index) : '') + '</dd></div>';
                     if (p.category) rows += '<div class="detail-row"><dt>' + esc(i18n.t('problems.detail.category')) + '</dt><dd>' + esc(p.category) + '</dd></div>';
@@ -1311,7 +1337,13 @@
                     // Content
                     var content = p.content || '';
                     if (i18n.getLanguage() !== 'en' && p.content_cn) content = p.content_cn;
-                    contentEl.innerHTML = content;
+                    if (p.source === 'leetcode') {
+                        contentEl.classList.remove('detail-content-plain');
+                        contentEl.innerHTML = content;
+                    } else {
+                        contentEl.classList.add('detail-content-plain');
+                        contentEl.textContent = content;
+                    }
 
                     // Link button
                     if (p.link) {
@@ -1417,6 +1449,7 @@
 
         // Restore UI state from URL
         if (searchInput) searchInput.value = currentSearch;
+        syncDifficultyFilterOptions(currentSource);
         if (diffSelect) diffSelect.value = currentDifficulty;
         if (ppSelect) ppSelect.value = String(currentPerPage);
         if (tagModeBtn) tagModeBtn.textContent = currentTagMode === 'any' ? 'OR' : 'AND';
@@ -1444,6 +1477,9 @@
         // Language change listener
         document.addEventListener('languageChanged', function() {
             updateTagsBtnText();
+            syncDifficultyFilterOptions(currentSource);
+            var diffSelect = document.getElementById('problem-difficulty');
+            if (diffSelect) diffSelect.value = currentDifficulty;
             loadProblems(currentSource, currentPage);
         });
     }

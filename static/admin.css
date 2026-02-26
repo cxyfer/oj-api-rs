@@ -81,6 +81,14 @@ tr:hover { background: var(--bg-hover); }
 .badge-easy { background: rgba(0,200,83,0.15); color: var(--color-success); }
 .badge-medium { background: rgba(255,171,0,0.15); color: #ffab00; }
 .badge-hard { background: rgba(255,23,68,0.15); color: var(--color-danger); }
+.badge-luogu-0 { background: rgba(191,191,191,0.15); color: #bfbfbf; }
+.badge-luogu-1 { background: rgba(254,76,97,0.15); color: #fe4c61; }
+.badge-luogu-2 { background: rgba(243,156,17,0.15); color: #f39c11; }
+.badge-luogu-3 { background: rgba(255,193,22,0.15); color: #ffc116; }
+.badge-luogu-4 { background: rgba(82,196,26,0.15); color: #52c41a; }
+.badge-luogu-5 { background: rgba(52,152,219,0.15); color: #3498db; }
+.badge-luogu-6 { background: rgba(157,61,207,0.15); color: #9d3dcf; }
+.badge-luogu-7 { background: #0e1d69; color: #ffffff; }
 .badge-active { background: rgba(0,200,83,0.15); color: var(--color-success); }
 .badge-revoked { background: rgba(255,255,255,0.08); color: var(--color-muted); }
 
@@ -404,6 +412,7 @@ input:focus { border-color: var(--color-primary); }
 .detail-row dd { margin: 0; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
 .detail-tag { display: inline-block; padding: 0.1rem 0.45rem; background: rgba(255,255,255,0.08); border-radius: 3px; font-size: 0.75rem; }
 .detail-content { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--color-border); font-size: 0.85rem; line-height: 1.7; overflow-x: auto; }
+.detail-content-plain { white-space: pre-wrap; word-break: break-word; }
 .detail-content:empty { display: none; }
 .detail-content pre { background: var(--bg-body); padding: 0.75rem; border-radius: var(--radius); overflow-x: auto; font-size: 0.8rem; }
 .detail-content code { font-family: monospace; font-size: 0.85em; }
@@ -461,6 +470,7 @@ input:focus { border-color: var(--color-primary); }
     transition: border-color var(--transition);
 }
 .filter-select:focus { border-color: var(--color-primary); background-color: rgba(255,255,255,0.06); }
+.filter-select option { background: var(--bg-surface); color: var(--color-text); }
 
 .multi-select { position: relative; }
 .multi-select-btn {
@@ -558,7 +568,6 @@ th.sort-desc::after { content: '↓'; opacity: 1; color: var(--color-primary); }
 #problems-table.source-atcoder .col-difficulty,
 #problems-table.source-atcoder .col-ac-rate,
 #problems-table.source-atcoder .col-tags,
-#problems-table.source-atcoder .col-rating,
 #problems-table.source-codeforces .col-difficulty,
 #problems-table.source-codeforces .col-ac-rate { display: none; }
 

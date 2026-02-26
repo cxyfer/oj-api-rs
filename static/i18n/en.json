@@ -32,7 +32,15 @@
     "difficulty": {
       "easy": "Easy",
       "medium": "Medium",
-      "hard": "Hard"
+      "hard": "Hard",
+      "luogu_0": "Unrated",
+      "luogu_1": "Beginner",
+      "luogu_2": "Elementary",
+      "luogu_3": "Elementary+",
+      "luogu_4": "Intermediate",
+      "luogu_5": "Advanced",
+      "luogu_6": "Expert",
+      "luogu_7": "Master"
     },
     "sources": {
       "leetcode": "LeetCode",

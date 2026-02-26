@@ -32,7 +32,15 @@
     "difficulty": {
       "easy": "简单",
       "medium": "中等",
-      "hard": "困难"
+      "hard": "困难",
+      "luogu_0": "暂无评定",
+      "luogu_1": "入门",
+      "luogu_2": "普及−",
+      "luogu_3": "普及/提高−",
+      "luogu_4": "普及+/提高",
+      "luogu_5": "提高+/省选−",
+      "luogu_6": "省选/NOI−",
+      "luogu_7": "NOI/NOI+/CTSC"
     },
     "sources": {
       "leetcode": "LeetCode",
