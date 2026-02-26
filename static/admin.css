@@ -328,11 +328,13 @@ input:focus { border-color: var(--color-primary); }
 .status-header.completed { color: var(--color-success); }
 .status-header.failed { color: var(--color-danger); }
 .status-header.timed_out { color: #ffab00; }
+.status-header.cancelled { color: var(--color-muted); }
 .status-details { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; font-size: 0.85rem; color: var(--color-muted); }
 .badge-crawler-running { background: rgba(68,138,255,0.15); color: #448aff; }
 .badge-crawler-completed { background: rgba(0,200,83,0.15); color: var(--color-success); }
 .badge-crawler-failed { background: rgba(255,23,68,0.15); color: var(--color-danger); }
 .badge-crawler-timed_out { background: rgba(255,171,0,0.15); color: #ffab00; }
+.badge-crawler-cancelled { background: rgba(255,255,255,0.15); color: var(--color-muted); }
 
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 .status-header.running { animation: pulse 2s ease-in-out infinite; }
