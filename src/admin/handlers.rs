@@ -364,11 +364,9 @@ pub async fn trigger_crawler(
         *state_clone.active_crawler_pid.lock().await = Some(pid);
 
         let mut wait_task = tokio::spawn(async move { child.wait_with_output().await });
-        let timed = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_secs),
-            &mut wait_task,
-        )
-        .await;
+        let timed =
+            tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), &mut wait_task)
+                .await;
 
         let mut lock = state_clone.crawler_lock.lock().await;
         // Clear pid under job lock to close the cancel race window
@@ -765,11 +763,9 @@ pub async fn trigger_embedding(
         *state_clone.active_embedding_pid.lock().await = Some(pid);
 
         let mut wait_task = tokio::spawn(async move { child.wait_with_output().await });
-        let timed = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_secs),
-            &mut wait_task,
-        )
-        .await;
+        let timed =
+            tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), &mut wait_task)
+                .await;
 
         let mut lock = state_clone.embedding_lock.lock().await;
         // Clear pid under job lock to close the cancel race window

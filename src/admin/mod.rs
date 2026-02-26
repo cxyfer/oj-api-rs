@@ -48,10 +48,7 @@ pub fn admin_router() -> Router<Arc<AppState>> {
             "/admin/api/crawlers/trigger",
             post(handlers::trigger_crawler),
         )
-        .route(
-            "/admin/api/crawlers/cancel",
-            post(handlers::cancel_crawler),
-        )
+        .route("/admin/api/crawlers/cancel", post(handlers::cancel_crawler))
         .route("/admin/api/crawlers/status", get(handlers::crawler_status))
         .route(
             "/admin/api/crawlers/{job_id}/output",

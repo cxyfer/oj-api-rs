@@ -50,7 +50,10 @@ pub struct CrawlerConfig {
 
 impl Default for CrawlerConfig {
     fn default() -> Self {
-        Self { timeout_secs: 300, per_source_timeout: HashMap::new() }
+        Self {
+            timeout_secs: 300,
+            per_source_timeout: HashMap::new(),
+        }
     }
 }
 

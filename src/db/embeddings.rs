@@ -66,7 +66,7 @@ pub fn get_embedding(pool: &DbPool, source: &str, id: &str) -> Option<Vec<f32>> 
         .ok()?;
 
     // Try binary LE f32 parse first
-    if raw.len() % 4 == 0 {
+    if raw.len().is_multiple_of(4) {
         let floats: Vec<f32> = raw
             .chunks_exact(4)
             .map(|chunk| f32::from_le_bytes(chunk.try_into().unwrap()))

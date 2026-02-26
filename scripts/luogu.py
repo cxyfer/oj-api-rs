@@ -113,7 +113,9 @@ class LuoguClient(BaseCrawler):
                     )
                     logger.warning(
                         "HTTP %s from %s. Backing off %.1fs",
-                        response.status_code, url, backoff,
+                        response.status_code,
+                        url,
+                        backoff,
                     )
                     await asyncio.sleep(backoff)
                     continue
@@ -139,16 +141,21 @@ class LuoguClient(BaseCrawler):
                 )
                 logger.warning(
                     "Rate limited content detected (%s). Backing off %.1fs",
-                    url, backoff,
+                    url,
+                    backoff,
                 )
                 await asyncio.sleep(backoff)
                 continue
             return text
         return None
+
     def _extract_lentille_context(self, html: str) -> Optional[dict]:
         soup = BeautifulSoup(html, "html.parser")
         for script in soup.find_all("script", {"type": "application/json"}):
-            if script.get("lentille-context") is not None or script.get("id") == "lentille-context":
+            if (
+                script.get("lentille-context") is not None
+                or script.get("id") == "lentille-context"
+            ):
                 try:
                     return json.loads(script.string)
                 except (json.JSONDecodeError, TypeError) as exc:
@@ -161,11 +168,19 @@ class LuoguClient(BaseCrawler):
         tags = api_data.get("tags", [])
         payload = {
             "tags": [
-                {"id": t["id"], "name": t["name"], "type": t.get("type"), "parent": t.get("parent")}
-                for t in tags if "id" in t and "name" in t
+                {
+                    "id": t["id"],
+                    "name": t["name"],
+                    "type": t.get("type"),
+                    "parent": t.get("parent"),
+                }
+                for t in tags
+                if "id" in t and "name" in t
             ],
             "types": api_data.get("types", []),
-            "tag_map": {str(t["id"]): t["name"] for t in tags if "id" in t and "name" in t},
+            "tag_map": {
+                str(t["id"]): t["name"] for t in tags if "id" in t and "name" in t
+            },
             "version": api_data.get("version"),
             "last_updated": datetime.now(timezone.utc).isoformat(),
         }
@@ -200,7 +215,9 @@ class LuoguClient(BaseCrawler):
             if response.status_code == 200:
                 data = json.loads(response.text)
                 tags = data.get("tags", [])
-                tag_map = {str(t["id"]): t["name"] for t in tags if "id" in t and "name" in t}
+                tag_map = {
+                    str(t["id"]): t["name"] for t in tags if "id" in t and "name" in t
+                }
                 self._save_tags(data)
                 return tag_map
         except Exception as exc:
@@ -260,6 +277,7 @@ class LuoguClient(BaseCrawler):
             "content_cn": None,
             "similar_questions": None,
         }
+
     def get_progress(self) -> dict:
         if not self.progress_file.exists():
             return {
@@ -308,6 +326,7 @@ class LuoguClient(BaseCrawler):
                     tmp_path.unlink()
             except OSError:
                 pass
+
     async def sync(self, overwrite: bool = False) -> None:
         async with self._create_curl_session(impersonate=CURL_IMPERSONATE) as session:
             progress = self.get_progress()
@@ -315,7 +334,9 @@ class LuoguClient(BaseCrawler):
 
             # Fetch first page to determine total (also establishes session cookies)
             url = f"{self.PROBLEM_LIST_URL}?page=1"
-            html = await self._fetch_text(session, url, referer="https://www.luogu.com.cn/")
+            html = await self._fetch_text(
+                session, url, referer="https://www.luogu.com.cn/"
+            )
             if not html:
                 logger.error("Failed to fetch first page")
                 return
@@ -338,7 +359,9 @@ class LuoguClient(BaseCrawler):
                 result = problems_data.get("result", [])
                 mapped = [p for raw in result if (p := self._map_problem(raw, tag_map))]
                 if mapped:
-                    count = self.problems_db.update_problems(mapped, force_update=overwrite)
+                    count = self.problems_db.update_problems(
+                        mapped, force_update=overwrite
+                    )
                     verb = "upserted" if overwrite else "inserted"
                     logger.info("Page 1: %s %s/%s problems", verb, count, len(mapped))
                 self.save_progress(1, total_count=total_count)
@@ -371,16 +394,23 @@ class LuoguClient(BaseCrawler):
                     total_pages = math.ceil(total_count / 50)
                 mapped = [p for raw in result if (p := self._map_problem(raw, tag_map))]
                 if mapped:
-                    count = self.problems_db.update_problems(mapped, force_update=overwrite)
+                    count = self.problems_db.update_problems(
+                        mapped, force_update=overwrite
+                    )
                     verb = "upserted" if overwrite else "inserted"
                     logger.info(
                         "Page %s/%s: %s %s/%s problems",
-                        page, total_pages, verb, count, len(mapped),
+                        page,
+                        total_pages,
+                        verb,
+                        count,
+                        len(mapped),
                     )
                 self.save_progress(page)
                 page += 1
 
         logger.info("Sync completed")
+
     def _compose_content_markdown(self, content: dict, samples: list) -> str:
         sections = []
         if content.get("background"):
@@ -447,13 +477,19 @@ class LuoguClient(BaseCrawler):
                     logger.info("Updated content for %s problems", count)
                     batch = []
             if batch:
-                count, ok = self.problems_db.batch_update_content(batch, batch_size=self.batch_size)
+                count, ok = self.problems_db.batch_update_content(
+                    batch, batch_size=self.batch_size
+                )
                 if not ok:
                     logger.warning("Some content updates failed")
                     failed = True
                 logger.info("Updated content for %s problems", count)
         if failed:
-            logger.warning("Content sync completed with errors, fetched %s/%s", fetched, len(missing))
+            logger.warning(
+                "Content sync completed with errors, fetched %s/%s",
+                fetched,
+                len(missing),
+            )
         else:
             logger.info("Content sync completed, fetched %s/%s", fetched, len(missing))
 
@@ -480,20 +516,32 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description="Luogu crawler")
     parser.add_argument("--sync", action="store_true", help="Sync problem list")
     parser.add_argument(
-        "--fill-missing-content", action="store_true", help="Fetch content for problems missing it"
+        "--fill-missing-content",
+        action="store_true",
+        help="Fetch content for problems missing it",
     )
     parser.add_argument(
-        "--missing-content-stats", action="store_true", help="Show missing content count"
+        "--missing-content-stats",
+        action="store_true",
+        help="Show missing content count",
     )
     parser.add_argument("--status", action="store_true", help="Show sync status")
     parser.add_argument(
-        "--overwrite", action="store_true", help="Overwrite existing problems instead of skipping"
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing problems instead of skipping",
     )
     parser.add_argument(
-        "--rate-limit", type=float, default=1.0, help="Seconds between requests (min 1.0)"
+        "--rate-limit",
+        type=float,
+        default=1.0,
+        help="Seconds between requests (min 1.0)",
     )
     parser.add_argument(
-        "--batch-size", type=int, default=10, help="DB write batch size for content sync (default: 10)"
+        "--batch-size",
+        type=int,
+        default=10,
+        help="DB write batch size for content sync (default: 10)",
     )
     parser.add_argument("--data-dir", type=str, default=None, help="Data directory")
     parser.add_argument("--db-path", type=str, default=None, help="Database path")
@@ -510,7 +558,9 @@ async def main() -> None:
     db_path = args.db_path or str(Path(config.database_path).resolve())
 
     client = LuoguClient(
-        data_dir=data_dir, db_path=db_path, rate_limit=args.rate_limit,
+        data_dir=data_dir,
+        db_path=db_path,
+        rate_limit=args.rate_limit,
         batch_size=args.batch_size,
     )
 
@@ -526,8 +576,3 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
-
-
-

@@ -166,11 +166,9 @@ pub async fn get_daily(
 
     tokio::spawn(async move {
         let mut wait_task = tokio::spawn(async move { child.wait_with_output().await });
-        let result = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_secs),
-            &mut wait_task,
-        )
-        .await;
+        let result =
+            tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), &mut wait_task)
+                .await;
         // Flatten JoinHandle layer for consistent matching below
         let result: Result<std::io::Result<std::process::Output>, tokio::time::error::Elapsed> =
             match result {
