@@ -1,6 +1,7 @@
 import asyncio
 import json
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -544,6 +545,38 @@ class LeetCodeClient(BaseCrawler):
         # If no rating is found, return 0
         return 0
 
+    async def _graphql_post_cn(self, url, headers, payload):
+        """POST to leetcode.cn GraphQL using curl_cffi with browser impersonation."""
+        import json as _json
+
+        async with self._create_curl_session(impersonate="chrome124") as session:
+            response = await session.post(
+                url, headers=headers, json=payload, timeout=30
+            )
+            if response.status_code != 200:
+                raise Exception(
+                    f"API request failed, status code: {response.status_code}, "
+                    f"response: {response.text[:500]}"
+                )
+            return _json.loads(response.text)
+
+    async def _graphql_post_aiohttp(self, url, headers, payload):
+        """POST to leetcode.com GraphQL using aiohttp."""
+        async with self._create_aiohttp_session() as session:
+            async with session.post(
+                url,
+                headers=headers,
+                json=payload,
+                proxy=self._get_aiohttp_request_proxy("https"),
+            ) as res:
+                if res.status != 200:
+                    error_msg = (
+                        f"API request failed, status code: {res.status}, "
+                        f"response: {await res.text()}"
+                    )
+                    raise Exception(error_msg)
+                return await res.json()
+
     async def fetch_daily_challenge(self, domain=None):
         """
         Get the daily challenge question from LeetCode API.
@@ -616,68 +649,63 @@ class LeetCodeClient(BaseCrawler):
                 }
             }
             """
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            **self._headers(referer=f"{base_url}/problemset/"),
+            "Content-Type": "application/json",
+            "Origin": base_url,
+        }
         payload = {"query": query}
 
         logger.info(f"Fetching daily challenge from LeetCode {domain.upper()} API...")
 
-        async with self._create_aiohttp_session() as session:
-            async with session.post(
-                api_endpoint,
-                headers=headers,
-                json=payload,
-                proxy=self._get_aiohttp_request_proxy("https"),
-            ) as res:
-                if res.status != 200:
-                    error_msg = f"API request failed, status code: {res.status}, response: {await res.text()}"
-                    logger.error(error_msg)
-                    raise Exception(error_msg)
+        if domain == "cn":
+            raw_data = await self._graphql_post_cn(api_endpoint, headers, payload)
+        else:
+            raw_data = await self._graphql_post_aiohttp(api_endpoint, headers, payload)
 
-                raw_data = await res.json()
+        if domain == "cn":
+            question_info = raw_data["data"]["todayRecord"][0]
+            question = question_info["question"]
+            link = f"{base_url}/problems/{question['titleSlug']}/"
+        else:
+            question_info = raw_data["data"][
+                "activeDailyCodingChallengeQuestion"
+            ]
+            question = question_info["question"]
+            link = f"{base_url}{question_info['link']}"
 
-                if domain == "cn":
-                    question_info = raw_data["data"]["todayRecord"][0]
-                    question = question_info["question"]
-                    link = f"{base_url}/problems/{question['titleSlug']}/"
-                else:
-                    question_info = raw_data["data"][
-                        "activeDailyCodingChallengeQuestion"
-                    ]
-                    question = question_info["question"]
-                    link = f"{base_url}{question_info['link']}"
+        qid = question["frontendQuestionId"]
+        slug = question["titleSlug"]
 
-                qid = question["frontendQuestionId"]
-                slug = question["titleSlug"]
+        # Create basic daily challenge data
+        daily = dict(
+            date=question_info["date"],
+            domain=domain,
+            qid=qid,
+            title=question["title"],
+            title_cn=question.get("titleCn", ""),
+            difficulty=question["difficulty"],
+            rating=None,  # This will be fetched from get_problem
+            ac_rate=question["acRate"]
+            if domain == "com"
+            else question["acRate"] * 100,
+            slug=slug,
+            link=link,
+            tags=[tag["name"] for tag in question["topicTags"]],
+        )
 
-                # Create basic daily challenge data
-                daily = dict(
-                    date=question_info["date"],
-                    domain=domain,
-                    qid=qid,
-                    title=question["title"],
-                    title_cn=question.get("titleCn", ""),
-                    difficulty=question["difficulty"],
-                    rating=None,  # This will be fetched from get_problem
-                    ac_rate=question["acRate"]
-                    if domain == "com"
-                    else question["acRate"] * 100,
-                    slug=slug,
-                    link=link,
-                    tags=[tag["name"] for tag in question["topicTags"]],
-                )
+        # Get problem detail
+        problem = await self.get_problem(problem_id=qid, slug=slug)
+        if problem:
+            for key, value in problem.items():
+                daily[key] = daily.get(key, value) or value
+            # Update database
+            self.daily_db.update_daily(daily)
+            logger.info(
+                f"Daily challenge for {daily['date']} (domain: {domain}) written to database"
+            )
 
-                # Get problem detail
-                problem = await self.get_problem(problem_id=qid, slug=slug)
-                if problem:
-                    for key, value in problem.items():
-                        daily[key] = daily.get(key, value) or value
-                    # Update database
-                    self.daily_db.update_daily(daily)
-                    logger.info(
-                        f"Daily challenge for {daily['date']} (domain: {domain}) written to database"
-                    )
-
-                return daily
+        return daily
 
     async def get_daily_challenge(self, date_str=None, domain=None):
         """
@@ -697,7 +725,7 @@ class LeetCodeClient(BaseCrawler):
 
         tz = (
             pytz.timezone("Asia/Shanghai")
-            if self.domain == "cn"
+            if domain == "cn"
             else pytz.timezone("UTC")
         )
         today = datetime.now(tz).strftime("%Y-%m-%d")
@@ -754,11 +782,11 @@ class LeetCodeClient(BaseCrawler):
         # If no valid file is found, fetch the data
         if info is None and query_time == today_time:
             logger.info("Fetching new challenge data...")
-            info = await self.fetch_daily_challenge(self.domain)
+            info = await self.fetch_daily_challenge(domain)
             return info
 
-        # If still no data found and domain is 'com', try fetching monthly data
-        if info is None and domain == "com":
+        # If still no data found, try fetching monthly data
+        if info is None:
             logger.info(
                 f"No data found for {date_str}, attempting to fetch monthly data..."
             )
@@ -766,9 +794,14 @@ class LeetCodeClient(BaseCrawler):
             year_int = int(year)
             month_int = int(month)
 
-            monthly_data = await self.fetch_monthly_daily_challenges(
-                year_int, month_int
-            )
+            if domain == "cn":
+                monthly_data = await self.fetch_monthly_daily_challenges_cn(
+                    year_int, month_int
+                )
+            else:
+                monthly_data = await self.fetch_monthly_daily_challenges(
+                    year_int, month_int
+                )
 
             if monthly_data and "challenges" in monthly_data:
                 logger.info(
@@ -1122,6 +1155,79 @@ class LeetCodeClient(BaseCrawler):
             logger.error(f"Error fetching monthly challenges: {str(e)}", exc_info=True)
             return {}
 
+    async def fetch_monthly_daily_challenges_cn(self, year, month):
+        if year < 2020 or (year == 2020 and month < 4):
+            logger.warning(
+                f"Monthly daily challenges are only available from April 2020 onwards. Requested: {year}-{month:02d}"
+            )
+            return {}
+
+        query = """
+        query dailyQuestionRecords($year: Int!, $month: Int!) {
+            dailyQuestionRecords(year: $year, month: $month) {
+                date
+                userStatus
+                question {
+                    questionFrontendId
+                    title
+                    titleSlug
+                    translatedTitle
+                }
+            }
+        }
+        """
+
+        variables = {"year": year, "month": month}
+        api_endpoint = "https://leetcode.cn/graphql/"
+        headers = {
+            **self._headers(referer="https://leetcode.cn/problemset/"),
+            "Content-Type": "application/json",
+            "Origin": "https://leetcode.cn",
+        }
+        payload = {
+            "query": query,
+            "variables": variables,
+            "operationName": "dailyQuestionRecords",
+        }
+
+        try:
+            logger.info(f"Fetching cn monthly daily challenges for {year}-{month}")
+
+            data = await self._graphql_post_cn(api_endpoint, headers, payload)
+            if "errors" in data:
+                logger.error(f"CN GraphQL errors: {data['errors']}")
+                return {}
+
+            records = data.get("data", {}).get("dailyQuestionRecords", [])
+            if not isinstance(records, list):
+                logger.error("Unexpected cn monthly response shape")
+                return {}
+
+            logger.info(f"Fetched {len(records)} cn daily challenges")
+
+            formatted_data = {
+                "year": year,
+                "month": month,
+                "challenges": [],
+            }
+
+            for record in records:
+                question = record.get("question", {})
+                formatted_data["challenges"].append({
+                    "date": record.get("date"),
+                    "user_status": record.get("userStatus"),
+                    "question_id": question.get("questionFrontendId"),
+                    "title": question.get("title"),
+                    "title_cn": question.get("translatedTitle"),
+                    "slug": question.get("titleSlug"),
+                })
+
+            return formatted_data
+
+        except Exception as e:
+            logger.error(f"Error fetching cn monthly challenges: {str(e)}", exc_info=True)
+            return {}
+
     async def _process_remaining_monthly_challenges(
         self, challenges, domain, year, month
     ):
@@ -1437,6 +1543,12 @@ async def main():
         metavar=("YEAR", "MONTH"),
         help="Fetch monthly daily challenges (e.g., --monthly 2025 1)",
     )
+    parser.add_argument(
+        "--domain",
+        choices=["com", "cn"],
+        default="com",
+        help="LeetCode domain (default: com)",
+    )
     args = parser.parse_args()
 
     scripts_dir = Path(__file__).resolve().parent
@@ -1455,7 +1567,7 @@ async def main():
         db_path = fallback_db
         data_dir = fallback_data
 
-    client = LeetCodeClient(data_dir=data_dir, db_path=db_path)
+    client = LeetCodeClient(domain=args.domain, data_dir=data_dir, db_path=db_path)
 
     if args.init:
         logger.info("Initializing database...")
@@ -1536,11 +1648,17 @@ async def main():
     if args.daily:
         logger.info("Fetching daily challenge...")
         daily = await client.fetch_daily_challenge()
+        if daily is None:
+            sys.stderr.write("Error: daily challenge returned None\n")
+            sys.exit(2)
         print(json.dumps(daily, indent=4))
 
     if args.date:
         logger.info(f"Fetching daily challenge for {args.date}...")
         daily = await client.get_daily_challenge(date_str=args.date)
+        if daily is None:
+            sys.stderr.write(f"Error: no daily challenge found for {args.date}\n")
+            sys.exit(2)
         print(json.dumps(daily, indent=4))
 
     if args.monthly:

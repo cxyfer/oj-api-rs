@@ -6,24 +6,60 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::api::error::ProblemDetail;
+use crate::models::LeetCodeDomain;
 use crate::AppState;
 
 #[derive(Deserialize)]
 pub struct DailyQuery {
     pub domain: Option<String>,
+    pub source: Option<String>,
     pub date: Option<String>,
+}
+
+fn resolve_domain(
+    domain: Option<&str>,
+    source: Option<&str>,
+) -> Result<LeetCodeDomain, ProblemDetail> {
+    let from_source = match source {
+        Some("leetcode.com") => Some(LeetCodeDomain::Com),
+        Some("leetcode.cn") => Some(LeetCodeDomain::Cn),
+        Some(s) => {
+            return Err(ProblemDetail::bad_request(format!(
+                "invalid source '{}', expected 'leetcode.com' or 'leetcode.cn'",
+                s
+            )))
+        }
+        None => None,
+    };
+
+    let from_domain = match domain {
+        Some(d) => Some(
+            d.parse::<LeetCodeDomain>()
+                .map_err(|_| ProblemDetail::bad_request("domain must be 'com' or 'cn'"))?,
+        ),
+        None => None,
+    };
+
+    match (from_domain, from_source) {
+        (Some(d), Some(s)) if d != s => Err(ProblemDetail::bad_request(
+            "domain and source conflict",
+        )),
+        (Some(d), _) => Ok(d),
+        (None, Some(s)) => Ok(s),
+        (None, None) => Ok(LeetCodeDomain::Com),
+    }
 }
 
 pub async fn get_daily(
     State(state): State<Arc<AppState>>,
     Query(query): Query<DailyQuery>,
 ) -> impl IntoResponse {
-    let domain = query.domain.as_deref().unwrap_or("com");
-    if domain != "com" && domain != "cn" {
-        return ProblemDetail::bad_request("domain must be 'com' or 'cn'").into_response();
-    }
+    let domain = match resolve_domain(query.domain.as_deref(), query.source.as_deref()) {
+        Ok(d) => d,
+        Err(e) => return e.into_response(),
+    };
 
-    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let today = domain.today();
     let date = query.date.as_deref().unwrap_or(&today);
 
     // Validate date format
@@ -33,7 +69,6 @@ pub async fn get_daily(
             .into_response();
     }
 
-    // Validate actual calendar date
     let parsed = match chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
         Ok(d) => d,
         Err(_) => {
@@ -42,7 +77,7 @@ pub async fn get_daily(
     };
 
     let lower = chrono::NaiveDate::from_ymd_opt(2020, 4, 1).unwrap();
-    let upper = chrono::Utc::now().date_naive();
+    let upper = domain.today_naive();
 
     if parsed < lower {
         return ProblemDetail::bad_request("date must be >= 2020-04-01").into_response();
@@ -52,25 +87,20 @@ pub async fn get_daily(
     }
 
     let pool = state.ro_pool.clone();
-    let domain_owned = domain.to_string();
+    let domain_str = domain.to_string();
     let date_owned = date.to_string();
     let result = tokio::task::spawn_blocking(move || {
-        crate::db::daily::get_daily(&pool, &domain_owned, &date_owned)
+        crate::db::daily::get_daily(&pool, &domain_str, &date_owned)
     })
     .await
     .unwrap_or(None);
 
-    match result {
-        Some(d) => return Json(d).into_response(),
-        None if domain != "com" => {
-            return ProblemDetail::not_found("no daily challenge found for this date")
-                .into_response()
-        }
-        None => {}
+    if let Some(d) = result {
+        return Json(d).into_response();
     }
 
-    // Fallback: spawn crawler for domain=com
-    let key = format!("com:{}", date);
+    // Fallback: spawn crawler
+    let key = format!("{}:{}", domain, date);
     let now = tokio::time::Instant::now();
 
     // Atomically check + claim slot under single lock to prevent TOCTOU race
@@ -95,7 +125,6 @@ pub async fn get_daily(
                 }
             }
         }
-        // Claim slot as Running before releasing lock
         fallback.insert(
             key.clone(),
             crate::models::DailyFallbackEntry {
@@ -107,11 +136,17 @@ pub async fn get_daily(
     }
 
     // Determine args
-    let today_str = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let today_str = domain.today();
+    let domain_arg = domain.to_string();
     let args: Vec<String> = if date == today_str {
-        vec!["--daily".into()]
+        vec!["--daily".into(), "--domain".into(), domain_arg]
     } else {
-        vec!["--date".into(), date.to_string()]
+        vec![
+            "--date".into(),
+            date.to_string(),
+            "--domain".into(),
+            domain_arg,
+        ]
     };
 
     let mut cmd = tokio::process::Command::new("uv");
