@@ -14,7 +14,7 @@ Luogu problem difficulty SHALL be rendered as a color-coded badge in both the pr
 | 4 | `普及+/提高` | `.badge-luogu-4` | `rgba(82,196,26,0.15)` | `#52c41a` |
 | 5 | `提高+/省选−` | `.badge-luogu-5` | `rgba(52,152,219,0.15)` | `#3498db` |
 | 6 | `省选/NOI−` | `.badge-luogu-6` | `rgba(157,61,207,0.15)` | `#9d3dcf` |
-| 7 | `NOI/NOI+/CTSC` | `.badge-luogu-7` | `rgba(14,29,105,0.15)` | `#0e1d69` |
+| 7 | `NOI/NOI+/CTSC` | `.badge-luogu-7` | `#0e1d69` | `#ffffff` |
 
 The badge label SHALL be the i18n translation of key `problems.difficulty.luogu_{N}`. If the key is missing, the raw `difficulty` string SHALL be used as fallback. For an unknown Luogu difficulty string (not in the 8-tier mapping), the badge SHALL render with no tier class and display the raw value — it SHALL NOT throw a JavaScript error.
 

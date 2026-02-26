@@ -1012,13 +1012,13 @@
                 var i18nKey = tier >= 0 ? 'problems.difficulty.luogu_' + tier : null;
                 var label = i18nKey ? i18n.t(i18nKey) : difficulty;
                 if (i18nKey && label === i18nKey) label = difficulty;
-                return '<span class="' + badgeClass + '">' + label + '</span>';
+                return '<span class="' + badgeClass + '">' + esc(label) + '</span>';
             }
             var lower = difficulty.toLowerCase();
             var i18nKey = 'problems.difficulty.' + lower;
             var label = i18n.t(i18nKey);
             if (label === i18nKey) label = difficulty;
-            return '<span class="badge badge-' + lower + '">' + label + '</span>';
+            return '<span class="badge badge-' + lower + '">' + esc(label) + '</span>';
         }
 
         function syncDifficultyFilterOptions(source) {
@@ -1133,7 +1133,7 @@
             if (ratingField) ratingField.style.display = showRating ? '' : 'none';
             if (tagsSelect) tagsSelect.parentElement.style.display = source === 'atcoder' ? 'none' : '';
             if (tagModeContainer) tagModeContainer.style.display = source === 'atcoder' ? 'none' : '';
-            problemsTable.classList.remove('source-leetcode', 'source-atcoder', 'source-codeforces');
+            problemsTable.classList.remove('source-leetcode', 'source-atcoder', 'source-codeforces', 'source-luogu');
             problemsTable.classList.add('source-' + source);
             syncDifficultyFilterOptions(source);
         }
