@@ -165,11 +165,22 @@ pub async fn get_daily(
     let pid = child.id().expect("child should have a pid");
 
     tokio::spawn(async move {
+        let mut wait_task = tokio::spawn(async move { child.wait_with_output().await });
         let result = tokio::time::timeout(
             std::time::Duration::from_secs(timeout_secs),
-            child.wait_with_output(),
+            &mut wait_task,
         )
         .await;
+        // Flatten JoinHandle layer for consistent matching below
+        let result: Result<std::io::Result<std::process::Output>, tokio::time::error::Elapsed> =
+            match result {
+                Ok(Ok(r)) => Ok(r),
+                Ok(Err(e)) => {
+                    tracing::error!("daily fallback join error: {}", e);
+                    Ok(Err(std::io::Error::other(e.to_string())))
+                }
+                Err(e) => Err(e),
+            };
 
         let status = match &result {
             Ok(Ok(output)) => {
@@ -220,6 +231,7 @@ pub async fn get_daily(
             Err(_) => {
                 tracing::warn!("daily fallback timed out");
                 crate::utils::kill_pgid(pid);
+                let _ = wait_task.await;
                 crate::models::CrawlerStatus::TimedOut
             }
         };

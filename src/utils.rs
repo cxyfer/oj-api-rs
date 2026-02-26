@@ -3,13 +3,21 @@ use tokio::process::{Child, Command};
 /// Spawns a process in its own process group.
 ///
 /// This allows killing the entire process tree on timeout/cancel.
+#[cfg(unix)]
 pub fn spawn_with_pgid(mut cmd: Command) -> std::io::Result<Child> {
     unsafe {
         cmd.pre_exec(|| {
-            libc::setpgid(0, 0);
+            if libc::setpgid(0, 0) == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
             Ok(())
         });
     }
+    cmd.spawn()
+}
+
+#[cfg(not(unix))]
+pub fn spawn_with_pgid(mut cmd: Command) -> std::io::Result<Child> {
     cmd.spawn()
 }
 
@@ -17,6 +25,7 @@ pub fn spawn_with_pgid(mut cmd: Command) -> std::io::Result<Child> {
 ///
 /// Returns `true` if the signal was sent, `false` if the pid was invalid or
 /// the process group no longer exists (ESRCH).
+#[cfg(unix)]
 pub fn kill_pgid(pid: u32) -> bool {
     if pid <= 1 {
         tracing::warn!("refusing to kill pgid {pid}: unsafe target");
@@ -34,4 +43,9 @@ pub fn kill_pgid(pid: u32) -> bool {
     } else {
         true
     }
+}
+
+#[cfg(not(unix))]
+pub fn kill_pgid(_pid: u32) -> bool {
+    false
 }

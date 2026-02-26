@@ -195,21 +195,27 @@ pub async fn similar_by_text(
     };
 
     let pid = child.id().expect("child should have a pid");
+    let mut wait_task = tokio::spawn(async move { child.wait_with_output().await });
 
     let output = match tokio::time::timeout(
         std::time::Duration::from_secs(embed_timeout),
-        child.wait_with_output(),
+        &mut wait_task,
     )
     .await
     {
-        Ok(Ok(o)) => o,
-        Ok(Err(e)) => {
+        Ok(Ok(Ok(o))) => o,
+        Ok(Ok(Err(e))) => {
             tracing::error!("embedding subprocess error: {}", e);
+            return ProblemDetail::bad_gateway("embedding service error").into_response();
+        }
+        Ok(Err(e)) => {
+            tracing::error!("embedding subprocess join error: {}", e);
             return ProblemDetail::bad_gateway("embedding service error").into_response();
         }
         Err(_) => {
             tracing::warn!("embedding query timed out");
             crate::utils::kill_pgid(pid);
+            let _ = wait_task.await;
             return ProblemDetail::gateway_timeout("embedding service timed out").into_response();
         }
     };
