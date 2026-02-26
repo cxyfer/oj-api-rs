@@ -76,6 +76,7 @@ timeout_secs = 300
 
 [embedding]
 timeout_secs = 30           # per-query embed-text timeout (similar search)
+batch_timeout_secs = 600    # admin batch embedding job timeout
 over_fetch_factor = 4
 concurrency = 4
 

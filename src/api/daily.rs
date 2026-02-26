@@ -126,7 +126,7 @@ pub async fn get_daily(
         cmd.env("CONFIG_PATH", cp);
     }
 
-    let child = match cmd.spawn() {
+    let child = match crate::utils::spawn_with_pgid(cmd) {
         Ok(c) => c,
         Err(e) => {
             tracing::error!("failed to spawn daily fallback crawler: {}", e);
@@ -162,6 +162,7 @@ pub async fn get_daily(
         .copied()
         .unwrap_or(state.config.crawler.timeout_secs);
     let job_id = uuid::Uuid::new_v4().to_string();
+    let pid = child.id().expect("child should have a pid");
 
     tokio::spawn(async move {
         let result = tokio::time::timeout(
@@ -216,7 +217,11 @@ pub async fn get_daily(
                 tracing::error!("daily fallback crawler error: {}", e);
                 crate::models::CrawlerStatus::Failed
             }
-            Err(_) => crate::models::CrawlerStatus::TimedOut,
+            Err(_) => {
+                tracing::warn!("daily fallback timed out");
+                crate::utils::kill_pgid(pid);
+                crate::models::CrawlerStatus::TimedOut
+            }
         };
 
         let cooldown = if status != crate::models::CrawlerStatus::Completed {

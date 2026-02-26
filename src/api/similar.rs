@@ -186,13 +186,15 @@ pub async fn similar_by_text(
         cmd.env("CONFIG_PATH", cp);
     }
 
-    let child = match cmd.spawn() {
+    let child = match crate::utils::spawn_with_pgid(cmd) {
         Ok(c) => c,
         Err(e) => {
             tracing::error!("failed to spawn embedding subprocess: {}", e);
             return ProblemDetail::bad_gateway("embedding service unavailable").into_response();
         }
     };
+
+    let pid = child.id().expect("child should have a pid");
 
     let output = match tokio::time::timeout(
         std::time::Duration::from_secs(embed_timeout),
@@ -206,6 +208,8 @@ pub async fn similar_by_text(
             return ProblemDetail::bad_gateway("embedding service error").into_response();
         }
         Err(_) => {
+            tracing::warn!("embedding query timed out");
+            crate::utils::kill_pgid(pid);
             return ProblemDetail::gateway_timeout("embedding service timed out").into_response();
         }
     };

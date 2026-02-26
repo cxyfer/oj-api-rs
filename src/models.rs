@@ -134,6 +134,7 @@ pub enum CrawlerStatus {
     Completed,
     Failed,
     TimedOut,
+    Cancelled,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -150,6 +151,7 @@ impl std::fmt::Display for CrawlerStatus {
             Self::Completed => write!(f, "completed"),
             Self::Failed => write!(f, "failed"),
             Self::TimedOut => write!(f, "timed_out"),
+            Self::Cancelled => write!(f, "cancelled"),
         }
     }
 }
