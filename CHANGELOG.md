@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.2.0] - 2026-02-26
+
+### Features
+
+- **luogu**: add Luogu as a new online judge source with full crawler support (#1)
+- **admin**: add 8-tier Luogu difficulty badges with official color scheme and source-aware dynamic filter dropdown (#3)
+- **crawler**: add `Cancelled` job status with race-condition-safe cancel flow (#2)
+- **api**: add `POST /admin/api/crawlers/cancel` and `/admin/api/embeddings/cancel` endpoints (#2)
+- **config**: add `embedding.batch_timeout_secs` independent timeout option (default 600s) (#2)
+
+### Bug Fixes
+
+- **crawler**: spawn subprocesses in dedicated process groups via `setpgid(0,0)`; kill entire pgid on timeout/cancel to prevent orphaned child processes (#2)
+- **crawler**: add PID safety guard (reject pid ≤ 1) and `ESRCH` handling for already-exited processes (#2)
+- **admin**: fix plain-text problem content rendering with `white-space: pre-wrap` (#3)
+- **admin**: fix difficulty dropdown option text visibility on dark theme (#3)
+- **admin**: fix NOI/NOI+/CTSC badge readability (solid `#0e1d69` background + white text) (#3)
+- **admin**: remove unused rating column from problems table (#3)
+
+### Docs
+
+- **readme**: document missing API endpoints and query params
+- **config**: document `embedding.batch_timeout_secs` in `config.toml.example` (#2)
+
+### Chore
+
+- **style**: apply `cargo fmt`, `cargo clippy`, and `ruff` formatting fixes
+
 ## [0.1.4] - 2026-02-25
 
 ### Bug Fixes
