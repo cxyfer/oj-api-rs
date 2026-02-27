@@ -246,6 +246,7 @@ pub enum ValueType {
     Float,
     Str,
     YearMonth,
+    Domain,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -309,7 +310,7 @@ pub static LEETCODE_ARGS: &[ArgSpec] = &[
     ArgSpec {
         flag: "--domain",
         arity: 1,
-        value_type: ValueType::Str,
+        value_type: ValueType::Domain,
         ui_exposed: true,
     },
 ];
@@ -637,6 +638,15 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
                     if v.contains("..") {
                         return Err(format!("{}: must not contain '..'", token));
                     }
+                }
+            }
+            ValueType::Domain => {
+                let v = &raw_args[i + 1];
+                if v != "com" && v != "cn" {
+                    return Err(format!(
+                        "{}: invalid domain '{}', expected 'com' or 'cn'",
+                        token, v
+                    ));
                 }
             }
             ValueType::YearMonth => {

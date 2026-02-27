@@ -236,7 +236,7 @@ class LeetCodeClient(BaseCrawler):
                     p.get("difficulty", {}).get("level", 0)
                 ),
                 "ac_rate": ac_rate,
-                "link": f"https://leetcode.com/problems/{slug}/",
+                "link": f"{self.base_url}/problems/{slug}/",
                 "category": category.title(),
                 "paid_only": int(p.get("paid_only", False)),
                 "rating": 0,  # reserve
@@ -310,17 +310,21 @@ class LeetCodeClient(BaseCrawler):
                     )
                     return {}
 
-    async def fetch_problem_detail(self, slug):
+    async def fetch_problem_detail(self, slug, domain=None):
         """
         Get detailed information for a specific problem.
 
         Args:
             slug (str): Problem slug/title-slug
+            domain (str, optional): Domain to use ('com' or 'cn'). Defaults to self.domain.
 
         Returns:
             dict: Problem details including content, tags, etc.
         """
-        url = self.graphql_url
+        if domain is None:
+            domain = self.domain
+        base_url = f"https://leetcode.{domain}"
+        url = f"{base_url}/graphql"
         headers = {
             **self._headers(),
             "X-Requested-With": "XMLHttpRequest",
@@ -384,10 +388,10 @@ class LeetCodeClient(BaseCrawler):
                             "title": q.get("title"),
                             "title_cn": q.get("translatedTitle"),
                             "slug": slug,
-                            "link": f"{self.base_url}/problems/{slug}/",
+                            "link": f"{base_url}/problems/{slug}/",
                             "difficulty": q.get("difficulty"),
                             "ac_rate": float(q.get("acRate", "0"))
-                            * (100 if self.domain == "cn" else 1),
+                            * (100 if domain == "cn" else 1),
                             "content": q.get("content"),
                             "content_cn": q.get("translatedContent"),
                             "stats": q.get("stats"),
@@ -410,7 +414,7 @@ class LeetCodeClient(BaseCrawler):
                     )
                     return None
 
-    async def get_problem(self, problem_id=None, slug=None):
+    async def get_problem(self, problem_id=None, slug=None, domain=None):
         """
         Fetch problem information by ID or slug
 
@@ -451,7 +455,7 @@ class LeetCodeClient(BaseCrawler):
                 f"Problem {problem_id_for_log} still not have detail information, "
                 "fetching problem detail from LeetCode API..."
             )
-            problem_detail = await self.fetch_problem_detail(problem["slug"])
+            problem_detail = await self.fetch_problem_detail(problem["slug"], domain=domain)
             if problem_detail:
                 for key, value in problem_detail.items():
                     problem[key] = problem.get(key, value) or value
@@ -559,7 +563,13 @@ class LeetCodeClient(BaseCrawler):
                     f"API request failed, status code: {response.status_code}, "
                     f"response: {response.text[:500]}"
                 )
-            return _json.loads(response.text)
+            try:
+                return _json.loads(response.text)
+            except _json.JSONDecodeError as e:
+                raise Exception(
+                    f"Failed to parse JSON from leetcode.cn: {e}. "
+                    f"Response (truncated): {response.text[:200]}"
+                )
 
     async def _graphql_post_aiohttp(self, url, headers, payload):
         """POST to leetcode.com GraphQL using aiohttp."""
@@ -703,7 +713,7 @@ class LeetCodeClient(BaseCrawler):
         )
 
         # Get problem detail
-        problem = await self.get_problem(problem_id=qid, slug=slug)
+        problem = await self.get_problem(problem_id=qid, slug=slug, domain=domain)
         if problem:
             for key, value in problem.items():
                 daily[key] = daily.get(key, value) or value
@@ -775,7 +785,7 @@ class LeetCodeClient(BaseCrawler):
 
             # Get problem detail
             problem = await self.get_problem(
-                problem_id=info["qid"], slug=info.get("slug", None)
+                problem_id=info["qid"], slug=info.get("slug", None), domain=domain
             )
             if problem:
                 for key, value in problem.items():
@@ -834,7 +844,7 @@ class LeetCodeClient(BaseCrawler):
 
                     if question_id and slug:
                         problem = await self.get_problem(
-                            problem_id=question_id, slug=slug
+                            problem_id=question_id, slug=slug, domain=domain
                         )
                         if problem:
                             # Prepare daily challenge data
@@ -1268,7 +1278,7 @@ class LeetCodeClient(BaseCrawler):
                         # Use semaphore to limit concurrent API requests
                         async with self._fetch_semaphore:
                             problem = await self.get_problem(
-                                problem_id=question_id, slug=slug
+                                problem_id=question_id, slug=slug, domain=domain
                             )
                         if problem:
                             # Prepare daily challenge data
@@ -1567,8 +1577,6 @@ async def main():
         db_path = str(Path(config.database_path).resolve())
         data_dir = str(Path(db_path).parent)
     except Exception as e:
-        import sys
-
         sys.stderr.write(
             f"Warning: Failed to load config, using defaults. Error: {e}\n"
         )
