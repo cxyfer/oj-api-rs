@@ -1,3 +1,7 @@
+use std::fmt;
+use std::str::FromStr;
+
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 fn deserialize_json_array<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
@@ -74,6 +78,73 @@ pub struct DailyChallenge {
     pub content_cn: Option<String>,
     #[serde(deserialize_with = "deserialize_json_array", default)]
     pub similar_questions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LeetCodeDomain {
+    Com,
+    Cn,
+}
+
+impl LeetCodeDomain {
+    pub fn today(&self) -> String {
+        match self {
+            Self::Com => Utc::now().format("%Y-%m-%d").to_string(),
+            Self::Cn => {
+                let cst = chrono::FixedOffset::east_opt(8 * 3600).unwrap();
+                Utc::now().with_timezone(&cst).format("%Y-%m-%d").to_string()
+            }
+        }
+    }
+
+    pub fn today_naive(&self) -> chrono::NaiveDate {
+        match self {
+            Self::Com => Utc::now().date_naive(),
+            Self::Cn => {
+                let cst = chrono::FixedOffset::east_opt(8 * 3600).unwrap();
+                Utc::now().with_timezone(&cst).date_naive()
+            }
+        }
+    }
+}
+
+impl fmt::Display for LeetCodeDomain {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Com => write!(f, "com"),
+            Self::Cn => write!(f, "cn"),
+        }
+    }
+}
+
+impl FromStr for LeetCodeDomain {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "com" => Ok(Self::Com),
+            "cn" => Ok(Self::Cn),
+            _ => Err(format!("invalid domain: {}", s)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for LeetCodeDomain {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse().map_err(serde::de::Error::custom)
+    }
+}
+
+impl Serialize for LeetCodeDomain {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -175,6 +246,7 @@ pub enum ValueType {
     Float,
     Str,
     YearMonth,
+    Domain,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -233,6 +305,12 @@ pub static LEETCODE_ARGS: &[ArgSpec] = &[
         flag: "--missing-content-stats",
         arity: 0,
         value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--domain",
+        arity: 1,
+        value_type: ValueType::Domain,
         ui_exposed: true,
     },
 ];
@@ -560,6 +638,15 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
                     if v.contains("..") {
                         return Err(format!("{}: must not contain '..'", token));
                     }
+                }
+            }
+            ValueType::Domain => {
+                let v = &raw_args[i + 1];
+                if v != "com" && v != "cn" {
+                    return Err(format!(
+                        "{}: invalid domain '{}', expected 'com' or 'cn'",
+                        token, v
+                    ));
                 }
             }
             ValueType::YearMonth => {

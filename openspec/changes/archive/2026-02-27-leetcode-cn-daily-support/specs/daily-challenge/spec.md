@@ -1,8 +1,5 @@
-# daily-challenge Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change oj-api-rs-v1. Update Purpose after archive.
-## Requirements
 ### Requirement: Daily challenge retrieval
 The system SHALL return the LeetCode daily challenge via `GET /api/v1/daily?domain={com|cn}&date={YYYY-MM-DD}`. The `domain` parameter SHALL be parsed as a `LeetCodeDomain` enum (`Com`, `Cn`). An optional `source` parameter SHALL be accepted as an alias (`leetcode.com` → `Com`, `leetcode.cn` → `Cn`).
 
@@ -82,6 +79,8 @@ The system SHALL return HTTP 404 only when no daily challenge record exists in t
 #### Scenario: No data, fallback triggered (cn)
 - **WHEN** client sends `GET /api/v1/daily?domain=cn` and no DB record exists for today (UTC+8) and no fallback is running
 - **THEN** system returns HTTP 202 with `{"status": "fetching", "retry_after": 30}` and spawns background crawler with `--domain cn`
+
+## ADDED Requirements
 
 ### Requirement: CN daily challenge fallback
 The system SHALL trigger a background crawler fallback for `domain=cn` when no DB record exists, using the same TOCTOU guard, cooldown, and background task pattern as `domain=com`. The fallback key SHALL be `{domain}:{date}` to prevent cross-domain cooldown collision. The crawler SHALL be spawned with `--domain cn` argument.
@@ -184,4 +183,3 @@ The `get_daily_challenge()` method SHALL use the local `domain` parameter (not `
 #### Scenario: Fetch uses domain parameter
 - **WHEN** `get_daily_challenge(domain="cn")` needs to fetch today's challenge
 - **THEN** it calls `fetch_daily_challenge(domain="cn")`, not `fetch_daily_challenge(self.domain)`
-
