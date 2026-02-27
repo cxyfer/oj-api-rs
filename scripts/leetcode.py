@@ -384,9 +384,10 @@ class LeetCodeClient(BaseCrawler):
                             "title": q.get("title"),
                             "title_cn": q.get("translatedTitle"),
                             "slug": slug,
-                            "link": f"https://leetcode.com/problems/{slug}/",
+                            "link": f"{self.base_url}/problems/{slug}/",
                             "difficulty": q.get("difficulty"),
-                            "ac_rate": float(q.get("acRate", "0")),
+                            "ac_rate": float(q.get("acRate", "0"))
+                            * (100 if self.domain == "cn" else 1),
                             "content": q.get("content"),
                             "content_cn": q.get("translatedContent"),
                             "stats": q.get("stats"),
@@ -664,8 +665,15 @@ class LeetCodeClient(BaseCrawler):
             raw_data = await self._graphql_post_aiohttp(api_endpoint, headers, payload)
 
         if domain == "cn":
-            question_info = raw_data["data"]["todayRecord"][0]
-            question = question_info["question"]
+            records = raw_data.get("data", {}).get("todayRecord")
+            if not records:
+                logger.error("CN daily: empty or missing todayRecord")
+                return None
+            question_info = records[0]
+            question = question_info.get("question")
+            if not question:
+                logger.error("CN daily: missing question in todayRecord")
+                return None
             link = f"{base_url}/problems/{question['titleSlug']}/"
         else:
             question_info = raw_data["data"][
@@ -1673,7 +1681,10 @@ async def main():
                 "Error: Monthly daily challenges are only available from April 2020 onwards."
             )
             return
-        monthly_data = await client.fetch_monthly_daily_challenges(year, month)
+        if args.domain == "cn":
+            monthly_data = await client.fetch_monthly_daily_challenges_cn(year, month)
+        else:
+            monthly_data = await client.fetch_monthly_daily_challenges(year, month)
         print(json.dumps(monthly_data, indent=4, ensure_ascii=False))
 
 
