@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.1] - 2026-03-01
+
+### Features
+
+- **daily**: add LeetCode CN daily challenge support (#4)
+- **spoj**: add SPOJ source crawling and Luogu training list support (#5)
+- **api**: add natural sort ordering for OJ problem IDs (#7)
+- **daily**: replace `?wait=true` with `?async=true`; waiting is now the default behavior (#8, #9)
+
+### Tests
+
+- **detect**: add comprehensive test coverage for source detection (#6)
+
+### Chore
+
+- **style**: apply `cargo fmt` formatting and fix `cargo clippy` warnings
+
 ## [0.2.0] - 2026-02-26
 
 ### Features
