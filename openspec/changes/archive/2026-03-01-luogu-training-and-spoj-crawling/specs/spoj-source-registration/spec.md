@@ -12,6 +12,10 @@
 | Flag | Arity | ValueType | ui_exposed |
 |---|---|---|---|
 | `--sync-spoj` | 0 | None | true |
+| `--fill-missing-content` | 0 | None | true |
+| `--missing-content-stats` | 0 | None | true |
+| `--overwrite` | 0 | None | true |
+| `--source` | 1 | Str | true |
 | `--rate-limit` | 1 | Float | true |
 | `--batch-size` | 1 | Int | true |
 | `--data-dir` | 1 | Str | false |
@@ -103,7 +107,7 @@ CATEGORY: idempotency
 
 ### P7: Argument Validation Completeness
 ```
-INVARIANT: SPOJ_ARGS whitelist accepts exactly {--sync-spoj, --rate-limit, --batch-size, --data-dir, --db-path}; rejects all others
+INVARIANT: SPOJ_ARGS whitelist accepts exactly {--sync-spoj, --fill-missing-content, --missing-content-stats, --overwrite, --source, --rate-limit, --batch-size, --data-dir, --db-path}; rejects all others
 FALSIFICATION: Generate all possible --flag combinations; validate_args must accept iff flag in whitelist
 CATEGORY: bounds
 ```

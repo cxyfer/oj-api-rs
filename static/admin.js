@@ -326,7 +326,7 @@
                     item.style.display = 'none';
                     cb.checked = true;
                     var hiddenInp = document.createElement('input');
-                    hiddenInp.type = 'text';
+                    hiddenInp.type = 'hidden';
                     hiddenInp.className = 'flag-input';
                     hiddenInp.value = f.value || '';
                     item.appendChild(hiddenInp);
@@ -1025,7 +1025,7 @@
 
         function renderDifficultyBadge(source, difficulty) {
             if (!difficulty) return '';
-            if (source === 'luogu') {
+            if (source === 'luogu' || source === 'spoj') {
                 var tier = LUOGU_DIFFICULTY_TIERS.indexOf(difficulty);
                 var badgeClass = tier >= 0 ? 'badge badge-luogu-' + tier : 'badge';
                 var i18nKey = tier >= 0 ? 'problems.difficulty.luogu_' + tier : null;

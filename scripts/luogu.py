@@ -429,14 +429,8 @@ class LuoguClient(BaseCrawler):
         self, training_list_value: str, overwrite: bool = False
     ) -> None:
         # Parse URL or plain ID
-        if "luogu.com.cn/training/" in training_list_value:
-            # Extract trailing numeric ID from URL
-            tid = training_list_value.rstrip("/").rstrip("#problems").split("/")[-1]
-            # Strip fragment if present
-            if "#" in tid:
-                tid = tid.split("#")[0]
-        else:
-            tid = training_list_value.strip()
+        m = re.search(r"/training/(\d+)", training_list_value)
+        tid = m.group(1) if m else training_list_value.strip()
 
         url = f"https://www.luogu.com.cn/training/{tid}"
         logger.info("Fetching training list %s", tid)
@@ -449,7 +443,7 @@ class LuoguClient(BaseCrawler):
             if not html:
                 logger.error("Failed to fetch training list %s", tid)
                 return
-            ctx = self._extract_lentille_context(html) or self._extract_fe_injection(html)
+            ctx = self._extract_fe_injection(html) or self._extract_lentille_context(html)
 
             mapped = []
             skipped = 0
@@ -467,8 +461,8 @@ class LuoguClient(BaseCrawler):
                     if not raw:
                         continue
                     pid = raw.get("pid", "")
-                    if pid.startswith("AT") or pid.startswith("CF"):
-                        logger.debug("Skipping %s (AT/CF prefix)", pid)
+                    if pid.startswith(("AT", "CF")):
+                        logger.info("Skipping %s (AT/CF prefix)", pid)
                         skipped += 1
                         continue
                     p = self._map_problem(raw, tag_map)
@@ -483,9 +477,11 @@ class LuoguClient(BaseCrawler):
                     if not href.startswith("/problem/"):
                         continue
                     pid = href.split("/problem/")[-1].strip()
-                    if not pid or pid.startswith("AT") or pid.startswith("CF"):
-                        if pid.startswith("AT") or pid.startswith("CF"):
-                            skipped += 1
+                    if not pid:
+                        continue
+                    if pid.startswith(("AT", "CF")):
+                        skipped += 1
+                        logger.info("Skipping %s (AT/CF prefix)", pid)
                         continue
                     title = a.get_text(strip=True)
                     p = self._map_problem({"pid": pid, "title": title}, tag_map)
@@ -522,8 +518,6 @@ class LuoguClient(BaseCrawler):
             progress = self.get_progress()
             completed_pages = set(progress.get("completed_pages", []))
 
-            tag_map = await self._fetch_tags_map(session)
-
             url = f"{self.PROBLEM_LIST_URL}?type=SP&page=1"
             html = await self._fetch_text(
                 session, url, referer="https://www.luogu.com.cn/"
@@ -534,6 +528,8 @@ class LuoguClient(BaseCrawler):
             ctx = self._extract_lentille_context(html)
             if not ctx:
                 return
+
+            tag_map = await self._fetch_tags_map(session)
             problems_data = ctx.get("data", {}).get("problems", {})
             total_count = problems_data.get("count", 0)
             if total_count == 0:
