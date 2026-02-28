@@ -236,9 +236,10 @@ pub fn list_problems(pool: &DbPool, params: &ListParams<'_>) -> Option<ListResul
     let select_sql = format!(
         "SELECT id, source, slug, title, title_cn, difficulty, ac_rate, rating, \
          contest, problem_index, tags, link \
-         FROM problems WHERE {} ORDER BY {} {}, natural_sort_key(id) ASC, id ASC LIMIT ?{} OFFSET ?{}",
+         FROM problems WHERE {} ORDER BY {} {}, id {} LIMIT ?{} OFFSET ?{}",
         where_sql,
         order_col,
+        order_dir,
         order_dir,
         idx,
         idx + 1
