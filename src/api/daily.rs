@@ -1,9 +1,11 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::extract::{Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use serde::Deserialize;
+use tokio::sync::Notify;
 
 use crate::api::error::ProblemDetail;
 use crate::models::LeetCodeDomain;
@@ -14,6 +16,7 @@ pub struct DailyQuery {
     pub domain: Option<String>,
     pub source: Option<String>,
     pub date: Option<String>,
+    pub wait: Option<bool>,
 }
 
 fn resolve_domain(
@@ -50,6 +53,31 @@ fn resolve_domain(
     }
 }
 
+async fn wait_and_fetch(
+    notify: Arc<Notify>,
+    state: &Arc<AppState>,
+    domain_str: &str,
+    date: &str,
+) -> Option<crate::models::DailyChallenge> {
+    let notification = notify.notified();
+    tokio::pin!(notification);
+    notification.as_mut().enable();
+
+    if tokio::time::timeout(Duration::from_secs(10), &mut notification)
+        .await
+        .is_err()
+    {
+        return None;
+    }
+
+    let pool = state.ro_pool.clone();
+    let domain_str = domain_str.to_string();
+    let date = date.to_string();
+    tokio::task::spawn_blocking(move || crate::db::daily::get_daily(&pool, &domain_str, &date))
+        .await
+        .unwrap_or(None)
+}
+
 pub async fn get_daily(
     State(state): State<Arc<AppState>>,
     Query(query): Query<DailyQuery>,
@@ -61,6 +89,7 @@ pub async fn get_daily(
 
     let today = domain.today();
     let date = query.date.as_deref().unwrap_or(&today);
+    let should_wait = query.wait.unwrap_or(false);
 
     // Validate date format
     let date_re = regex::Regex::new(r"^\d{4}-\d{2}-\d{2}$").unwrap();
@@ -104,10 +133,17 @@ pub async fn get_daily(
     let now = tokio::time::Instant::now();
 
     // Atomically check + claim slot under single lock to prevent TOCTOU race
-    {
+    let notify_opt = {
         let mut fallback = state.daily_fallback.lock().await;
         if let Some(entry) = fallback.get(&key) {
             if entry.status == crate::models::CrawlerStatus::Running {
+                if should_wait {
+                    let notify = entry.notify.clone();
+                    drop(fallback);
+                    if let Some(d) = wait_and_fetch(notify, &state, &domain.to_string(), date).await {
+                        return Json(d).into_response();
+                    }
+                }
                 return (
                     axum::http::StatusCode::ACCEPTED,
                     Json(serde_json::json!({"status": "fetching", "retry_after": 30})),
@@ -125,15 +161,18 @@ pub async fn get_daily(
                 }
             }
         }
+        let notify = Arc::new(Notify::new());
         fallback.insert(
             key.clone(),
             crate::models::DailyFallbackEntry {
                 status: crate::models::CrawlerStatus::Running,
                 started_at: now,
                 cooldown_until: None,
+                notify: notify.clone(),
             },
         );
-    }
+        if should_wait { Some(notify) } else { None }
+    };
 
     // Determine args
     let today_str = domain.today();
@@ -168,13 +207,14 @@ pub async fn get_daily(
             let mut fallback = state.daily_fallback.lock().await;
             if let Some(entry) = fallback.get_mut(&key) {
                 entry.status = crate::models::CrawlerStatus::Failed;
-                entry.cooldown_until = Some(now + std::time::Duration::from_secs(30));
+                entry.cooldown_until = Some(now + Duration::from_secs(30));
+                entry.notify.notify_waiters();
             }
             // Schedule cleanup for failed spawn
             let state_clone = state.clone();
             let key_clone = key;
             tokio::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                tokio::time::sleep(Duration::from_secs(60)).await;
                 let mut fallback = state_clone.daily_fallback.lock().await;
                 if let Some(entry) = fallback.get(&key_clone) {
                     if entry.started_at == now {
@@ -182,11 +222,16 @@ pub async fn get_daily(
                     }
                 }
             });
+            if should_wait {
+                return (
+                    axum::http::StatusCode::ACCEPTED,
+                    Json(serde_json::json!({"status": "fetching", "retry_after": 30})),
+                )
+                    .into_response();
+            }
             return ProblemDetail::internal("failed to spawn crawler").into_response();
         }
     };
-
-    // Spawn background task
     let state_clone = state.clone();
     let key_clone = key.clone();
     let timeout_secs = state
@@ -202,7 +247,7 @@ pub async fn get_daily(
     tokio::spawn(async move {
         let mut wait_task = tokio::spawn(async move { child.wait_with_output().await });
         let result =
-            tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), &mut wait_task)
+            tokio::time::timeout(Duration::from_secs(timeout_secs), &mut wait_task)
                 .await;
         // Flatten JoinHandle layer for consistent matching below
         let result: Result<std::io::Result<std::process::Output>, tokio::time::error::Elapsed> =
@@ -270,7 +315,7 @@ pub async fn get_daily(
         };
 
         let cooldown = if status != crate::models::CrawlerStatus::Completed {
-            Some(tokio::time::Instant::now() + std::time::Duration::from_secs(30))
+            Some(tokio::time::Instant::now() + Duration::from_secs(30))
         } else {
             None
         };
@@ -280,11 +325,12 @@ pub async fn get_daily(
             if let Some(entry) = fallback.get_mut(&key_clone) {
                 entry.status = status;
                 entry.cooldown_until = cooldown;
+                entry.notify.notify_waiters();
             }
         }
 
         // Clean up entry after 60s, only if it's still ours
-        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        tokio::time::sleep(Duration::from_secs(60)).await;
         let mut fallback = state_clone.daily_fallback.lock().await;
         if let Some(entry) = fallback.get(&key_clone) {
             if entry.started_at == now {
@@ -292,6 +338,17 @@ pub async fn get_daily(
             }
         }
     });
+
+    if let Some(notify) = notify_opt {
+        if let Some(d) = wait_and_fetch(notify, &state, &domain.to_string(), date).await {
+            return Json(d).into_response();
+        }
+        return (
+            axum::http::StatusCode::ACCEPTED,
+            Json(serde_json::json!({"status": "fetching", "retry_after": 30})),
+        )
+            .into_response();
+    }
 
     (
         axum::http::StatusCode::ACCEPTED,

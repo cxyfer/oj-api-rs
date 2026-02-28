@@ -1,8 +1,10 @@
 use std::fmt;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use tokio::sync::Notify;
 
 fn deserialize_json_array<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
 where
@@ -750,6 +752,7 @@ pub struct DailyFallbackEntry {
     pub status: CrawlerStatus,
     pub started_at: tokio::time::Instant,
     pub cooldown_until: Option<tokio::time::Instant>,
+    pub notify: Arc<Notify>,
 }
 
 // Embedding job model (parallel to CrawlerJob)
