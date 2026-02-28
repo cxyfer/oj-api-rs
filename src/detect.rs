@@ -25,8 +25,7 @@ static CF_ID_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)^(?:CF)?\d+[A-Z]\d*$").unwrap());
 
 static LUOGU_ID_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^([PBTU]\d+|CF\d+[A-Z]|AT_(?:abc|arc|agc|ahc)\d+_[a-z]\d*|UVA\d+)$")
-        .unwrap()
+    Regex::new(r"(?i)^([PBTU]\d+|CF\d+[A-Z]|AT_(?:abc|arc|agc|ahc)\d+_[a-z]\d*|UVA\d+)$").unwrap()
 });
 
 static SP_ID_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^SP\d+$").unwrap());
@@ -230,10 +229,22 @@ mod tests {
 
     #[test]
     fn test_atcoder_id() {
-        assert_eq!(detect_source("abc300_a"), ("atcoder", "abc300_a".to_string()));
-        assert_eq!(detect_source("arc100_c"), ("atcoder", "arc100_c".to_string()));
-        assert_eq!(detect_source("agc050_a"), ("atcoder", "agc050_a".to_string()));
-        assert_eq!(detect_source("ahc001_a"), ("atcoder", "ahc001_a".to_string()));
+        assert_eq!(
+            detect_source("abc300_a"),
+            ("atcoder", "abc300_a".to_string())
+        );
+        assert_eq!(
+            detect_source("arc100_c"),
+            ("atcoder", "arc100_c".to_string())
+        );
+        assert_eq!(
+            detect_source("agc050_a"),
+            ("atcoder", "agc050_a".to_string())
+        );
+        assert_eq!(
+            detect_source("ahc001_a"),
+            ("atcoder", "ahc001_a".to_string())
+        );
     }
 
     #[test]
@@ -246,7 +257,10 @@ mod tests {
         ];
 
         for (input, expected_id) in cases {
-            assert_eq!(detect_source(input), ("codeforces", expected_id.to_string()));
+            assert_eq!(
+                detect_source(input),
+                ("codeforces", expected_id.to_string())
+            );
         }
     }
 
@@ -258,14 +272,20 @@ mod tests {
         ];
 
         for (input, expected_id) in cases {
-            assert_eq!(detect_source(input), ("codeforces", expected_id.to_string()));
+            assert_eq!(
+                detect_source(input),
+                ("codeforces", expected_id.to_string())
+            );
         }
     }
 
     #[test]
     fn test_leetcode_numeric() {
         assert_eq!(detect_source("1"), ("leetcode", "1".to_string()));
-        assert_eq!(detect_source("two-sum"), ("leetcode", "two-sum".to_string()));
+        assert_eq!(
+            detect_source("two-sum"),
+            ("leetcode", "two-sum".to_string())
+        );
     }
 
     #[test]
@@ -320,8 +340,14 @@ mod tests {
 
     #[test]
     fn test_case_normalization() {
-        assert_eq!(detect_source("ABC300_A"), ("atcoder", "abc300_a".to_string()));
-        assert_eq!(detect_source("cf1900a"), ("codeforces", "1900A".to_string()));
+        assert_eq!(
+            detect_source("ABC300_A"),
+            ("atcoder", "abc300_a".to_string())
+        );
+        assert_eq!(
+            detect_source("cf1900a"),
+            ("codeforces", "1900A".to_string())
+        );
         assert_eq!(detect_source("Sp1"), ("spoj", "SP1".to_string()));
     }
 }

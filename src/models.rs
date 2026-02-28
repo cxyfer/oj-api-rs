@@ -94,7 +94,10 @@ impl LeetCodeDomain {
             Self::Com => Utc::now().format("%Y-%m-%d").to_string(),
             Self::Cn => {
                 let cst = chrono::FixedOffset::east_opt(8 * 3600).unwrap();
-                Utc::now().with_timezone(&cst).format("%Y-%m-%d").to_string()
+                Utc::now()
+                    .with_timezone(&cst)
+                    .format("%Y-%m-%d")
+                    .to_string()
             }
         }
     }

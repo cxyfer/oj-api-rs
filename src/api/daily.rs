@@ -45,9 +45,9 @@ fn resolve_domain(
     };
 
     match (from_domain, from_source) {
-        (Some(d), Some(s)) if d != s => Err(ProblemDetail::bad_request(
-            "domain and source conflict",
-        )),
+        (Some(d), Some(s)) if d != s => {
+            Err(ProblemDetail::bad_request("domain and source conflict"))
+        }
         (Some(d), _) => Ok(d),
         (None, Some(s)) => Ok(s),
         (None, None) => Ok(LeetCodeDomain::Com),
@@ -146,7 +146,15 @@ pub async fn get_daily(
                     let notify = entry.notify.clone();
                     let completed = entry.completed.clone();
                     drop(fallback);
-                    if let Some(d) = wait_and_fetch(notify, completed, &state, domain.to_string(), date.to_string()).await {
+                    if let Some(d) = wait_and_fetch(
+                        notify,
+                        completed,
+                        &state,
+                        domain.to_string(),
+                        date.to_string(),
+                    )
+                    .await
+                    {
                         return Json(d).into_response();
                     }
                 }
@@ -179,7 +187,11 @@ pub async fn get_daily(
                 completed: completed.clone(),
             },
         );
-        if should_wait { Some((notify, completed)) } else { None }
+        if should_wait {
+            Some((notify, completed))
+        } else {
+            None
+        }
     };
 
     // Determine args
@@ -255,9 +267,7 @@ pub async fn get_daily(
 
     tokio::spawn(async move {
         let mut wait_task = tokio::spawn(async move { child.wait_with_output().await });
-        let result =
-            tokio::time::timeout(Duration::from_secs(timeout_secs), &mut wait_task)
-                .await;
+        let result = tokio::time::timeout(Duration::from_secs(timeout_secs), &mut wait_task).await;
         // Flatten JoinHandle layer for consistent matching below
         let result: Result<std::io::Result<std::process::Output>, tokio::time::error::Elapsed> =
             match result {
@@ -350,7 +360,15 @@ pub async fn get_daily(
     });
 
     if let Some((notify, completed)) = notify_opt {
-        if let Some(d) = wait_and_fetch(notify, completed, &state, domain.to_string(), date.to_string()).await {
+        if let Some(d) = wait_and_fetch(
+            notify,
+            completed,
+            &state,
+            domain.to_string(),
+            date.to_string(),
+        )
+        .await
+        {
             return Json(d).into_response();
         }
         return (
