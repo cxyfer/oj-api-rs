@@ -17,7 +17,7 @@ pub struct DailyQuery {
     pub domain: Option<String>,
     pub source: Option<String>,
     pub date: Option<String>,
-    pub wait: Option<bool>,
+    pub r#async: Option<bool>,
 }
 
 fn resolve_domain(
@@ -93,7 +93,7 @@ pub async fn get_daily(
 
     let today = domain.today();
     let date = query.date.as_deref().unwrap_or(&today);
-    let should_wait = query.wait.unwrap_or(false);
+    let should_wait = !query.r#async.unwrap_or(false);
 
     // Validate date format
     let date_re = regex::Regex::new(r"^\d{4}-\d{2}-\d{2}$").unwrap();
