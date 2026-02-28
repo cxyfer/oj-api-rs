@@ -68,13 +68,12 @@ async fn wait_and_fetch(
     notification.as_mut().enable();
 
     // If crawler already finished, skip waiting entirely.
-    if !completed.load(Ordering::Acquire) {
-        if tokio::time::timeout(Duration::from_secs(10), &mut notification)
+    if !completed.load(Ordering::Acquire)
+        && tokio::time::timeout(Duration::from_secs(10), &mut notification)
             .await
             .is_err()
-        {
-            return None;
-        }
+    {
+        return None;
     }
 
     let pool = state.ro_pool.clone();
