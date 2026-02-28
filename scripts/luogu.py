@@ -3,7 +3,9 @@ import asyncio
 import json
 import math
 import os
+import re
 import time
+import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -147,6 +149,19 @@ class LuoguClient(BaseCrawler):
                 continue
             return text
         return None
+
+    def _extract_fe_injection(self, html: str) -> Optional[dict]:
+        match = re.search(
+            r'window\._feInjection\s*=\s*JSON\.parse\(decodeURIComponent\("([^"]+)"\)\)',
+            html,
+        )
+        if not match:
+            return None
+        try:
+            return json.loads(urllib.parse.unquote(match.group(1)))
+        except Exception as exc:
+            logger.error("Failed to parse _feInjection: %s", exc)
+            return None
 
     def _extract_lentille_context(self, html: str) -> Optional[dict]:
         soup = BeautifulSoup(html, "html.parser")
@@ -434,13 +449,15 @@ class LuoguClient(BaseCrawler):
             if not html:
                 logger.error("Failed to fetch training list %s", tid)
                 return
-            ctx = self._extract_lentille_context(html)
+            ctx = self._extract_lentille_context(html) or self._extract_fe_injection(html)
 
             mapped = []
             skipped = 0
 
             if ctx:
-                training = ctx.get("data", {}).get("training", {})
+                # lentille-context uses "data"; _feInjection uses "currentData"
+                data_root = ctx.get("currentData") or ctx.get("data") or {}
+                training = data_root.get("training", {})
                 problems = training.get("problems", [])
                 if not problems:
                     logger.warning("No problems found in training list %s", tid)
