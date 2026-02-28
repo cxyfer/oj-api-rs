@@ -25,9 +25,11 @@ static CF_ID_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)^(?:CF)?\d+[A-Z]\d*$").unwrap());
 
 static LUOGU_ID_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^([PBTU]\d+|CF\d+[A-Z]|AT_(?:abc|arc|agc|ahc)\d+_[a-z]\d*|UVA\d+|SP\d+)$")
+    Regex::new(r"(?i)^([PBTU]\d+|CF\d+[A-Z]|AT_(?:abc|arc|agc|ahc)\d+_[a-z]\d*|UVA\d+)$")
         .unwrap()
 });
+
+static SP_ID_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^SP\d+$").unwrap());
 
 const VALID_SOURCES: &[&str] = &["atcoder", "leetcode", "codeforces", "luogu", "uva", "spoj"];
 
@@ -71,6 +73,9 @@ pub fn detect_source(input: &str) -> (&'static str, String) {
         if luogu_pid.starts_with("AT") {
             return ("atcoder", luogu_pid.to_lowercase());
         }
+        if luogu_pid.starts_with("SP") && SP_ID_RE.is_match(&luogu_pid) {
+            return ("spoj", luogu_pid);
+        }
         return ("luogu", luogu_pid);
     }
 
@@ -112,6 +117,11 @@ pub fn detect_source(input: &str) -> (&'static str, String) {
         return ("codeforces", pid.to_uppercase());
     }
 
+    // SPOJ SP\d+ pattern
+    if SP_ID_RE.is_match(pid) {
+        return ("spoj", pid.to_uppercase());
+    }
+
     // Luogu patterns
     if LUOGU_ID_RE.is_match(pid) {
         return ("luogu", pid.to_uppercase());
@@ -119,4 +129,47 @@ pub fn detect_source(input: &str) -> (&'static str, String) {
 
     // Default: LeetCode slug
     ("leetcode", pid.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_spoj_id() {
+        assert_eq!(detect_source("SP1"), ("spoj", "SP1".to_string()));
+        assert_eq!(detect_source("sp1"), ("spoj", "SP1".to_string()));
+        assert_eq!(detect_source("SP12345"), ("spoj", "SP12345".to_string()));
+    }
+
+    #[test]
+    fn test_spoj_luogu_url() {
+        assert_eq!(
+            detect_source("https://www.luogu.com.cn/problem/SP1"),
+            ("spoj", "SP1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_luogu_id_unaffected() {
+        assert_eq!(detect_source("P1000"), ("luogu", "P1000".to_string()));
+        assert_eq!(detect_source("B2001"), ("luogu", "B2001".to_string()));
+    }
+
+    #[test]
+    fn test_atcoder_id() {
+        assert_eq!(detect_source("abc300_a"), ("atcoder", "abc300_a".to_string()));
+    }
+
+    #[test]
+    fn test_codeforces_id() {
+        assert_eq!(detect_source("CF1900A"), ("codeforces", "1900A".to_string()));
+        assert_eq!(detect_source("1900A"), ("codeforces", "1900A".to_string()));
+    }
+
+    #[test]
+    fn test_leetcode_numeric() {
+        assert_eq!(detect_source("1"), ("leetcode", "1".to_string()));
+        assert_eq!(detect_source("two-sum"), ("leetcode", "two-sum".to_string()));
+    }
 }

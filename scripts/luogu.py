@@ -3,7 +3,9 @@ import asyncio
 import json
 import math
 import os
+import re
 import time
+import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -23,7 +25,6 @@ RATE_LIMIT_MARKERS = (
     "too many requests",
     "just a moment...",
     "attention required",
-    "captcha",
     "checking your browser",
 )
 
@@ -148,6 +149,19 @@ class LuoguClient(BaseCrawler):
                 continue
             return text
         return None
+
+    def _extract_fe_injection(self, html: str) -> Optional[dict]:
+        match = re.search(
+            r'window\._feInjection\s*=\s*JSON\.parse\(decodeURIComponent\("([^"]+)"\)\)',
+            html,
+        )
+        if not match:
+            return None
+        try:
+            return json.loads(urllib.parse.unquote(match.group(1)))
+        except Exception as exc:
+            logger.error("Failed to parse _feInjection: %s", exc)
+            return None
 
     def _extract_lentille_context(self, html: str) -> Optional[dict]:
         soup = BeautifulSoup(html, "html.parser")
@@ -411,6 +425,226 @@ class LuoguClient(BaseCrawler):
 
         logger.info("Sync completed")
 
+    async def sync_training_list(
+        self, training_list_value: str, overwrite: bool = False
+    ) -> None:
+        # Parse URL or plain ID
+        m = re.search(r"/training/(\d+)", training_list_value)
+        tid = m.group(1) if m else training_list_value.strip()
+
+        url = f"https://www.luogu.com.cn/training/{tid}"
+        logger.info("Fetching training list %s", tid)
+
+        async with self._create_curl_session(impersonate=CURL_IMPERSONATE) as session:
+            tag_map = await self._fetch_tags_map(session)
+            html = await self._fetch_text(
+                session, url, referer="https://www.luogu.com.cn/"
+            )
+            if not html:
+                logger.error("Failed to fetch training list %s", tid)
+                return
+            ctx = self._extract_fe_injection(html) or self._extract_lentille_context(html)
+
+            mapped = []
+            skipped = 0
+
+            if ctx:
+                # lentille-context uses "data"; _feInjection uses "currentData"
+                data_root = ctx.get("currentData") or ctx.get("data") or {}
+                training = data_root.get("training", {})
+                problems = training.get("problems", [])
+                if not problems:
+                    logger.warning("No problems found in training list %s", tid)
+                    return
+                for item in problems:
+                    raw = item.get("problem")
+                    if not raw:
+                        continue
+                    pid = raw.get("pid", "")
+                    if pid.startswith(("AT", "CF")):
+                        logger.info("Skipping %s (AT/CF prefix)", pid)
+                        skipped += 1
+                        continue
+                    p = self._map_problem(raw, tag_map)
+                    if p:
+                        mapped.append(p)
+            else:
+                # Training pages may serve static HTML without lentille-context;
+                # fall back to parsing <a href="/problem/..."> links.
+                soup = BeautifulSoup(html, "html.parser")
+                for a in soup.find_all("a", href=True):
+                    href = a["href"]
+                    if not href.startswith("/problem/"):
+                        continue
+                    pid = href.split("/problem/")[-1].strip()
+                    if not pid:
+                        continue
+                    if pid.startswith(("AT", "CF")):
+                        skipped += 1
+                        logger.info("Skipping %s (AT/CF prefix)", pid)
+                        continue
+                    title = a.get_text(strip=True)
+                    p = self._map_problem({"pid": pid, "title": title}, tag_map)
+                    if p:
+                        mapped.append(p)
+                if not mapped:
+                    logger.warning("No problems found in training list %s", tid)
+                    return
+
+            if mapped:
+                count = self.problems_db.update_problems(mapped, force_update=overwrite)
+                verb = "upserted" if overwrite else "inserted"
+                logger.info(
+                    "Training list %s: %s %s/%s problems (skipped %s AT/CF)",
+                    tid,
+                    verb,
+                    count,
+                    len(mapped),
+                    skipped,
+                )
+            else:
+                logger.info("Training list %s: no applicable problems", tid)
+
+    async def sync_spoj(self, overwrite: bool = False) -> None:
+        saved_progress_file = self.progress_file
+        self.progress_file = self.data_dir / "spoj_progress.json"
+        try:
+            await self._sync_spoj_inner(overwrite)
+        finally:
+            self.progress_file = saved_progress_file
+
+    async def _sync_spoj_inner(self, overwrite: bool) -> None:
+        async with self._create_curl_session(impersonate=CURL_IMPERSONATE) as session:
+            progress = self.get_progress()
+            completed_pages = set(progress.get("completed_pages", []))
+
+            url = f"{self.PROBLEM_LIST_URL}?type=SP&page=1"
+            html = await self._fetch_text(
+                session, url, referer="https://www.luogu.com.cn/"
+            )
+            if not html:
+                logger.error("Failed to fetch first SPOJ page")
+                return
+            ctx = self._extract_lentille_context(html)
+            if not ctx:
+                return
+
+            tag_map = await self._fetch_tags_map(session)
+            problems_data = ctx.get("data", {}).get("problems", {})
+            total_count = problems_data.get("count", 0)
+            if total_count == 0:
+                logger.warning("SPOJ total count is 0, nothing to sync")
+                return
+            total_pages = math.ceil(total_count / 50)
+            logger.info("SPOJ total problems: %s, pages: %s", total_count, total_pages)
+
+            if "1" not in completed_pages:
+                result = problems_data.get("result", [])
+                mapped = [
+                    p
+                    for raw in result
+                    if (p := self._map_spoj_problem(raw, tag_map))
+                ]
+                if mapped:
+                    count = self.problems_db.update_problems(
+                        mapped, force_update=overwrite
+                    )
+                    verb = "upserted" if overwrite else "inserted"
+                    logger.info("SPOJ page 1: %s %s/%s problems", verb, count, len(mapped))
+                self.save_progress(1, total_count=total_count)
+
+            page = 2
+            while page <= total_pages:
+                if str(page) in completed_pages:
+                    page += 1
+                    continue
+                url = f"{self.PROBLEM_LIST_URL}?type=SP&page={page}"
+                html = await self._fetch_text(
+                    session, url, referer="https://www.luogu.com.cn/problem/list"
+                )
+                if not html:
+                    logger.warning("Failed to fetch SPOJ page %s, stopping", page)
+                    break
+                ctx = self._extract_lentille_context(html)
+                if not ctx:
+                    logger.warning("No lentille-context on SPOJ page %s, stopping", page)
+                    break
+                problems_data = ctx.get("data", {}).get("problems", {})
+                result = problems_data.get("result", [])
+                if not result:
+                    logger.info("Empty result on SPOJ page %s, stopping", page)
+                    break
+                new_count = problems_data.get("count", total_count)
+                if new_count != total_count:
+                    total_count = new_count
+                    total_pages = math.ceil(total_count / 50)
+                mapped = [
+                    p
+                    for raw in result
+                    if (p := self._map_spoj_problem(raw, tag_map))
+                ]
+                if mapped:
+                    count = self.problems_db.update_problems(
+                        mapped, force_update=overwrite
+                    )
+                    verb = "upserted" if overwrite else "inserted"
+                    logger.info(
+                        "SPOJ page %s/%s: %s %s/%s problems",
+                        page,
+                        total_pages,
+                        verb,
+                        count,
+                        len(mapped),
+                    )
+                self.save_progress(page)
+                page += 1
+
+        logger.info("SPOJ sync completed")
+
+    def _map_spoj_problem(self, raw: dict, tag_map: dict[str, str]) -> Optional[dict]:
+        pid = raw.get("pid")
+        if not pid:
+            return None
+        title_raw = raw.get("title", "")
+        if " - " in title_raw:
+            parts = title_raw.split(" - ", 1)
+            slug = parts[0].strip()
+            title = parts[1].strip()
+            if not slug:
+                slug = str(pid)
+        else:
+            slug = str(pid)
+            title = title_raw
+
+        raw_tags = raw.get("tags", [])
+        tags = [tag_map.get(str(t), str(t)) for t in raw_tags]
+        total_submit = raw.get("totalSubmit", 0)
+        total_accepted = raw.get("totalAccepted", 0)
+        ac_rate = (
+            round(total_accepted * 100 / total_submit, 2)
+            if isinstance(total_submit, (int, float)) and total_submit > 0
+            else None
+        )
+        return {
+            "id": str(pid),
+            "source": "spoj",
+            "slug": slug,
+            "title": title,
+            "title_cn": title,
+            "difficulty": self._map_difficulty(raw.get("difficulty")),
+            "ac_rate": ac_rate,
+            "rating": None,
+            "contest": None,
+            "problem_index": None,
+            "tags": json.dumps(tags, ensure_ascii=False),
+            "link": f"https://www.spoj.com/problems/{slug}/",
+            "category": "Algorithms",
+            "paid_only": 0,
+            "content": None,
+            "content_cn": None,
+            "similar_questions": None,
+        }
+
     def _compose_content_markdown(self, content: dict, samples: list) -> str:
         sections = []
         if content.get("background"):
@@ -451,12 +685,12 @@ class LuoguClient(BaseCrawler):
         samples = problem.get("samples", [])
         return self._compose_content_markdown(content, samples)
 
-    async def sync_content(self) -> None:
-        missing = self.problems_db.get_problem_ids_missing_content(source="luogu")
+    async def sync_content(self, source: str = "luogu") -> None:
+        missing = self.problems_db.get_problem_ids_missing_content(source=source)
         if not missing:
-            logger.info("No problems with missing content")
+            logger.info("No %s problems with missing content", source)
             return
-        logger.info("Fetching content for %s problems", len(missing))
+        logger.info("Fetching content for %s %s problems", len(missing), source)
         batch = []
         fetched = 0
         failed = False
@@ -465,7 +699,7 @@ class LuoguClient(BaseCrawler):
                 md = await self.fetch_problem_content(session, pid)
                 if md is None or md == "":
                     continue
-                batch.append((md, "luogu", pid))
+                batch.append((md, source, pid))
                 fetched += 1
                 if len(batch) >= self.batch_size:
                     count, ok = self.problems_db.batch_update_content(
@@ -507,9 +741,9 @@ class LuoguClient(BaseCrawler):
         )
         logger.info("Problems with missing content: %s", db_count)
 
-    def show_missing_content_stats(self) -> None:
-        count = self.problems_db.count_missing_content(source="luogu")
-        logger.info("Missing content: %s", count)
+    def show_missing_content_stats(self, source: str = "luogu") -> None:
+        count = self.problems_db.count_missing_content(source=source)
+        logger.info("Missing content (%s): %s", source, count)
 
 
 async def main() -> None:
@@ -545,11 +779,36 @@ async def main() -> None:
     )
     parser.add_argument("--data-dir", type=str, default=None, help="Data directory")
     parser.add_argument("--db-path", type=str, default=None, help="Database path")
+    parser.add_argument(
+        "--training-list",
+        type=str,
+        default=None,
+        help="Sync a Luogu training list (URL or ID)",
+    )
+    parser.add_argument(
+        "--sync-spoj",
+        action="store_true",
+        help="Sync SPOJ problems from Luogu SP sub-library",
+    )
+    parser.add_argument(
+        "--source",
+        type=str,
+        default=None,
+        choices=["luogu", "spoj"],
+        help="Target source for --fill-missing-content/--missing-content-stats",
+    )
 
     args = parser.parse_args()
     do_sync_content = args.fill_missing_content
 
-    if not (args.sync or do_sync_content or args.missing_content_stats or args.status):
+    if not (
+        args.sync
+        or do_sync_content
+        or args.missing_content_stats
+        or args.status
+        or args.training_list
+        or args.sync_spoj
+    ):
         parser.print_help()
         return
 
@@ -568,10 +827,16 @@ async def main() -> None:
         client.show_status()
     if args.sync:
         await client.sync(overwrite=args.overwrite)
+    if args.training_list:
+        await client.sync_training_list(args.training_list, overwrite=args.overwrite)
+    if args.sync_spoj:
+        await client.sync_spoj(overwrite=args.overwrite)
+
+    source = args.source or "luogu"
     if do_sync_content:
-        await client.sync_content()
+        await client.sync_content(source=source)
     if args.missing_content_stats:
-        client.show_missing_content_stats()
+        client.show_missing_content_stats(source=source)
 
 
 if __name__ == "__main__":

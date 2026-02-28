@@ -46,7 +46,8 @@
       "leetcode": "LeetCode",
       "atcoder": "AtCoder",
       "codeforces": "Codeforces",
-      "luogu": "洛谷"
+      "luogu": "洛谷",
+      "spoj": "SPOJ"
     },
     "pagination": {
       "first": "« 第一頁",
@@ -140,7 +141,10 @@
       "test": "測試目標",
       "sync": "同步",
       "overwrite": "覆蓋已存在",
-      "batch_size": "批次大小"
+      "batch_size": "批次大小",
+      "training_list": "題單",
+      "sync_spoj": "同步 SPOJ",
+      "source": "資料來源"
     }
   },
   "login": {
