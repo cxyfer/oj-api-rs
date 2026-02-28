@@ -139,7 +139,9 @@ GET /api/v1/daily                     # LeetCode daily challenge
                                       # ?domain=com|cn  &date=YYYY-MM-DD
 ```
 
-When today's challenge is not yet in the database (domain=com only), the API returns HTTP 202 and triggers a background Python crawler. Retry after ~30 seconds to get the data.
+When today's challenge is not yet in the database, the API triggers a background Python crawler and waits up to 10 s for it to complete before responding. If the crawler succeeds within the window the response is HTTP 200; otherwise HTTP 202 is returned.
+
+Pass `?async=true` to skip waiting and receive HTTP 202 immediately.
 
 ### Similarity Search
 
