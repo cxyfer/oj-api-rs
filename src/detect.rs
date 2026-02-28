@@ -25,9 +25,11 @@ static CF_ID_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)^(?:CF)?\d+[A-Z]\d*$").unwrap());
 
 static LUOGU_ID_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^([PBTU]\d+|CF\d+[A-Z]|AT_(?:abc|arc|agc|ahc)\d+_[a-z]\d*|UVA\d+|SP\d+)$")
+    Regex::new(r"(?i)^([PBTU]\d+|CF\d+[A-Z]|AT_(?:abc|arc|agc|ahc)\d+_[a-z]\d*|UVA\d+)$")
         .unwrap()
 });
+
+static SP_ID_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^SP\d+$").unwrap());
 
 const VALID_SOURCES: &[&str] = &["atcoder", "leetcode", "codeforces", "luogu", "uva", "spoj"];
 
@@ -71,6 +73,9 @@ pub fn detect_source(input: &str) -> (&'static str, String) {
         if luogu_pid.starts_with("AT") {
             return ("atcoder", luogu_pid.to_lowercase());
         }
+        if luogu_pid.starts_with("SP") && SP_ID_RE.is_match(&luogu_pid) {
+            return ("spoj", luogu_pid);
+        }
         return ("luogu", luogu_pid);
     }
 
@@ -110,6 +115,11 @@ pub fn detect_source(input: &str) -> (&'static str, String) {
     }
     if CF_ID_RE.is_match(pid) {
         return ("codeforces", pid.to_uppercase());
+    }
+
+    // SPOJ SP\d+ pattern
+    if SP_ID_RE.is_match(pid) {
+        return ("spoj", pid.to_uppercase());
     }
 
     // Luogu patterns

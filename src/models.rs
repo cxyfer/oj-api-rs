@@ -515,6 +515,75 @@ pub static LUOGU_ARGS: &[ArgSpec] = &[
         ui_exposed: true,
     },
     ArgSpec {
+        flag: "--training-list",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--source",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--data-dir",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
+    ArgSpec {
+        flag: "--db-path",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
+];
+
+pub static SPOJ_ARGS: &[ArgSpec] = &[
+    ArgSpec {
+        flag: "--sync-spoj",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--fill-missing-content",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--missing-content-stats",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--overwrite",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--source",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
+    ArgSpec {
+        flag: "--rate-limit",
+        arity: 1,
+        value_type: ValueType::Float,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--batch-size",
+        arity: 1,
+        value_type: ValueType::Int,
+        ui_exposed: true,
+    },
+    ArgSpec {
         flag: "--data-dir",
         arity: 1,
         value_type: ValueType::Str,
@@ -541,6 +610,7 @@ pub enum CrawlerSource {
     AtCoder,
     Codeforces,
     Luogu,
+    Spoj,
     Diag,
 }
 
@@ -551,6 +621,7 @@ impl CrawlerSource {
             "atcoder" => Ok(Self::AtCoder),
             "codeforces" => Ok(Self::Codeforces),
             "luogu" => Ok(Self::Luogu),
+            "spoj" => Ok(Self::Spoj),
             "diag" => Ok(Self::Diag),
             _ => Err(format!("invalid source: {}", s)),
         }
@@ -562,6 +633,7 @@ impl CrawlerSource {
             Self::AtCoder => "atcoder.py",
             Self::Codeforces => "codeforces.py",
             Self::Luogu => "luogu.py",
+            Self::Spoj => "luogu.py",
             Self::Diag => "diag.py",
         }
     }
@@ -572,6 +644,7 @@ impl CrawlerSource {
             Self::AtCoder => ATCODER_ARGS,
             Self::Codeforces => CODEFORCES_ARGS,
             Self::Luogu => LUOGU_ARGS,
+            Self::Spoj => SPOJ_ARGS,
             Self::Diag => DIAG_ARGS,
         }
     }

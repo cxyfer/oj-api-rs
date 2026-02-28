@@ -46,7 +46,8 @@
       "leetcode": "LeetCode",
       "atcoder": "AtCoder",
       "codeforces": "Codeforces",
-      "luogu": "Luogu"
+      "luogu": "Luogu",
+      "spoj": "SPOJ"
     },
     "pagination": {
       "first": "« First",
@@ -138,7 +139,10 @@
       "test": "Test Target",
       "sync": "Sync",
       "overwrite": "Overwrite Existing",
-      "batch_size": "Batch Size"
+      "batch_size": "Batch Size",
+      "training_list": "Training List",
+      "sync_spoj": "Sync SPOJ",
+      "source": "Source"
     }
   },
   "login": {

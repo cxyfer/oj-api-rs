@@ -252,6 +252,17 @@
                 { flag: '--status', i18nKey: 'status', type: 'checkbox' },
                 { flag: '--overwrite', i18nKey: 'overwrite', type: 'checkbox' },
                 { flag: '--rate-limit', i18nKey: 'rate_limit', type: 'number', placeholder: 'seconds', step: '0.1' },
+                { flag: '--batch-size', i18nKey: 'batch_size', type: 'number', placeholder: '10', step: '1' },
+                { flag: '--training-list', i18nKey: 'training_list', type: 'text', placeholder: 'URL or ID' },
+                { flag: '--source', i18nKey: 'source', type: 'select', options: ['luogu', 'spoj'] }
+            ],
+            spoj: [
+                { flag: '--sync-spoj', i18nKey: 'sync_spoj', type: 'checkbox' },
+                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
+                { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' },
+                { flag: '--overwrite', i18nKey: 'overwrite', type: 'checkbox' },
+                { flag: '--source', i18nKey: 'source', type: 'hidden', value: 'spoj' },
+                { flag: '--rate-limit', i18nKey: 'rate_limit', type: 'number', placeholder: 'seconds', step: '0.1' },
                 { flag: '--batch-size', i18nKey: 'batch_size', type: 'number', placeholder: '10', step: '1' }
             ]
         };
@@ -311,6 +322,14 @@
                     });
                     cb.addEventListener('change', function() { sel.disabled = !cb.checked; });
                     item.appendChild(sel);
+                } else if (f.type === 'hidden') {
+                    item.style.display = 'none';
+                    cb.checked = true;
+                    var hiddenInp = document.createElement('input');
+                    hiddenInp.type = 'text';
+                    hiddenInp.className = 'flag-input';
+                    hiddenInp.value = f.value || '';
+                    item.appendChild(hiddenInp);
                 } else if (f.type !== 'checkbox') {
                     var inp = document.createElement('input');
                     inp.type = f.type === 'date' ? 'date' : (f.type === 'number' ? 'number' : 'text');
@@ -837,7 +856,7 @@
 
         function parseUrlState() {
             var params = new URLSearchParams(window.location.search);
-            if (params.get('source') && ['leetcode', 'atcoder', 'codeforces', 'luogu'].indexOf(params.get('source')) !== -1) {
+            if (params.get('source') && ['leetcode', 'atcoder', 'codeforces', 'luogu', 'spoj'].indexOf(params.get('source')) !== -1) {
                 currentSource = params.get('source');
             }
             currentPage = parseInt(params.get('page'), 10) || 1;
@@ -1033,7 +1052,7 @@
                     opt.textContent = i18n.t(pair[1]);
                     diffSelect.appendChild(opt);
                 });
-            } else if (source === 'luogu') {
+            } else if (source === 'luogu' || source === 'spoj') {
                 LUOGU_DIFFICULTY_TIERS.forEach(function(val, idx) {
                     var opt = document.createElement('option');
                     opt.value = val;
@@ -1129,11 +1148,11 @@
             var tagsSelect = document.getElementById('tags-select');
             var tagModeContainer = document.querySelector('.tag-mode-container');
             var showRating = source === 'leetcode' || source === 'codeforces';
-            if (diffField) diffField.style.display = (source === 'leetcode' || source === 'luogu') ? '' : 'none';
+            if (diffField) diffField.style.display = (source === 'leetcode' || source === 'luogu' || source === 'spoj') ? '' : 'none';
             if (ratingField) ratingField.style.display = showRating ? '' : 'none';
             if (tagsSelect) tagsSelect.parentElement.style.display = source === 'atcoder' ? 'none' : '';
             if (tagModeContainer) tagModeContainer.style.display = source === 'atcoder' ? 'none' : '';
-            problemsTable.classList.remove('source-leetcode', 'source-atcoder', 'source-codeforces', 'source-luogu');
+            problemsTable.classList.remove('source-leetcode', 'source-atcoder', 'source-codeforces', 'source-luogu', 'source-spoj');
             problemsTable.classList.add('source-' + source);
             syncDifficultyFilterOptions(source);
         }
