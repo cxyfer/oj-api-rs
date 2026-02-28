@@ -1,3 +1,4 @@
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -55,24 +56,28 @@ fn resolve_domain(
 
 async fn wait_and_fetch(
     notify: Arc<Notify>,
+    completed: Arc<std::sync::atomic::AtomicBool>,
     state: &Arc<AppState>,
-    domain_str: &str,
-    date: &str,
+    domain_str: String,
+    date: String,
 ) -> Option<crate::models::DailyChallenge> {
+    // Register interest before checking completed flag to avoid race where
+    // notify_waiters() fires between the flag check and notified() setup.
     let notification = notify.notified();
     tokio::pin!(notification);
     notification.as_mut().enable();
 
-    if tokio::time::timeout(Duration::from_secs(10), &mut notification)
-        .await
-        .is_err()
-    {
-        return None;
+    // If crawler already finished, skip waiting entirely.
+    if !completed.load(Ordering::Acquire) {
+        if tokio::time::timeout(Duration::from_secs(10), &mut notification)
+            .await
+            .is_err()
+        {
+            return None;
+        }
     }
 
     let pool = state.ro_pool.clone();
-    let domain_str = domain_str.to_string();
-    let date = date.to_string();
     tokio::task::spawn_blocking(move || crate::db::daily::get_daily(&pool, &domain_str, &date))
         .await
         .unwrap_or(None)
@@ -139,8 +144,9 @@ pub async fn get_daily(
             if entry.status == crate::models::CrawlerStatus::Running {
                 if should_wait {
                     let notify = entry.notify.clone();
+                    let completed = entry.completed.clone();
                     drop(fallback);
-                    if let Some(d) = wait_and_fetch(notify, &state, &domain.to_string(), date).await {
+                    if let Some(d) = wait_and_fetch(notify, completed, &state, domain.to_string(), date.to_string()).await {
                         return Json(d).into_response();
                     }
                 }
@@ -162,6 +168,7 @@ pub async fn get_daily(
             }
         }
         let notify = Arc::new(Notify::new());
+        let completed = Arc::new(std::sync::atomic::AtomicBool::new(false));
         fallback.insert(
             key.clone(),
             crate::models::DailyFallbackEntry {
@@ -169,9 +176,10 @@ pub async fn get_daily(
                 started_at: now,
                 cooldown_until: None,
                 notify: notify.clone(),
+                completed: completed.clone(),
             },
         );
-        if should_wait { Some(notify) } else { None }
+        if should_wait { Some((notify, completed)) } else { None }
     };
 
     // Determine args
@@ -208,6 +216,7 @@ pub async fn get_daily(
             if let Some(entry) = fallback.get_mut(&key) {
                 entry.status = crate::models::CrawlerStatus::Failed;
                 entry.cooldown_until = Some(now + Duration::from_secs(30));
+                entry.completed.store(true, Ordering::Release);
                 entry.notify.notify_waiters();
             }
             // Schedule cleanup for failed spawn
@@ -325,6 +334,7 @@ pub async fn get_daily(
             if let Some(entry) = fallback.get_mut(&key_clone) {
                 entry.status = status;
                 entry.cooldown_until = cooldown;
+                entry.completed.store(true, Ordering::Release);
                 entry.notify.notify_waiters();
             }
         }
@@ -339,8 +349,8 @@ pub async fn get_daily(
         }
     });
 
-    if let Some(notify) = notify_opt {
-        if let Some(d) = wait_and_fetch(notify, &state, &domain.to_string(), date).await {
+    if let Some((notify, completed)) = notify_opt {
+        if let Some(d) = wait_and_fetch(notify, completed, &state, domain.to_string(), date.to_string()).await {
             return Json(d).into_response();
         }
         return (

@@ -753,6 +753,7 @@ pub struct DailyFallbackEntry {
     pub started_at: tokio::time::Instant,
     pub cooldown_until: Option<tokio::time::Instant>,
     pub notify: Arc<Notify>,
+    pub completed: Arc<std::sync::atomic::AtomicBool>,
 }
 
 // Embedding job model (parallel to CrawlerJob)
