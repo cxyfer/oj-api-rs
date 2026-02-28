@@ -23,7 +23,6 @@ RATE_LIMIT_MARKERS = (
     "too many requests",
     "just a moment...",
     "attention required",
-    "captcha",
     "checking your browser",
 )
 
@@ -436,29 +435,48 @@ class LuoguClient(BaseCrawler):
                 logger.error("Failed to fetch training list %s", tid)
                 return
             ctx = self._extract_lentille_context(html)
-            if not ctx:
-                return
-
-            training = ctx.get("data", {}).get("training", {})
-            problems = training.get("problems", [])
-            if not problems:
-                logger.warning("No problems found in training list %s", tid)
-                return
 
             mapped = []
             skipped = 0
-            for item in problems:
-                raw = item.get("problem")
-                if not raw:
-                    continue
-                pid = raw.get("pid", "")
-                if pid.startswith("AT") or pid.startswith("CF"):
-                    logger.debug("Skipping %s (AT/CF prefix)", pid)
-                    skipped += 1
-                    continue
-                p = self._map_problem(raw, tag_map)
-                if p:
-                    mapped.append(p)
+
+            if ctx:
+                training = ctx.get("data", {}).get("training", {})
+                problems = training.get("problems", [])
+                if not problems:
+                    logger.warning("No problems found in training list %s", tid)
+                    return
+                for item in problems:
+                    raw = item.get("problem")
+                    if not raw:
+                        continue
+                    pid = raw.get("pid", "")
+                    if pid.startswith("AT") or pid.startswith("CF"):
+                        logger.debug("Skipping %s (AT/CF prefix)", pid)
+                        skipped += 1
+                        continue
+                    p = self._map_problem(raw, tag_map)
+                    if p:
+                        mapped.append(p)
+            else:
+                # Training pages may serve static HTML without lentille-context;
+                # fall back to parsing <a href="/problem/..."> links.
+                soup = BeautifulSoup(html, "html.parser")
+                for a in soup.find_all("a", href=True):
+                    href = a["href"]
+                    if not href.startswith("/problem/"):
+                        continue
+                    pid = href.split("/problem/")[-1].strip()
+                    if not pid or pid.startswith("AT") or pid.startswith("CF"):
+                        if pid.startswith("AT") or pid.startswith("CF"):
+                            skipped += 1
+                        continue
+                    title = a.get_text(strip=True)
+                    p = self._map_problem({"pid": pid, "title": title}, tag_map)
+                    if p:
+                        mapped.append(p)
+                if not mapped:
+                    logger.warning("No problems found in training list %s", tid)
+                    return
 
             if mapped:
                 count = self.problems_db.update_problems(mapped, force_update=overwrite)
