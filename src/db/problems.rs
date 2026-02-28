@@ -222,8 +222,8 @@ pub fn list_problems(pool: &DbPool, params: &ListParams<'_>) -> Option<ListResul
         Some("difficulty") => "CASE WHEN LOWER(difficulty)='easy' THEN 1 WHEN LOWER(difficulty)='medium' THEN 2 WHEN LOWER(difficulty)='hard' THEN 3 ELSE 4 END",
         Some("rating") => "rating",
         Some("ac_rate") => "ac_rate",
-        Some("id") => "id",
-        _ => "id",
+        Some("id") => "natural_sort_key(id)",
+        _ => "natural_sort_key(id)",
     };
     let order_dir = match params.sort_by {
         Some(_) => match params.sort_order {
@@ -236,9 +236,10 @@ pub fn list_problems(pool: &DbPool, params: &ListParams<'_>) -> Option<ListResul
     let select_sql = format!(
         "SELECT id, source, slug, title, title_cn, difficulty, ac_rate, rating, \
          contest, problem_index, tags, link \
-         FROM problems WHERE {} ORDER BY {} {}, id ASC LIMIT ?{} OFFSET ?{}",
+         FROM problems WHERE {} ORDER BY {} {}, id {} LIMIT ?{} OFFSET ?{}",
         where_sql,
         order_col,
+        order_dir,
         order_dir,
         idx,
         idx + 1
