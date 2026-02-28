@@ -186,40 +186,40 @@ The `get_daily_challenge()` method SHALL use the local `domain` parameter (not `
 - **THEN** it calls `fetch_daily_challenge(domain="cn")`, not `fetch_daily_challenge(self.domain)`
 
 ### Requirement: Daily challenge wait-for-result
-The system SHALL accept an optional `?wait=true` query parameter on `GET /api/v1/daily`.
-When `wait=true`, the handler SHALL await the background crawler's completion (up to 10 s)
-before responding. If the crawler completes within 10 s and the DB row exists, the system
-SHALL return HTTP 200 with the challenge data. If the crawler fails, times out, or the DB
-row is still absent after notification, the system SHALL return HTTP 202.
+The system SHALL accept an optional `?async=true` query parameter on `GET /api/v1/daily`.
+By default (when `async` is omitted or `false`), the handler SHALL await the background crawler's
+completion (up to 10 s) before responding. If the crawler completes within 10 s and the DB row
+exists, the system SHALL return HTTP 200 with the challenge data. If the crawler fails, times out,
+or the DB row is still absent after notification, the system SHALL return HTTP 202.
 
-When `wait` is omitted or `false`, existing behavior is unchanged.
+When `async=true`, the handler returns HTTP 202 immediately upon triggering the crawler without waiting.
 
-#### Scenario: Wait succeeds — new crawler finishes in time
-- **WHEN** client sends `GET /api/v1/daily?wait=true` and no DB row exists
+#### Scenario: Default behavior — waits for crawler
+- **WHEN** client sends `GET /api/v1/daily` (no `?async` parameter) and no DB row exists
 - **THEN** system spawns the crawler, awaits notification (≤10 s), reads DB, and returns HTTP 200 with challenge data
 
 #### Scenario: Wait succeeds — joins existing crawler
-- **WHEN** a crawler for the same key is already `Running` and client sends `GET /api/v1/daily?wait=true`
+- **WHEN** a crawler for the same key is already `Running` and client sends `GET /api/v1/daily`
 - **THEN** system joins the existing `Notify` (no second crawler spawned), awaits notification (≤10 s), and returns HTTP 200 if DB row exists
 
 #### Scenario: Wait times out
-- **WHEN** client sends `GET /api/v1/daily?wait=true` and the crawler does not complete within 10 s
+- **WHEN** client sends `GET /api/v1/daily` and the crawler does not complete within 10 s
 - **THEN** system returns HTTP 202 with `{"status": "fetching", "retry_after": 30}`
 
 #### Scenario: Crawler fails during wait
-- **WHEN** client sends `GET /api/v1/daily?wait=true` and the crawler exits with non-zero status
+- **WHEN** client sends `GET /api/v1/daily` and the crawler exits with non-zero status
 - **THEN** system receives the notification, reads DB (finds nothing), and returns HTTP 202
 
 #### Scenario: Spawn failure during wait
-- **WHEN** client sends `GET /api/v1/daily?wait=true` and `uv run python3 leetcode.py` fails to spawn
+- **WHEN** client sends `GET /api/v1/daily` and `uv run python3 leetcode.py` fails to spawn
 - **THEN** system calls `notify_waiters()` in the failure path, and the waiting handler returns HTTP 202
 
-#### Scenario: No-wait behavior unchanged
-- **WHEN** client sends `GET /api/v1/daily` without `?wait` parameter
-- **THEN** system returns HTTP 202 immediately upon triggering crawler, identical to pre-change behavior
+#### Scenario: Async mode — immediate return
+- **WHEN** client sends `GET /api/v1/daily?async=true`
+- **THEN** system returns HTTP 202 immediately upon triggering crawler without waiting
 
-#### Scenario: Two concurrent wait requests share one crawler
-- **WHEN** two concurrent requests both send `GET /api/v1/daily?wait=true` for the same key
+#### Scenario: Two concurrent default requests share one crawler
+- **WHEN** two concurrent requests both send `GET /api/v1/daily` for the same key
 - **THEN** only one crawler is spawned; both requests await the same `Notify` and both receive the result
 
 ### Requirement: DailyFallbackEntry notify field
