@@ -185,3 +185,58 @@ The `get_daily_challenge()` method SHALL use the local `domain` parameter (not `
 - **WHEN** `get_daily_challenge(domain="cn")` needs to fetch today's challenge
 - **THEN** it calls `fetch_daily_challenge(domain="cn")`, not `fetch_daily_challenge(self.domain)`
 
+### Requirement: Daily challenge wait-for-result
+The system SHALL accept an optional `?wait=true` query parameter on `GET /api/v1/daily`.
+When `wait=true`, the handler SHALL await the background crawler's completion (up to 10 s)
+before responding. If the crawler completes within 10 s and the DB row exists, the system
+SHALL return HTTP 200 with the challenge data. If the crawler fails, times out, or the DB
+row is still absent after notification, the system SHALL return HTTP 202.
+
+When `wait` is omitted or `false`, existing behavior is unchanged.
+
+#### Scenario: Wait succeeds — new crawler finishes in time
+- **WHEN** client sends `GET /api/v1/daily?wait=true` and no DB row exists
+- **THEN** system spawns the crawler, awaits notification (≤10 s), reads DB, and returns HTTP 200 with challenge data
+
+#### Scenario: Wait succeeds — joins existing crawler
+- **WHEN** a crawler for the same key is already `Running` and client sends `GET /api/v1/daily?wait=true`
+- **THEN** system joins the existing `Notify` (no second crawler spawned), awaits notification (≤10 s), and returns HTTP 200 if DB row exists
+
+#### Scenario: Wait times out
+- **WHEN** client sends `GET /api/v1/daily?wait=true` and the crawler does not complete within 10 s
+- **THEN** system returns HTTP 202 with `{"status": "fetching", "retry_after": 30}`
+
+#### Scenario: Crawler fails during wait
+- **WHEN** client sends `GET /api/v1/daily?wait=true` and the crawler exits with non-zero status
+- **THEN** system receives the notification, reads DB (finds nothing), and returns HTTP 202
+
+#### Scenario: Spawn failure during wait
+- **WHEN** client sends `GET /api/v1/daily?wait=true` and `uv run python3 leetcode.py` fails to spawn
+- **THEN** system calls `notify_waiters()` in the failure path, and the waiting handler returns HTTP 202
+
+#### Scenario: No-wait behavior unchanged
+- **WHEN** client sends `GET /api/v1/daily` without `?wait` parameter
+- **THEN** system returns HTTP 202 immediately upon triggering crawler, identical to pre-change behavior
+
+#### Scenario: Two concurrent wait requests share one crawler
+- **WHEN** two concurrent requests both send `GET /api/v1/daily?wait=true` for the same key
+- **THEN** only one crawler is spawned; both requests await the same `Notify` and both receive the result
+
+### Requirement: DailyFallbackEntry notify field
+`DailyFallbackEntry` in `src/models.rs` SHALL include a `notify: Arc<tokio::sync::Notify>`
+field. The field SHALL be initialised with `Arc::new(Notify::new())` at entry creation.
+All completion paths (success, failure, timeout, spawn error) SHALL call
+`entry.notify.notify_waiters()` to unblock any waiting handlers.
+
+#### Scenario: Notify initialised at entry creation
+- **WHEN** a new `DailyFallbackEntry` is inserted into `state.daily_fallback`
+- **THEN** its `notify` field is a fresh `Arc<Notify>` (not shared from a previous entry)
+
+#### Scenario: notify_waiters called on crawler success
+- **WHEN** the background crawler exits with status 0
+- **THEN** `entry.notify.notify_waiters()` is called before cleanup sleep
+
+#### Scenario: notify_waiters called on spawn failure
+- **WHEN** `spawn_with_pgid(cmd)` returns `Err(_)`
+- **THEN** `entry.notify.notify_waiters()` is called within the error handler
+
