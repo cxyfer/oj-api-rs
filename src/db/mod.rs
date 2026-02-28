@@ -1,6 +1,7 @@
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::ffi::sqlite3_auto_extension;
+use rusqlite::functions::FunctionFlags;
 use sqlite_vec::sqlite3_vec_init;
 
 pub mod daily;
@@ -32,6 +33,15 @@ pub fn create_ro_pool(path: &str, max_size: u32, busy_timeout_ms: u64) -> DbPool
              PRAGMA query_only=ON;",
             busy_timeout_ms
         ))?;
+        conn.create_scalar_function(
+            "natural_sort_key",
+            1,
+            FunctionFlags::SQLITE_DETERMINISTIC | FunctionFlags::SQLITE_INNOCUOUS,
+            |ctx| {
+                let s: Option<String> = ctx.get(0)?;
+                Ok(s.map_or_else(String::new, |v| crate::utils::natural_sort_key(&v)))
+            },
+        )?;
         Ok(())
     });
     Pool::builder()
