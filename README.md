@@ -11,9 +11,9 @@ Built with Rust (axum + SQLite), featuring vector similarity search, a tri-lingu
 | LeetCode | `leetcode` | ✅ |
 | AtCoder | `atcoder` | ✅ |
 | Codeforces | `codeforces` | ✅ |
-| Luogu | `luogu` | 🚧 Planned |
+| Luogu | `luogu` | ✅ |
 | UVa | `uva` | 🚧 Planned |
-| SPOJ | `spoj` | 🚧 Planned |
+| SPOJ | `spoj` | ✅ |
 
 ## Tech Stack
 
@@ -274,6 +274,7 @@ scripts/              # Python crawlers and embedding pipeline
 ├── leetcode.py       # LeetCode crawler (--daily, --date, --init, --monthly, ...)
 ├── atcoder.py        # AtCoder crawler (--fetch-all, --resume, --contest, ...)
 ├── codeforces.py     # Codeforces crawler (--sync-problemset, --fetch-all, ...)
+├── luogu.py          # Luogu crawler (--fetch-all, --training, --sync-spoj, ...)
 ├── embedding_cli.py  # Embedding pipeline (--build, --embed-text)
 ├── utils/            # Shared utilities (config, database, logger, html_converter)
 └── embeddings/       # Embedding modules (generator, rewriter, searcher, storage)
