@@ -188,25 +188,11 @@ async fn shutdown_signal(state: Arc<AppState>, timeout_secs: u64) {
 }
 
 async fn cleanup_active_jobs(state: &Arc<AppState>) {
-    cleanup_active_job(
-        &state.active_crawler_pid,
-        "crawler",
-        "/admin/api/crawlers/cancel",
-    )
-    .await;
-    cleanup_active_job(
-        &state.active_embedding_pid,
-        "embedding",
-        "/admin/api/embeddings/cancel",
-    )
-    .await;
+    cleanup_active_job(&state.active_crawler_pid, "crawler").await;
+    cleanup_active_job(&state.active_embedding_pid, "embedding").await;
 }
 
-async fn cleanup_active_job(
-    pid_lock: &tokio::sync::Mutex<Option<u32>>,
-    job_type: &str,
-    cancel_path: &str,
-) {
+async fn cleanup_active_job(pid_lock: &tokio::sync::Mutex<Option<u32>>, job_type: &str) {
     let pid = {
         let mut lock = pid_lock.lock().await;
         lock.take()
@@ -217,16 +203,14 @@ async fn cleanup_active_job(
             let killed = crate::utils::kill_pgid(pid);
             if killed {
                 tracing::info!(
-                    "shutdown cleanup killed active {} process group via {} (pid {})",
+                    "shutdown cleanup killed active {} process group (pid {})",
                     job_type,
-                    cancel_path,
                     pid
                 );
             } else {
                 tracing::warn!(
-                    "shutdown cleanup failed to kill active {} process group via {} (pid {})",
+                    "shutdown cleanup failed to kill active {} process group (pid {})",
                     job_type,
-                    cancel_path,
                     pid
                 );
             }

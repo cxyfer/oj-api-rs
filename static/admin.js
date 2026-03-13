@@ -200,6 +200,29 @@
         });
     }
 
+    function setupCancelHandler(options) {
+        var statusCard = document.getElementById(options.cardId);
+        if (!statusCard) return;
+        statusCard.addEventListener('click', function(e) {
+            if (!e.target.classList.contains(options.buttonClass)) return;
+            var btn = e.target;
+            showConfirm(i18n.t('messages.confirm_cancel'), function() {
+                btn.disabled = true;
+                api(options.apiUrl, { method: 'POST' }).then(function(res) {
+                    if (res.ok) {
+                        toast(i18n.t(options.successMessageKey));
+                        options.poll();
+                    } else {
+                        toast(i18n.t(options.errorMessageKey), 'error');
+                        btn.disabled = false;
+                    }
+                }).catch(function() {
+                    btn.disabled = false;
+                });
+            });
+        });
+    }
+
     // Crawlers page
     var triggerBtn = document.getElementById('crawler-trigger-btn');
     if (triggerBtn) {
@@ -425,24 +448,13 @@
             });
         });
 
-        // Cancel crawler (event delegation)
-        document.getElementById('crawler-status-card').addEventListener('click', function(e) {
-            if (!e.target.classList.contains('cancel-crawler-btn')) return;
-            var btn = e.target;
-            showConfirm(i18n.t('messages.confirm_cancel'), function() {
-                btn.disabled = true;
-                api('/admin/api/crawlers/cancel', { method: 'POST' }).then(function(res) {
-                    if (res.ok) {
-                        toast(i18n.t('messages.crawler_cancelled'));
-                        pollStatus();
-                    } else {
-                        toast(i18n.t('messages.failed_cancel_crawler'), 'error');
-                        btn.disabled = false;
-                    }
-                }).catch(function() {
-                    btn.disabled = false;
-                });
-            });
+        setupCancelHandler({
+            cardId: 'crawler-status-card',
+            buttonClass: 'cancel-crawler-btn',
+            apiUrl: '/admin/api/crawlers/cancel',
+            successMessageKey: 'messages.crawler_cancelled',
+            errorMessageKey: 'messages.failed_cancel_crawler',
+            poll: pollStatus
         });
 
         // Polling
@@ -661,24 +673,13 @@
             });
         });
 
-        // Cancel embedding (event delegation)
-        document.getElementById('embedding-status-card').addEventListener('click', function(e) {
-            if (!e.target.classList.contains('cancel-embedding-btn')) return;
-            var btn = e.target;
-            showConfirm(i18n.t('messages.confirm_cancel'), function() {
-                btn.disabled = true;
-                api('/admin/api/embeddings/cancel', { method: 'POST' }).then(function(res) {
-                    if (res.ok) {
-                        toast(i18n.t('messages.embedding_cancelled'));
-                        pollEmbedStatus();
-                    } else {
-                        toast(i18n.t('messages.failed_cancel_embedding'), 'error');
-                        btn.disabled = false;
-                    }
-                }).catch(function() {
-                    btn.disabled = false;
-                });
-            });
+        setupCancelHandler({
+            cardId: 'embedding-status-card',
+            buttonClass: 'cancel-embedding-btn',
+            apiUrl: '/admin/api/embeddings/cancel',
+            successMessageKey: 'messages.embedding_cancelled',
+            errorMessageKey: 'messages.failed_cancel_embedding',
+            poll: pollEmbedStatus
         });
 
         // Polling
