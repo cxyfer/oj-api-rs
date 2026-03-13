@@ -100,14 +100,16 @@
     "control": {
       "source": "Source",
       "args": "Arguments",
-      "trigger": "Trigger"
+      "trigger": "Trigger",
+      "cancel": "Cancel"
     },
     "status": {
       "running": "Running",
       "job": "Job",
       "started": "Started",
       "finished": "Finished",
-      "args": "Args"
+      "args": "Args",
+      "cancelled": "Cancelled"
     },
     "history_table": {
       "trigger": "Trigger",
@@ -187,7 +189,12 @@
     "failed_load_output": "Failed to load output",
     "failed_load_detail": "Failed to load problem detail",
     "embedding_triggered": "Embedding job triggered",
-    "failed_trigger_embedding": "Failed to trigger embedding job"
+    "failed_trigger_embedding": "Failed to trigger embedding job",
+    "crawler_cancelled": "Crawler job cancelled",
+    "embedding_cancelled": "Embedding job cancelled",
+    "failed_cancel_crawler": "Failed to cancel crawler",
+    "failed_cancel_embedding": "Failed to cancel embedding job",
+    "confirm_cancel": "Cancel the running job?"
   },
   "embeddings": {
     "title": "Embeddings",
@@ -212,7 +219,8 @@
       "embedding": "Embedding",
       "completed": "Completed",
       "failed": "Failed",
-      "skipped": "Skipped"
+      "skipped": "Skipped",
+      "cancelled": "Cancelled"
     }
   }
 }

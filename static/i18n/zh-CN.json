@@ -100,14 +100,16 @@
     "control": {
       "source": "来源",
       "args": "参数",
-      "trigger": "执行"
+      "trigger": "执行",
+      "cancel": "取消执行"
     },
     "status": {
       "running": "运行中",
       "job": "任务",
       "started": "开始时间",
       "finished": "结束时间",
-      "args": "参数"
+      "args": "参数",
+      "cancelled": "已取消"
     },
     "history_table": {
       "trigger": "触发方式",
@@ -186,7 +188,12 @@
     "failed_load_output": "无法加载输出内容",
     "failed_load_detail": "无法加载题目详情",
     "embedding_triggered": "嵌入任务已启动",
-    "failed_trigger_embedding": "无法启动嵌入任务"
+    "failed_trigger_embedding": "无法启动嵌入任务",
+    "crawler_cancelled": "爬虫任务已取消",
+    "embedding_cancelled": "嵌入任务已取消",
+    "failed_cancel_crawler": "无法取消爬虫任务",
+    "failed_cancel_embedding": "无法取消嵌入任务",
+    "confirm_cancel": "确定要取消正在执行的任务吗？"
   },
   "embeddings": {
     "title": "向量嵌入",
@@ -211,7 +218,8 @@
       "embedding": "嵌入中",
       "completed": "已完成",
       "failed": "失败",
-      "skipped": "已跳过"
+      "skipped": "已跳过",
+      "cancelled": "已取消"
     }
   }
 }

@@ -61,7 +61,9 @@
 <div class="card status-card" id="embedding-status-card" style="margin-bottom:1rem{% if !is_running %};display:none{% endif %}">
     {% if is_running %}
     {% match current_job %}{% when Some with (job) %}
-    <div class="status-header running" data-i18n="crawlers.status.running">Running</div>
+    <div class="status-header running" data-i18n="crawlers.status.running">Running
+        <button class="btn btn-sm btn-danger cancel-embedding-btn" data-i18n="crawlers.control.cancel">Cancel</button>
+    </div>
     <div class="status-details">
         <span><strong data-i18n="crawlers.status.job">Job</strong>: {{ job.job_id }}</span>
         <span><strong data-i18n="common.source">Source</strong>: {{ job.source }}</span>

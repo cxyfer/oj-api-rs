@@ -425,6 +425,26 @@
             });
         });
 
+        // Cancel crawler (event delegation)
+        document.getElementById('crawler-status-card').addEventListener('click', function(e) {
+            if (!e.target.classList.contains('cancel-crawler-btn')) return;
+            var btn = e.target;
+            showConfirm(i18n.t('messages.confirm_cancel'), function() {
+                btn.disabled = true;
+                api('/admin/api/crawlers/cancel', { method: 'POST' }).then(function(res) {
+                    if (res.ok) {
+                        toast(i18n.t('messages.crawler_cancelled'));
+                        pollStatus();
+                    } else {
+                        toast(i18n.t('messages.failed_cancel_crawler'), 'error');
+                        btn.disabled = false;
+                    }
+                }).catch(function() {
+                    btn.disabled = false;
+                });
+            });
+        });
+
         // Polling
         function startPolling() {
             if (crawlerPollId) return;
@@ -461,7 +481,8 @@
                     var job = data.current_job;
                     card.style.display = '';
                     card.innerHTML =
-                        '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') + '</div>' +
+                        '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') +
+                        ' <button class="btn btn-sm btn-danger cancel-crawler-btn" data-i18n="crawlers.control.cancel">' + i18n.t('crawlers.control.cancel') + '</button></div>' +
                         '<div class="status-details">' +
                         '<span><strong data-i18n="crawlers.status.job">' + i18n.t('crawlers.status.job') + '</strong>: ' + job.job_id + '</span> ' +
                         '<span><strong data-i18n="crawlers.status.source">' + i18n.t('crawlers.control.source') + '</strong>: ' + job.source + '</span> ' +
@@ -640,6 +661,26 @@
             });
         });
 
+        // Cancel embedding (event delegation)
+        document.getElementById('embedding-status-card').addEventListener('click', function(e) {
+            if (!e.target.classList.contains('cancel-embedding-btn')) return;
+            var btn = e.target;
+            showConfirm(i18n.t('messages.confirm_cancel'), function() {
+                btn.disabled = true;
+                api('/admin/api/embeddings/cancel', { method: 'POST' }).then(function(res) {
+                    if (res.ok) {
+                        toast(i18n.t('messages.embedding_cancelled'));
+                        pollEmbedStatus();
+                    } else {
+                        toast(i18n.t('messages.failed_cancel_embedding'), 'error');
+                        btn.disabled = false;
+                    }
+                }).catch(function() {
+                    btn.disabled = false;
+                });
+            });
+        });
+
         // Polling
         function startEmbedPolling() {
             if (embedPollId) return;
@@ -711,7 +752,8 @@
                 var job = data.current_job;
                 card.style.display = '';
                 card.innerHTML =
-                    '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') + '</div>' +
+                    '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') +
+                    ' <button class="btn btn-sm btn-danger cancel-embedding-btn" data-i18n="crawlers.control.cancel">' + i18n.t('crawlers.control.cancel') + '</button></div>' +
                     '<div class="status-details">' +
                     '<span><strong data-i18n="crawlers.status.job">' + i18n.t('crawlers.status.job') + '</strong>: ' + job.job_id + '</span> ' +
                     '<span><strong data-i18n="common.source">' + i18n.t('common.source') + '</strong>: ' + job.source + '</span> ' +
