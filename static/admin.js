@@ -200,6 +200,29 @@
         });
     }
 
+    function setupCancelHandler(options) {
+        var statusCard = document.getElementById(options.cardId);
+        if (!statusCard) return;
+        statusCard.addEventListener('click', function(e) {
+            if (!e.target.classList.contains(options.buttonClass)) return;
+            var btn = e.target;
+            showConfirm(i18n.t('messages.confirm_cancel'), function() {
+                btn.disabled = true;
+                api(options.apiUrl, { method: 'POST' }).then(function(res) {
+                    if (res.ok) {
+                        toast(i18n.t(options.successMessageKey));
+                        options.poll();
+                    } else {
+                        toast(i18n.t(options.errorMessageKey), 'error');
+                        btn.disabled = false;
+                    }
+                }).catch(function() {
+                    btn.disabled = false;
+                });
+            });
+        });
+    }
+
     // Crawlers page
     var triggerBtn = document.getElementById('crawler-trigger-btn');
     if (triggerBtn) {
@@ -425,6 +448,15 @@
             });
         });
 
+        setupCancelHandler({
+            cardId: 'crawler-status-card',
+            buttonClass: 'cancel-crawler-btn',
+            apiUrl: '/admin/api/crawlers/cancel',
+            successMessageKey: 'messages.crawler_cancelled',
+            errorMessageKey: 'messages.failed_cancel_crawler',
+            poll: pollStatus
+        });
+
         // Polling
         function startPolling() {
             if (crawlerPollId) return;
@@ -461,7 +493,8 @@
                     var job = data.current_job;
                     card.style.display = '';
                     card.innerHTML =
-                        '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') + '</div>' +
+                        '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') +
+                        ' <button class="btn btn-sm btn-danger cancel-crawler-btn" data-i18n="crawlers.control.cancel">' + i18n.t('crawlers.control.cancel') + '</button></div>' +
                         '<div class="status-details">' +
                         '<span><strong data-i18n="crawlers.status.job">' + i18n.t('crawlers.status.job') + '</strong>: ' + job.job_id + '</span> ' +
                         '<span><strong data-i18n="crawlers.status.source">' + i18n.t('crawlers.control.source') + '</strong>: ' + job.source + '</span> ' +
@@ -640,6 +673,15 @@
             });
         });
 
+        setupCancelHandler({
+            cardId: 'embedding-status-card',
+            buttonClass: 'cancel-embedding-btn',
+            apiUrl: '/admin/api/embeddings/cancel',
+            successMessageKey: 'messages.embedding_cancelled',
+            errorMessageKey: 'messages.failed_cancel_embedding',
+            poll: pollEmbedStatus
+        });
+
         // Polling
         function startEmbedPolling() {
             if (embedPollId) return;
@@ -711,7 +753,8 @@
                 var job = data.current_job;
                 card.style.display = '';
                 card.innerHTML =
-                    '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') + '</div>' +
+                    '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') +
+                    ' <button class="btn btn-sm btn-danger cancel-embedding-btn" data-i18n="crawlers.control.cancel">' + i18n.t('crawlers.control.cancel') + '</button></div>' +
                     '<div class="status-details">' +
                     '<span><strong data-i18n="crawlers.status.job">' + i18n.t('crawlers.status.job') + '</strong>: ' + job.job_id + '</span> ' +
                     '<span><strong data-i18n="common.source">' + i18n.t('common.source') + '</strong>: ' + job.source + '</span> ' +

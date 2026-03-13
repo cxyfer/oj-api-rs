@@ -111,6 +111,7 @@ async fn main() {
         .allow_methods(Any)
         .allow_headers(Any);
 
+    let shutdown_state = state.clone();
     let app = Router::new()
         // Health check — no auth
         .route("/health", get(health::health_check))
@@ -149,7 +150,7 @@ async fn main() {
 
     let shutdown_timeout = config.server.graceful_shutdown_secs;
     axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal(shutdown_timeout))
+        .with_graceful_shutdown(shutdown_signal(shutdown_state, shutdown_timeout))
         .await
         .unwrap_or_else(|e| {
             eprintln!("server error: {}", e);
@@ -157,7 +158,7 @@ async fn main() {
         });
 }
 
-async fn shutdown_signal(timeout_secs: u64) {
+async fn shutdown_signal(state: Arc<AppState>, timeout_secs: u64) {
     let ctrl_c = async {
         signal::ctrl_c().await.expect("failed to listen for ctrl+c");
     };
@@ -178,8 +179,44 @@ async fn shutdown_signal(timeout_secs: u64) {
         _ = terminate => {},
     }
 
+    cleanup_active_jobs(&state).await;
+
     tracing::info!(
         "shutdown signal received, waiting up to {}s for in-flight requests",
         timeout_secs
     );
+}
+
+async fn cleanup_active_jobs(state: &Arc<AppState>) {
+    cleanup_active_job(&state.active_crawler_pid, "crawler").await;
+    cleanup_active_job(&state.active_embedding_pid, "embedding").await;
+}
+
+async fn cleanup_active_job(pid_lock: &tokio::sync::Mutex<Option<u32>>, job_type: &str) {
+    let pid = {
+        let mut lock = pid_lock.lock().await;
+        lock.take()
+    };
+
+    match pid {
+        Some(pid) => {
+            let killed = crate::utils::kill_pgid(pid);
+            if killed {
+                tracing::info!(
+                    "shutdown cleanup killed active {} process group (pid {})",
+                    job_type,
+                    pid
+                );
+            } else {
+                tracing::warn!(
+                    "shutdown cleanup failed to kill active {} process group (pid {})",
+                    job_type,
+                    pid
+                );
+            }
+        }
+        None => {
+            tracing::debug!("shutdown cleanup found no active {} process", job_type);
+        }
+    }
 }
