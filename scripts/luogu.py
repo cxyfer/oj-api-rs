@@ -316,12 +316,23 @@ class LuoguClient(BaseCrawler):
         self,
         page: int,
         total_count: Optional[int] = None,
+        mark_completed: Optional[bool] = True,
     ) -> None:
         progress = self.get_progress()
         completed = set(progress.get("completed_pages", []))
-        completed.add(str(page))
+        if mark_completed is True:
+            completed.add(str(page))
+        elif mark_completed is False:
+            completed.discard(str(page))
         progress["completed_pages"] = sorted(completed, key=lambda x: int(x))
-        progress["last_completed_page"] = page
+        if mark_completed is True:
+            progress["last_completed_page"] = page
+        elif mark_completed is False:
+            progress["last_completed_page"] = (
+                int(progress["completed_pages"][-1])
+                if progress["completed_pages"]
+                else None
+            )
         progress["last_updated"] = datetime.now(timezone.utc).isoformat()
         if total_count is not None:
             progress["total_count_snapshot"] = total_count
@@ -368,8 +379,9 @@ class LuoguClient(BaseCrawler):
             # Fetch tags after session is established
             tag_map = await self._fetch_tags_map(session)
 
-            # Process first page if not already done
-            if "1" not in completed_pages:
+            # Process first page unless it is already a saved stable page.
+            should_process_page_1 = "1" not in completed_pages or total_pages == 1
+            if should_process_page_1:
                 result = problems_data.get("result", [])
                 mapped = [p for raw in result if (p := self._map_problem(raw, tag_map))]
                 if mapped:
@@ -378,11 +390,18 @@ class LuoguClient(BaseCrawler):
                     )
                     verb = "upserted" if overwrite else "inserted"
                     logger.info("Page 1: %s %s/%s problems", verb, count, len(mapped))
-                self.save_progress(1, total_count=total_count)
+            mark_page_1_completed = True if "1" not in completed_pages and total_pages > 1 else None
+            if total_pages == 1:
+                mark_page_1_completed = False
+            self.save_progress(
+                1,
+                total_count=total_count,
+                mark_completed=mark_page_1_completed,
+            )
 
             page = 2
             while page <= total_pages:
-                if str(page) in completed_pages:
+                if str(page) in completed_pages and page < total_pages:
                     page += 1
                     continue
                 url = f"{self.PROBLEM_LIST_URL}?page={page}"
@@ -420,7 +439,11 @@ class LuoguClient(BaseCrawler):
                         count,
                         len(mapped),
                     )
-                self.save_progress(page)
+                self.save_progress(
+                    page,
+                    total_count=total_count,
+                    mark_completed=page < total_pages,
+                )
                 page += 1
 
         logger.info("Sync completed")
