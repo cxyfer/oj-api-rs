@@ -323,15 +323,14 @@ class LuoguClient(BaseCrawler):
         if mark_completed is True:
             completed.add(str(page))
         elif mark_completed is False:
-            completed.discard(str(page))
+            completed = {p for p in completed if int(p) < page}
         progress["completed_pages"] = sorted(completed, key=lambda x: int(x))
         if mark_completed is True:
             progress["last_completed_page"] = page
         elif mark_completed is False:
-            progress["last_completed_page"] = (
-                int(progress["completed_pages"][-1])
-                if progress["completed_pages"]
-                else None
+            progress["last_completed_page"] = max(
+                (int(p) for p in progress["completed_pages"]),
+                default=None,
             )
         progress["last_updated"] = datetime.now(timezone.utc).isoformat()
         if total_count is not None:
@@ -390,9 +389,12 @@ class LuoguClient(BaseCrawler):
                     )
                     verb = "upserted" if overwrite else "inserted"
                     logger.info("Page 1: %s %s/%s problems", verb, count, len(mapped))
-            mark_page_1_completed = True if "1" not in completed_pages and total_pages > 1 else None
             if total_pages == 1:
                 mark_page_1_completed = False
+            elif "1" not in completed_pages:
+                mark_page_1_completed = True
+            else:
+                mark_page_1_completed = None
             self.save_progress(
                 1,
                 total_count=total_count,
