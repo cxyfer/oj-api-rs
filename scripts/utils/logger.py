@@ -83,9 +83,6 @@ class ColoredFormatter(FileLocFormatter):
     }
 
     def format(self, record):
-        # Add file location information to the record
-        _attach_fileloc(record)
-
         # Add color to the level name
         levelname = record.levelname
         if levelname in self.COLORS:

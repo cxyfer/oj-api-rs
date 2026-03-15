@@ -338,6 +338,9 @@ pub async fn get_daily(
     .await
     {
         tracing::warn!("failed to persist daily fallback metadata: {}", err);
+        handle_daily_fallback_terminal_failure(&state, &key, &job_id, now, &artifact_paths).await;
+        return ProblemDetail::internal("failed to persist daily fallback metadata")
+            .into_response();
     }
 
     let mut cmd = tokio::process::Command::new("uv");

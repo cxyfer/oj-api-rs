@@ -1,8 +1,10 @@
 use std::collections::{HashSet, VecDeque};
+use std::fs::OpenOptions;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
+use fs2::FileExt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
@@ -138,30 +140,32 @@ pub async fn persist_crawler_running_progress(artifact_paths: &JobArtifactPaths,
     }
 
     let metadata = JobArtifactMetadata::from(job);
-    let stored_progress = match tokio::fs::read_to_string(&artifact_paths.progress).await {
-        Ok(content) => serde_json::from_str::<CrawlerProgress>(&content).ok(),
-        Err(_) => None,
-    };
-
-    let progress = match stored_progress {
-        Some(mut progress) => {
-            if crawler_phase_is_terminal(&progress.phase) {
-                return;
-            }
-            progress.phase = CrawlerPhase::Running;
-            progress.updated_at = metadata.updated_at.clone();
-            progress.metadata = Some(metadata.clone());
-            progress
-        }
-        None => CrawlerProgress {
-            phase: CrawlerPhase::Running,
-            message: None,
-            updated_at: metadata.updated_at.clone(),
-            metadata: Some(metadata),
+    let result = update_json_atomic(
+        &artifact_paths.progress,
+        |stored_progress: Option<CrawlerProgress>| {
+            let progress = match stored_progress {
+                Some(mut progress) => {
+                    if crawler_phase_is_terminal(&progress.phase) {
+                        return Ok(progress);
+                    }
+                    progress.phase = CrawlerPhase::Running;
+                    progress.updated_at = metadata.updated_at.clone();
+                    progress.metadata = Some(metadata.clone());
+                    progress
+                }
+                None => CrawlerProgress {
+                    phase: CrawlerPhase::Running,
+                    message: None,
+                    updated_at: metadata.updated_at.clone(),
+                    metadata: Some(metadata.clone()),
+                },
+            };
+            Ok(progress)
         },
-    };
+    )
+    .await;
 
-    if let Err(err) = write_crawler_progress(artifact_paths, &progress).await {
+    if let Err(err) = result {
         tracing::warn!("failed to persist running crawler progress: {}", err);
     }
 }
@@ -175,29 +179,31 @@ pub async fn persist_crawler_terminal_progress(
     }
 
     let metadata = JobArtifactMetadata::from(job);
-    let stored_progress = match tokio::fs::read_to_string(&artifact_paths.progress).await {
-        Ok(content) => serde_json::from_str::<CrawlerProgress>(&content).ok(),
-        Err(_) => None,
-    };
-
-    let progress = match stored_progress {
-        Some(mut progress) => {
-            if !crawler_phase_is_terminal(&progress.phase) {
-                progress.phase = CrawlerPhase::from(&job.status);
-            }
-            progress.updated_at = metadata.updated_at.clone();
-            progress.metadata = Some(metadata.clone());
-            progress
-        }
-        None => CrawlerProgress {
-            phase: CrawlerPhase::from(&job.status),
-            message: None,
-            updated_at: metadata.updated_at.clone(),
-            metadata: Some(metadata),
+    let result = update_json_atomic(
+        &artifact_paths.progress,
+        |stored_progress: Option<CrawlerProgress>| {
+            let progress = match stored_progress {
+                Some(mut progress) => {
+                    if !crawler_phase_is_terminal(&progress.phase) {
+                        progress.phase = CrawlerPhase::from(&job.status);
+                    }
+                    progress.updated_at = metadata.updated_at.clone();
+                    progress.metadata = Some(metadata.clone());
+                    progress
+                }
+                None => CrawlerProgress {
+                    phase: CrawlerPhase::from(&job.status),
+                    message: None,
+                    updated_at: metadata.updated_at.clone(),
+                    metadata: Some(metadata.clone()),
+                },
+            };
+            Ok(progress)
         },
-    };
+    )
+    .await;
 
-    if let Err(err) = write_crawler_progress(artifact_paths, &progress).await {
+    if let Err(err) = result {
         tracing::warn!("failed to persist final crawler progress: {}", err);
     }
 }
@@ -366,16 +372,55 @@ pub async fn read_job_output(
     }
 }
 
-pub async fn write_json_atomic<T>(path: impl AsRef<Path>, value: &T) -> std::io::Result<()>
+async fn lock_progress_guard(path: &Path) -> std::io::Result<std::fs::File> {
+    let lock_path = path.with_extension(format!(
+        "{}.lock",
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("json")
+    ));
+    if let Some(parent) = lock_path.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+    tokio::task::spawn_blocking(move || {
+        let file = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(&lock_path)?;
+        file.lock_exclusive()?;
+        Ok::<_, io::Error>(file)
+    })
+    .await
+    .map_err(|err| io::Error::other(err.to_string()))?
+}
+
+
+pub async fn update_json_atomic<T>(
+    path: impl AsRef<Path>,
+    mut update: impl FnMut(Option<T>) -> std::io::Result<T>,
+) -> std::io::Result<T>
 where
-    T: Serialize,
+    T: Serialize + DeserializeOwned,
 {
     let path = path.as_ref();
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
+    let _guard = lock_progress_guard(path).await?;
 
-    let payload = serde_json::to_vec_pretty(value)
+    let current = match tokio::fs::read_to_string(path).await {
+        Ok(content) => Some(
+            serde_json::from_str(&content)
+                .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?,
+        ),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => None,
+        Err(err) => return Err(err),
+    };
+
+    let next = update(current)?;
+    let payload = serde_json::to_vec_pretty(&next)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
     let nonce = format!(
         "{}-{}",
@@ -390,7 +435,17 @@ where
         nonce
     ));
     tokio::fs::write(&tmp, payload).await?;
-    tokio::fs::rename(&tmp, path).await
+    tokio::fs::rename(&tmp, path).await?;
+    Ok(next)
+}
+
+pub async fn write_json_atomic<T>(path: impl AsRef<Path>, value: &T) -> std::io::Result<()>
+where
+    T: Serialize + DeserializeOwned + Clone,
+{
+    update_json_atomic(path, |_| Ok(value.clone()))
+        .await
+        .map(|_| ())
 }
 
 pub async fn write_crawler_progress(
@@ -450,9 +505,9 @@ pub struct RetainedRefreshState {
 
 impl RetainedRefreshState {
     pub fn take_due_work(&mut self, now: tokio::time::Instant) -> (bool, bool) {
-        let should_sync = self
-            .last_summary_sync
-            .is_none_or(|last| now.duration_since(last) >= REQUEST_PATH_RETAINED_SUMMARY_SYNC_INTERVAL);
+        let should_sync = self.last_summary_sync.is_none_or(|last| {
+            now.duration_since(last) >= REQUEST_PATH_RETAINED_SUMMARY_SYNC_INTERVAL
+        });
         let should_cleanup = self
             .last_cleanup
             .is_none_or(|last| now.duration_since(last) >= REQUEST_PATH_RETAINED_CLEANUP_INTERVAL);
@@ -965,8 +1020,8 @@ mod tests {
         natural_sort_key, persist_crawler_running_progress, persist_crawler_terminal_progress,
         persist_job_metadata, read_job_output, reconstruct_retained_job_state,
         start_live_output_capture, write_crawler_progress, write_embedding_progress,
-        RetainedRefreshState, REQUEST_PATH_RETAINED_CLEANUP_INTERVAL,
-        REQUEST_PATH_RETAINED_SUMMARY_SYNC_INTERVAL, OUTPUT_TAIL_MAX_BYTES,
+        RetainedRefreshState, OUTPUT_TAIL_MAX_BYTES, REQUEST_PATH_RETAINED_CLEANUP_INTERVAL,
+        REQUEST_PATH_RETAINED_SUMMARY_SYNC_INTERVAL,
     };
     use crate::models::{
         CrawlerJob, CrawlerPhase, CrawlerProgress, CrawlerStatus, CrawlerTrigger, EmbeddingJob,

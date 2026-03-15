@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 import uuid
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
@@ -28,6 +29,11 @@ from utils.database import EmbeddingDatabaseManager
 from utils.logger import get_core_logger
 
 logger = get_core_logger()
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-Unix fallback
+    fcntl = None
 
 LOGS_DIR = os.path.join(os.path.dirname(__file__), "logs")
 TERMINAL_PHASES = {"completed", "failed", "cancelled", "timed_out"}
@@ -109,6 +115,20 @@ def _merge_progress(existing: dict, update: dict, allow_terminal_phase: bool) ->
     return merged
 
 
+@contextmanager
+def _progress_lock(path: str):
+    lock_path = f"{path}.lock"
+    os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+    with open(lock_path, "a+", encoding="utf-8") as lock_file:
+        if fcntl is not None:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if fcntl is not None:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
 def _write_progress(job_id: str, data: dict, allow_terminal_phase: bool = True) -> None:
     """Atomic merge-write of progress file via temp + rename."""
     path = _resolve_progress_path(job_id)
@@ -116,20 +136,21 @@ def _write_progress(job_id: str, data: dict, allow_terminal_phase: bool = True) 
     os.makedirs(progress_dir, exist_ok=True)
     payload = dict(data)
     payload.setdefault("updated_at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
-    merged = _merge_progress(
-        _read_existing_progress(path), payload, allow_terminal_phase=allow_terminal_phase
-    )
-    fd, tmp = tempfile.mkstemp(dir=progress_dir, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(merged, f)
-        os.replace(tmp, path)
-    except Exception:
+    with _progress_lock(path):
+        merged = _merge_progress(
+            _read_existing_progress(path), payload, allow_terminal_phase=allow_terminal_phase
+        )
+        fd, tmp = tempfile.mkstemp(dir=progress_dir, suffix=".tmp")
         try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(merged, f, indent=2, ensure_ascii=False, sort_keys=True)
+            os.replace(tmp, path)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
 
 
 def _fetch_problems_with_content_sync(
@@ -333,8 +354,8 @@ async def build_embeddings(
                     },
                     allow_terminal_phase=False,
                 )
-            except Exception:
-                pass
+            except (OSError, ValueError) as exc:
+                logger.warning("Failed to update embedding progress: %s", exc)
 
         async def rewrite_worker(worker_id: int) -> None:
             nonlocal rewrite_done, rewrite_skipped
@@ -783,8 +804,8 @@ async def main() -> None:
                         final_progress,
                         allow_terminal_phase=_progress_path_from_env() is None,
                     )
-                except Exception:
-                    pass
+                except (OSError, ValueError) as exc:
+                    logger.warning("Failed to write final embedding progress: %s", exc)
 
         if combined_report.total_failed > 0:
             sys.exit(1)

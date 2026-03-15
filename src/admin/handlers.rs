@@ -122,28 +122,22 @@ async fn persist_embedding_terminal_progress(
     };
     let metadata = JobArtifactMetadata::from(job);
     let progress_path = artifact_paths.progress.clone();
-    let final_progress = if let Ok(content) = tokio::fs::read_to_string(&progress_path).await {
-        let mut prog: serde_json::Value =
-            serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({}));
-        let current_phase = prog.get("phase").and_then(|value| value.as_str());
-        if !current_phase.is_some_and(embedding_phase_is_terminal) {
-            prog["phase"] = serde_json::json!(final_phase);
-        }
-        if prog.get("started_at").is_none() {
-            prog["started_at"] = serde_json::json!(metadata.started_at.clone());
-        }
-        prog["updated_at"] = serde_json::json!(metadata.updated_at.clone());
-        prog["metadata"] = serde_json::to_value(&metadata).unwrap_or(serde_json::Value::Null);
-        prog
-    } else {
-        serde_json::json!({
-            "phase": final_phase,
-            "started_at": metadata.started_at.clone(),
-            "updated_at": metadata.updated_at.clone(),
-            "metadata": metadata,
+    let result =
+        crate::utils::update_json_atomic(&progress_path, |current: Option<serde_json::Value>| {
+            let mut prog = current.unwrap_or_else(|| serde_json::json!({}));
+            let current_phase = prog.get("phase").and_then(|value| value.as_str());
+            if !current_phase.is_some_and(embedding_phase_is_terminal) {
+                prog["phase"] = serde_json::json!(final_phase);
+            }
+            if prog.get("started_at").is_none() {
+                prog["started_at"] = serde_json::json!(metadata.started_at.clone());
+            }
+            prog["updated_at"] = serde_json::json!(metadata.updated_at.clone());
+            prog["metadata"] = serde_json::to_value(&metadata).unwrap_or(serde_json::Value::Null);
+            Ok(prog)
         })
-    };
-    if let Err(err) = crate::utils::write_json_atomic(&progress_path, &final_progress).await {
+        .await;
+    if let Err(err) = result {
         tracing::warn!("failed to persist final embedding progress: {}", err);
     }
 }
@@ -249,10 +243,7 @@ fn embedding_launch_allowed(
             .unwrap_or(false)
 }
 
-fn clear_embedding_launch_guard_if_matches(
-    launch_guard: &mut Option<String>,
-    job_id: &str,
-) {
+fn clear_embedding_launch_guard_if_matches(launch_guard: &mut Option<String>, job_id: &str) {
     if launch_guard.as_deref() == Some(job_id) {
         *launch_guard = None;
     }
@@ -269,7 +260,10 @@ fn push_or_replace_embedding_history(
     history: &mut std::collections::VecDeque<EmbeddingJob>,
     job: EmbeddingJob,
 ) {
-    if let Some(existing) = history.iter_mut().find(|existing| existing.job_id == job.job_id) {
+    if let Some(existing) = history
+        .iter_mut()
+        .find(|existing| existing.job_id == job.job_id)
+    {
         *existing = job;
         return;
     }
@@ -626,7 +620,8 @@ pub async fn trigger_crawler(
         }
         return ProblemDetail::internal("failed to persist crawler metadata").into_response();
     }
-    if let Err(err) = crate::utils::refresh_retained_job_state_now(state.as_ref(), true, true).await {
+    if let Err(err) = crate::utils::refresh_retained_job_state_now(state.as_ref(), true, true).await
+    {
         tracing::warn!(
             "failed to reconcile retained job history before crawler launch: {}",
             err
@@ -1149,7 +1144,8 @@ pub async fn trigger_embedding(
     }
     drop(lock);
     drop(launch_guard);
-    if let Err(err) = crate::utils::refresh_retained_job_state_now(state.as_ref(), true, true).await {
+    if let Err(err) = crate::utils::refresh_retained_job_state_now(state.as_ref(), true, true).await
+    {
         tracing::warn!(
             "failed to reconcile retained job history before embedding launch: {}",
             err
@@ -1298,8 +1294,12 @@ pub async fn trigger_embedding(
                 }
             }
 
-            let finished_job =
-                finalize_owned_embedding_job(&mut lock, &spawned_job_id, capture_result.0, capture_result.1);
+            let finished_job = finalize_owned_embedding_job(
+                &mut lock,
+                &spawned_job_id,
+                capture_result.0,
+                capture_result.1,
+            );
             if let Some(job) = finished_job.as_ref() {
                 persist_embedding_terminal_progress(&artifact_paths, job).await;
             }
@@ -1341,8 +1341,9 @@ pub async fn cancel_embedding(State(state): State<Arc<AppState>>) -> impl IntoRe
     };
 
     if let Some(job) = cancelled_job {
-        let artifact_paths = crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job.job_id)
-            .expect("existing embedding job id should map to artifact paths");
+        let artifact_paths =
+            crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job.job_id)
+                .expect("existing embedding job id should map to artifact paths");
         persist_embedding_terminal_progress(&artifact_paths, &job).await;
         let mut history = state.embedding_history.lock().await;
         push_or_replace_embedding_history(&mut history, job);
@@ -1697,11 +1698,27 @@ mod tests {
 
         assert!(!embedding_trigger_conflicts(&None));
         assert!(embedding_trigger_conflicts(&Some("embed-1".to_string())));
-        assert!(embedding_launch_allowed(&Some("embed-1".to_string()), Some(&running), "embed-1"));
-        assert!(!embedding_launch_allowed(&Some("embed-1".to_string()), Some(&running), "embed-2"));
-        assert!(!embedding_launch_allowed(&Some("embed-1".to_string()), Some(&cancelled), "embed-1"));
+        assert!(embedding_launch_allowed(
+            &Some("embed-1".to_string()),
+            Some(&running),
+            "embed-1"
+        ));
+        assert!(!embedding_launch_allowed(
+            &Some("embed-1".to_string()),
+            Some(&running),
+            "embed-2"
+        ));
+        assert!(!embedding_launch_allowed(
+            &Some("embed-1".to_string()),
+            Some(&cancelled),
+            "embed-1"
+        ));
         assert!(!embedding_launch_allowed(&None, Some(&running), "embed-1"));
-        assert!(!embedding_launch_allowed(&Some("embed-1".to_string()), None, "embed-1"));
+        assert!(!embedding_launch_allowed(
+            &Some("embed-1".to_string()),
+            None,
+            "embed-1"
+        ));
     }
 
     #[test]

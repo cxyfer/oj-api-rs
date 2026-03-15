@@ -3,9 +3,15 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-Unix fallback
+    fcntl = None
 
 TERMINAL_PHASES = {"completed", "failed", "cancelled", "timed_out"}
 
@@ -31,33 +37,48 @@ def _read_existing_progress(path: Path) -> dict[str, Any]:
         return {}
 
 
+@contextmanager
+def _progress_lock(path: Path):
+    lock_path = path.with_suffix(f"{path.suffix}.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as lock_file:
+        if fcntl is not None:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if fcntl is not None:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
 def append_crawler_progress(message: Optional[str] = None) -> None:
     path = _progress_path_from_env()
     if path is None:
         return
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    existing = _read_existing_progress(path)
-    existing_phase = existing.get("phase")
-    if existing_phase in TERMINAL_PHASES:
-        return
+    with _progress_lock(path):
+        existing = _read_existing_progress(path)
+        existing_phase = existing.get("phase")
+        if existing_phase in TERMINAL_PHASES:
+            return
 
-    payload = dict(existing)
-    payload["phase"] = "running"
-    if message is not None:
-        payload["message"] = message
-    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+        payload = dict(existing)
+        payload["phase"] = "running"
+        if message is not None:
+            payload["message"] = message
+        payload["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-    fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2, ensure_ascii=False, sort_keys=True)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp_name, path)
-    except Exception:
+        fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
         try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2, ensure_ascii=False, sort_keys=True)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_name, path)
+        except Exception:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
