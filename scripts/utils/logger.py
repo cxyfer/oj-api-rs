@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -22,6 +23,7 @@ GLOBAL_MODULE_LEVELS = {
     "google_genai": logging.WARNING,
     "httpx": logging.WARNING,
 }
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 def _resolve_log_level(value: object, default: int) -> int:
@@ -32,7 +34,42 @@ def _resolve_log_level(value: object, default: int) -> int:
     return getattr(logging, str(value).upper(), default)
 
 
-class ColoredFormatter(logging.Formatter):
+def _attach_fileloc(record: logging.LogRecord) -> None:
+    record.fileloc = f"{record.filename}:{record.lineno}"
+
+
+def _strip_ansi(text: str) -> str:
+    return ANSI_ESCAPE_RE.sub("", text)
+
+
+def _resolve_job_log_path() -> Optional[str]:
+    path = os.getenv("OJ_PYTHON_LOG_PATH")
+    if path is None:
+        return None
+    path = path.strip()
+    return path or None
+
+
+def _is_job_logging_enabled() -> bool:
+    return _resolve_job_log_path() is not None
+
+
+class FileLocFormatter(logging.Formatter):
+    """Formatter that ensures file location is available."""
+
+    def format(self, record):
+        _attach_fileloc(record)
+        return super().format(record)
+
+
+class PlainTextFormatter(FileLocFormatter):
+    """Formatter for per-job plain-text logs without ANSI sequences."""
+
+    def format(self, record):
+        return _strip_ansi(super().format(record))
+
+
+class ColoredFormatter(FileLocFormatter):
     """Custom colored formatter that includes file location information."""
 
     # ANSI color codes
@@ -47,7 +84,7 @@ class ColoredFormatter(logging.Formatter):
 
     def format(self, record):
         # Add file location information to the record
-        record.fileloc = f"{record.filename}:{record.lineno}"
+        _attach_fileloc(record)
 
         # Add color to the level name
         levelname = record.levelname
@@ -115,6 +152,7 @@ class Logger:
         Set up the logging system with global configuration.
         """
         global GLOBAL_LOG_LEVEL, GLOBAL_LOG_DIR, GLOBAL_MODULE_LEVELS
+        config_warning = None
         try:
             # Load config here to avoid circular import during module load
             from utils.config import get_config
@@ -130,14 +168,10 @@ class Logger:
                 for module, level in logger_config.get("modules", {}).items()
             }
         except Exception as exc:
-            try:
-                import sys
-
-                sys.stderr.write(
-                    f"Warning: Failed to load logging config from config.toml, using defaults. Error: {exc}\n"
-                )
-            except Exception:
-                pass
+            config_warning = (
+                "Failed to load logging config from config.toml, using defaults. "
+                f"Error: {exc}"
+            )
         # Create logs directory if it doesn't exist
         os.makedirs(GLOBAL_LOG_DIR, exist_ok=True)
 
@@ -147,7 +181,11 @@ class Logger:
             datefmt="%Y-%m-%d %H:%M:%S",
         )
 
-        file_formatter = logging.Formatter(
+        file_formatter = FileLocFormatter(
+            fmt=("%(asctime)s | %(levelname)-8s | %(fileloc)-32s | %(message)s"),
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        job_formatter = PlainTextFormatter(
             fmt=("%(asctime)s | %(levelname)-8s | %(fileloc)-32s | %(message)s"),
             datefmt="%Y-%m-%d %H:%M:%S",
         )
@@ -163,6 +201,15 @@ class Logger:
         )
         file_handler.setFormatter(file_formatter)
 
+        job_file_handler = None
+        job_log_path = _resolve_job_log_path()
+        if job_log_path:
+            job_log_dir = os.path.dirname(job_log_path)
+            if job_log_dir:
+                os.makedirs(job_log_dir, exist_ok=True)
+            job_file_handler = logging.FileHandler(job_log_path, encoding="utf-8")
+            job_file_handler.setFormatter(job_formatter)
+
         # Configure root logger
         root_logger = logging.getLogger()
         root_logger.setLevel(GLOBAL_LOG_LEVEL)
@@ -172,8 +219,11 @@ class Logger:
             root_logger.handlers.clear()
 
         # Add the handlers
-        root_logger.addHandler(stream_handler)
+        if not _is_job_logging_enabled():
+            root_logger.addHandler(stream_handler)
         root_logger.addHandler(file_handler)
+        if job_file_handler is not None:
+            root_logger.addHandler(job_file_handler)
 
         # Set levels for specific modules
         for module_name, module_level in GLOBAL_MODULE_LEVELS.items():
@@ -181,6 +231,9 @@ class Logger:
             module_logger.setLevel(module_level)
 
         Logger._initialized = True
+
+        if config_warning:
+            logging.getLogger("config").warning(config_warning)
 
         # Log initialization
         logging.info("Logging system initialized")

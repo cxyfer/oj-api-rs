@@ -178,18 +178,72 @@ pub async fn tokens_page(State(state): State<Arc<AppState>>) -> impl IntoRespons
 #[template(path = "admin/crawlers.html")]
 struct CrawlersTemplate {
     is_running: bool,
+    is_manual_running: bool,
+    can_cancel_current_job: bool,
     current_job: Option<CrawlerJob>,
     history: Vec<CrawlerJob>,
 }
 
 pub async fn crawlers_page(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let lock = state.crawler_lock.lock().await;
-    let is_running = lock
+    {
+        let active_jobs = {
+            let jobs = state.crawler_jobs.lock().await;
+            let embedding_job = state.embedding_lock.lock().await;
+            jobs.values()
+                .filter(|job| job.status == crate::models::CrawlerStatus::Running)
+                .map(|job| (crate::models::JobType::Crawler, job.job_id.clone()))
+                .chain(
+                    embedding_job
+                        .as_ref()
+                        .filter(|job| job.status == crate::models::CrawlerStatus::Running)
+                        .map(|job| (crate::models::JobType::Embedding, job.job_id.clone()))
+                        .into_iter(),
+                )
+                .collect()
+        };
+        let mut crawler_history = state.crawler_history.lock().await;
+        let mut embedding_history = state.embedding_history.lock().await;
+        if let Err(err) = crate::utils::reconcile_retained_job_state(
+            crate::models::JOB_ARTIFACTS_ROOT,
+            &active_jobs,
+            &mut crawler_history,
+            &mut embedding_history,
+        )
+        .await
+        {
+            tracing::warn!(
+                "failed to reconcile retained job state for crawlers_page: {}",
+                err
+            );
+        }
+    }
+
+    let mut running_jobs: Vec<CrawlerJob> = {
+        let jobs = state.crawler_jobs.lock().await;
+        jobs.values()
+            .filter(|job| job.status == crate::models::CrawlerStatus::Running)
+            .cloned()
+            .collect()
+    };
+    running_jobs.sort_by(|a, b| {
+        a.started_at
+            .cmp(&b.started_at)
+            .then_with(|| a.job_id.cmp(&b.job_id))
+    });
+
+    let is_running = !running_jobs.is_empty();
+    let is_manual_running = running_jobs
+        .iter()
+        .any(|job| job.trigger == crate::models::CrawlerTrigger::Admin);
+    let current_job = running_jobs
+        .iter()
+        .find(|job| job.trigger == crate::models::CrawlerTrigger::Admin)
+        .cloned()
+        .or_else(|| running_jobs.first().cloned());
+    let can_cancel_current_job = current_job
         .as_ref()
-        .map(|j| j.status == crate::models::CrawlerStatus::Running)
+        .map(|job| job.trigger == crate::models::CrawlerTrigger::Admin)
         .unwrap_or(false);
-    let current_job = if is_running { lock.clone() } else { None };
-    drop(lock);
 
     let history_lock = state.crawler_history.lock().await;
     let history: Vec<CrawlerJob> = history_lock.iter().rev().cloned().collect();
@@ -198,6 +252,8 @@ pub async fn crawlers_page(State(state): State<Arc<AppState>>) -> impl IntoRespo
     Html(
         CrawlersTemplate {
             is_running,
+            is_manual_running,
+            can_cancel_current_job,
             current_job,
             history,
         }
@@ -216,6 +272,40 @@ struct EmbeddingsTemplate {
 }
 
 pub async fn embeddings_page(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    {
+        let active_jobs = {
+            let crawler_jobs = state.crawler_jobs.lock().await;
+            let embedding_job = state.embedding_lock.lock().await;
+            crawler_jobs
+                .values()
+                .filter(|job| job.status == crate::models::CrawlerStatus::Running)
+                .map(|job| (crate::models::JobType::Crawler, job.job_id.clone()))
+                .chain(
+                    embedding_job
+                        .as_ref()
+                        .filter(|job| job.status == crate::models::CrawlerStatus::Running)
+                        .map(|job| (crate::models::JobType::Embedding, job.job_id.clone()))
+                        .into_iter(),
+                )
+                .collect()
+        };
+        let mut crawler_history = state.crawler_history.lock().await;
+        let mut embedding_history = state.embedding_history.lock().await;
+        if let Err(err) = crate::utils::reconcile_retained_job_state(
+            crate::models::JOB_ARTIFACTS_ROOT,
+            &active_jobs,
+            &mut crawler_history,
+            &mut embedding_history,
+        )
+        .await
+        {
+            tracing::warn!(
+                "failed to reconcile retained job state for embeddings_page: {}",
+                err
+            );
+        }
+    }
+
     let lock = state.embedding_lock.lock().await;
     let is_running = lock
         .as_ref()

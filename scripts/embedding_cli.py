@@ -30,6 +30,7 @@ from utils.logger import get_core_logger
 logger = get_core_logger()
 
 LOGS_DIR = os.path.join(os.path.dirname(__file__), "logs")
+TERMINAL_PHASES = {"completed", "failed", "cancelled", "timed_out"}
 
 
 @dataclass
@@ -67,14 +68,61 @@ class BuildReport:
         return sum(self.failed.values())
 
 
-def _write_progress(job_id: str, data: dict) -> None:
-    """Atomic write of progress file via temp + rename."""
-    os.makedirs(LOGS_DIR, exist_ok=True)
-    path = os.path.join(LOGS_DIR, f"{job_id}.progress.json")
-    fd, tmp = tempfile.mkstemp(dir=LOGS_DIR, suffix=".tmp")
+def _progress_path_from_env() -> Optional[str]:
+    value = os.getenv("OJ_PROGRESS_PATH")
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
+
+def _resolve_progress_path(job_id: str) -> str:
+    return _progress_path_from_env() or os.path.join(
+        LOGS_DIR, "embedding", job_id, "progress.json"
+    )
+
+
+def _read_existing_progress(path: str) -> dict:
     try:
-        with os.fdopen(fd, "w") as f:
-            json.dump(data, f)
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except Exception:
+        return {}
+
+
+def _merge_progress(existing: dict, update: dict, allow_terminal_phase: bool) -> dict:
+    merged = dict(existing)
+    existing_phase = existing.get("phase")
+    has_terminal_phase = existing_phase in TERMINAL_PHASES
+
+    for key, value in update.items():
+        if key == "phase":
+            if has_terminal_phase:
+                continue
+            if not allow_terminal_phase and value in TERMINAL_PHASES:
+                continue
+        merged[key] = value
+
+    return merged
+
+
+def _write_progress(job_id: str, data: dict, allow_terminal_phase: bool = True) -> None:
+    """Atomic merge-write of progress file via temp + rename."""
+    path = _resolve_progress_path(job_id)
+    progress_dir = os.path.dirname(path)
+    os.makedirs(progress_dir, exist_ok=True)
+    payload = dict(data)
+    payload.setdefault("updated_at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+    merged = _merge_progress(
+        _read_existing_progress(path), payload, allow_terminal_phase=allow_terminal_phase
+    )
+    fd, tmp = tempfile.mkstemp(dir=progress_dir, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(merged, f)
         os.replace(tmp, path)
     except Exception:
         try:
@@ -283,6 +331,7 @@ async def build_embeddings(
                         },
                         "started_at": wall_start,
                     },
+                    allow_terminal_phase=False,
                 )
             except Exception:
                 pass
@@ -721,11 +770,19 @@ async def main() -> None:
                 )
         finally:
             combined_report.duration_secs = time.monotonic() - start_time
-            print(f"EMBEDDING_SUMMARY:{json.dumps(combined_report.to_dict())}")
+            summary = combined_report.to_dict()
+            print(f"EMBEDDING_SUMMARY:{json.dumps(summary)}")
             if job_id:
                 phase = "failed" if combined_report.total_failed > 0 else "completed"
+                final_progress = {"summary": summary}
+                if _progress_path_from_env() is None:
+                    final_progress["phase"] = phase
                 try:
-                    _write_progress(job_id, {"phase": phase})
+                    _write_progress(
+                        job_id,
+                        final_progress,
+                        allow_terminal_phase=_progress_path_from_env() is None,
+                    )
                 except Exception:
                     pass
 

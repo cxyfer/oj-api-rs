@@ -1,4 +1,5 @@
 use std::fmt;
+use std::path::{Component, Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -178,32 +179,28 @@ pub struct CrawlerJob {
 
 const MAX_OUTPUT_BYTES: usize = 64 * 1024;
 
+fn lossy_tail(bytes: &[u8]) -> Option<String> {
+    if bytes.is_empty() {
+        return None;
+    }
+    let start = bytes.len().saturating_sub(MAX_OUTPUT_BYTES);
+    Some(String::from_utf8_lossy(&bytes[start..]).into_owned())
+}
+
 impl CrawlerJob {
     pub fn set_output(&mut self, stdout: Vec<u8>, stderr: Vec<u8>) {
-        self.stdout = if stdout.is_empty() {
-            None
-        } else {
-            let s = if stdout.len() > MAX_OUTPUT_BYTES {
-                String::from_utf8_lossy(&stdout[stdout.len() - MAX_OUTPUT_BYTES..]).into_owned()
-            } else {
-                String::from_utf8_lossy(&stdout).into_owned()
-            };
-            Some(s)
-        };
-        self.stderr = if stderr.is_empty() {
-            None
-        } else {
-            let s = if stderr.len() > MAX_OUTPUT_BYTES {
-                String::from_utf8_lossy(&stderr[stderr.len() - MAX_OUTPUT_BYTES..]).into_owned()
-            } else {
-                String::from_utf8_lossy(&stderr).into_owned()
-            };
-            Some(s)
-        };
+        self.stdout = lossy_tail(&stdout);
+        self.stderr = lossy_tail(&stderr);
     }
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActiveCrawlerPid {
+    pub job_id: String,
+    pub pid: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum CrawlerStatus {
     Running,
@@ -213,7 +210,7 @@ pub enum CrawlerStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum CrawlerTrigger {
     Admin,
@@ -237,6 +234,166 @@ impl std::fmt::Display for CrawlerTrigger {
         match self {
             Self::Admin => write!(f, "admin"),
             Self::DailyFallback => write!(f, "daily_fallback"),
+        }
+    }
+}
+
+pub const MANUAL_CRAWLER_RUNTIME_KEY: &str = "manual";
+
+pub fn manual_crawler_runtime_key() -> &'static str {
+    MANUAL_CRAWLER_RUNTIME_KEY
+}
+
+pub fn daily_fallback_crawler_runtime_key(domain: &str, date: &str) -> String {
+    format!("daily_fallback:{domain}:{date}")
+}
+
+pub const JOB_ARTIFACTS_ROOT: &str = "scripts/logs";
+pub const JOB_STDOUT_LOG: &str = "stdout.log";
+pub const JOB_STDERR_LOG: &str = "stderr.log";
+pub const JOB_PYTHON_LOG: &str = "python.log";
+pub const JOB_PROGRESS_FILE: &str = "progress.json";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JobType {
+    Crawler,
+    Embedding,
+}
+
+impl JobType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Crawler => "crawler",
+            Self::Embedding => "embedding",
+        }
+    }
+}
+
+impl fmt::Display for JobType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for JobType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "crawler" => Ok(Self::Crawler),
+            "embedding" => Ok(Self::Embedding),
+            _ => Err(format!("invalid job type: {}", s)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobArtifactPaths {
+    pub job_type: JobType,
+    pub job_id: String,
+    pub root_dir: PathBuf,
+    pub job_dir: PathBuf,
+    pub stdout: PathBuf,
+    pub stderr: PathBuf,
+    pub python_log: PathBuf,
+    pub progress: PathBuf,
+}
+
+fn validate_job_id(job_id: &str) -> Result<(), String> {
+    if job_id.is_empty() {
+        return Err("job_id must not be empty".to_string());
+    }
+    let path = Path::new(job_id);
+    if path.is_absolute() {
+        return Err("job_id must be relative".to_string());
+    }
+    if path.components().count() != 1 {
+        return Err("job_id must not contain path separators".to_string());
+    }
+    match path.components().next() {
+        Some(Component::Normal(_)) => Ok(()),
+        _ => Err("job_id must be a normal path segment".to_string()),
+    }
+}
+
+impl JobArtifactPaths {
+    pub fn new(job_type: JobType, job_id: impl AsRef<str>) -> Result<Self, String> {
+        Self::with_root(JOB_ARTIFACTS_ROOT, job_type, job_id)
+    }
+
+    pub fn with_root(
+        root: impl AsRef<Path>,
+        job_type: JobType,
+        job_id: impl AsRef<str>,
+    ) -> Result<Self, String> {
+        let root_dir = root.as_ref().to_path_buf();
+        let job_id = job_id.as_ref().to_string();
+        validate_job_id(&job_id)?;
+        let job_dir = root_dir.join(job_type.as_str()).join(&job_id);
+        Ok(Self {
+            job_type,
+            job_id,
+            stdout: job_dir.join(JOB_STDOUT_LOG),
+            stderr: job_dir.join(JOB_STDERR_LOG),
+            python_log: job_dir.join(JOB_PYTHON_LOG),
+            progress: job_dir.join(JOB_PROGRESS_FILE),
+            root_dir,
+            job_dir,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct JobArtifactMetadata {
+    pub job_id: String,
+    pub job_type: JobType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trigger: Option<CrawlerTrigger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finished_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+}
+
+impl From<&CrawlerJob> for JobArtifactMetadata {
+    fn from(job: &CrawlerJob) -> Self {
+        Self {
+            job_id: job.job_id.clone(),
+            job_type: JobType::Crawler,
+            source: Some(job.source.clone()),
+            args: job.args.clone(),
+            trigger: Some(job.trigger.clone()),
+            started_at: Some(job.started_at.clone()),
+            finished_at: job.finished_at.clone(),
+            updated_at: job
+                .finished_at
+                .clone()
+                .or_else(|| Some(job.started_at.clone())),
+        }
+    }
+}
+
+impl From<&EmbeddingJob> for JobArtifactMetadata {
+    fn from(job: &EmbeddingJob) -> Self {
+        Self {
+            job_id: job.job_id.clone(),
+            job_type: JobType::Embedding,
+            source: Some(job.source.clone()),
+            args: job.args.clone(),
+            trigger: None,
+            started_at: Some(job.started_at.clone()),
+            finished_at: job.finished_at.clone(),
+            updated_at: job
+                .finished_at
+                .clone()
+                .or_else(|| Some(job.started_at.clone())),
         }
     }
 }
@@ -752,11 +909,21 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
 }
 
 pub struct DailyFallbackEntry {
+    pub job_id: String,
     pub status: CrawlerStatus,
     pub started_at: tokio::time::Instant,
     pub cooldown_until: Option<tokio::time::Instant>,
     pub notify: Arc<Notify>,
     pub completed: Arc<std::sync::atomic::AtomicBool>,
+    pub stdout: Option<String>,
+    pub stderr: Option<String>,
+}
+
+impl DailyFallbackEntry {
+    pub fn set_output(&mut self, stdout: Vec<u8>, stderr: Vec<u8>) {
+        self.stdout = lossy_tail(&stdout);
+        self.stderr = lossy_tail(&stderr);
+    }
 }
 
 // Embedding job model (parallel to CrawlerJob)
@@ -775,27 +942,91 @@ pub struct EmbeddingJob {
     pub stderr: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CrawlerPhase {
+    Queued,
+    Running,
+    Completed,
+    Failed,
+    Cancelled,
+    TimedOut,
+}
+
+impl fmt::Display for CrawlerPhase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = match self {
+            Self::Queued => "queued",
+            Self::Running => "running",
+            Self::Completed => "completed",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+            Self::TimedOut => "timed_out",
+        };
+        f.write_str(value)
+    }
+}
+
+impl From<CrawlerStatus> for CrawlerPhase {
+    fn from(value: CrawlerStatus) -> Self {
+        match value {
+            CrawlerStatus::Running => Self::Running,
+            CrawlerStatus::Completed => Self::Completed,
+            CrawlerStatus::Failed => Self::Failed,
+            CrawlerStatus::TimedOut => Self::TimedOut,
+            CrawlerStatus::Cancelled => Self::Cancelled,
+        }
+    }
+}
+
+impl From<&CrawlerStatus> for CrawlerPhase {
+    fn from(value: &CrawlerStatus) -> Self {
+        value.clone().into()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrawlerProgress {
+    pub phase: CrawlerPhase,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<JobArtifactMetadata>,
+}
+
+impl CrawlerProgress {
+    pub fn queued(metadata: JobArtifactMetadata) -> Self {
+        Self {
+            phase: CrawlerPhase::Queued,
+            message: None,
+            updated_at: metadata.updated_at.clone(),
+            metadata: Some(metadata),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EmbeddingProgress {
+    pub phase: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rewrite_progress: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embed_progress: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<JobArtifactMetadata>,
+}
+
 impl EmbeddingJob {
     pub fn set_output(&mut self, stdout: Vec<u8>, stderr: Vec<u8>) {
-        self.stdout = if stdout.is_empty() {
-            None
-        } else {
-            let s = if stdout.len() > MAX_OUTPUT_BYTES {
-                String::from_utf8_lossy(&stdout[stdout.len() - MAX_OUTPUT_BYTES..]).into_owned()
-            } else {
-                String::from_utf8_lossy(&stdout).into_owned()
-            };
-            Some(s)
-        };
-        self.stderr = if stderr.is_empty() {
-            None
-        } else {
-            let s = if stderr.len() > MAX_OUTPUT_BYTES {
-                String::from_utf8_lossy(&stderr[stderr.len() - MAX_OUTPUT_BYTES..]).into_owned()
-            } else {
-                String::from_utf8_lossy(&stderr).into_owned()
-            };
-            Some(s)
-        };
+        self.stdout = lossy_tail(&stdout);
+        self.stderr = lossy_tail(&stderr);
     }
 }

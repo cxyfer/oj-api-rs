@@ -55,6 +55,10 @@ pub fn admin_router() -> Router<Arc<AppState>> {
             get(handlers::crawler_output),
         )
         .route(
+            "/admin/api/crawlers/{job_id}/progress",
+            get(handlers::crawler_progress),
+        )
+        .route(
             "/admin/api/embeddings/stats",
             get(handlers::embedding_stats),
         )

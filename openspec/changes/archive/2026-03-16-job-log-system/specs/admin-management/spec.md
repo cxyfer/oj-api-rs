@@ -1,56 +1,4 @@
-# admin-management Specification
-
-## Purpose
-TBD - created by archiving change oj-api-rs-v1. Update Purpose after archive.
-## Requirements
-### Requirement: Admin HTML pages
-The system SHALL serve HTML admin pages via Askama templates at `/admin/` (index), `/admin/problems` (problem management). All HTML output SHALL be auto-escaped by Askama to prevent XSS. Problem `content` (raw HTML) SHALL be rendered in an iframe with `sandbox` attribute.
-
-#### Scenario: Admin index page
-- **WHEN** client sends `GET /admin/` with valid admin secret
-- **THEN** system returns HTML page with navigation to problem and token management
-
-#### Scenario: Problem management page
-- **WHEN** client sends `GET /admin/problems` with valid admin secret
-- **THEN** system returns HTML page listing problems with pagination and CRUD controls
-
-### Requirement: Problem CRUD via admin API
-The system SHALL support creating, updating, and deleting problems via admin API endpoints.
-
-#### Scenario: Create problem
-- **WHEN** client sends `POST /admin/api/problems` with valid admin secret and problem JSON body
-- **THEN** system inserts the problem into the DB and returns HTTP 201
-
-#### Scenario: Update problem
-- **WHEN** client sends `PUT /admin/api/problems/{source}/{id}` with updated fields
-- **THEN** system updates the matching problem and returns HTTP 200
-
-#### Scenario: Delete problem
-- **WHEN** client sends `DELETE /admin/api/problems/{source}/{id}`
-- **THEN** system deletes the problem AND its corresponding embedding from `vec_embeddings` and `problem_embeddings`, then returns HTTP 204
-
-#### Scenario: Delete non-existent problem
-- **WHEN** client sends `DELETE /admin/api/problems/leetcode/999999`
-- **THEN** system returns HTTP 404
-
-### Requirement: API token management
-The system SHALL support listing, creating, and revoking API tokens. Tokens SHALL be 64-character hex strings (32 random bytes).
-
-#### Scenario: List tokens
-- **WHEN** client sends `GET /admin/api/tokens`
-- **THEN** system returns all tokens with `token`, `label`, `created_at`, `last_used_at`, `is_active`
-
-#### Scenario: Create token
-- **WHEN** client sends `POST /admin/api/tokens` with `{"label": "my-bot"}`
-- **THEN** system generates a random 64-char hex token, inserts it, and returns HTTP 201 with the new token
-
-#### Scenario: Revoke token
-- **WHEN** client sends `DELETE /admin/api/tokens/{token}`
-- **THEN** system sets `is_active = 0` for that token and returns HTTP 204
-
-#### Scenario: Revoke non-existent token
-- **WHEN** client sends `DELETE /admin/api/tokens/nonexistent`
-- **THEN** system returns HTTP 404
+## MODIFIED Requirements
 
 ### Requirement: Crawler trigger (async)
 The system SHALL trigger Python crawlers via `POST /admin/api/crawlers/trigger` with a JSON body specifying the source. Execution SHALL be asynchronous: the endpoint returns immediately with a `job_id`. Manual admin-triggered crawler jobs SHALL remain single-instance: while one manual crawler job is running, a second manual trigger request SHALL be rejected with HTTP 409. Daily fallback crawler jobs MAY run concurrently with a manual crawler job and SHALL be tracked as separate crawler-domain jobs.
@@ -87,6 +35,8 @@ The system SHALL expose `GET /admin/api/crawlers/status` to check crawler execut
 - **WHEN** one manual crawler job and one daily fallback crawler job are both active
 - **THEN** system returns both jobs in the `running_jobs` array
 - **AND** the daily fallback job is distinguishable in history/status metadata through its trigger marker
+
+## ADDED Requirements
 
 ### Requirement: Crawler job output polling
 The system SHALL expose `GET /admin/api/crawlers/{job_id}/output` for crawler-domain jobs, including daily fallback jobs. The endpoint SHALL return the full current contents of `stdout.log`, `stderr.log`, and `python.log` on each poll using the JSON fields `stdout`, `stderr`, and `python_log`. If an artifact file is missing or empty, the corresponding field SHALL be returned as an empty string. The endpoint SHALL support both running and completed jobs. If the job has been removed by retention cleanup or never existed, the endpoint SHALL return HTTP 404.
@@ -135,11 +85,3 @@ The `/admin/crawlers` page SHALL allow admins to inspect running crawler-domain 
 #### Scenario: Python log has dedicated tab
 - **WHEN** admin opens the crawler log modal
 - **THEN** the modal includes separate tabs for `stdout`, `stderr`, and `python.log`
-
-### Requirement: Admin CORS restriction
-Admin routes SHALL NOT include CORS headers allowing cross-origin requests. Only same-origin access SHALL be permitted.
-
-#### Scenario: Cross-origin admin request
-- **WHEN** a cross-origin request is made to `/admin/*`
-- **THEN** system does not include `Access-Control-Allow-Origin` header
-

@@ -19,6 +19,7 @@ from utils.html_converter import (
     normalize_newlines,
     table_to_markdown,
 )
+from utils.job_progress import append_crawler_progress
 from utils.logger import get_leetcode_logger
 
 logger = get_leetcode_logger()
@@ -615,6 +616,7 @@ class CodeforcesClient(BaseCrawler):
                 os.fsync(f.fileno())
             # Use temp file for atomic writes to avoid corrupting the progress file
             tmp_path.replace(self.progress_file)
+            append_crawler_progress(f"Fetched contest {contest_id}")
         except Exception as exc:
             logger.warning("Failed to write progress file: %s", exc)
             try:

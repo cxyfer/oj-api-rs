@@ -13,6 +13,7 @@ from utils.base_crawler import BaseCrawler
 from utils.config import get_config
 from utils.database import DailyChallengeDatabaseManager, ProblemsDatabaseManager
 from utils.html_converter import normalize_math_delimiters
+from utils.job_progress import append_crawler_progress
 from utils.logger import get_leetcode_logger
 
 # Set up logging
@@ -1652,6 +1653,9 @@ async def main():
                                     processed,
                                     total,
                                 )
+                                append_crawler_progress(
+                                    f"Processed {processed}/{total} missing problems"
+                                )
 
                 tasks = [asyncio.create_task(worker(i)) for i in range(workers)]
                 await queue.join()
@@ -1663,6 +1667,7 @@ async def main():
 
     if args.daily:
         logger.info("Fetching daily challenge...")
+        append_crawler_progress("Fetching daily challenge")
         daily = await client.fetch_daily_challenge()
         if daily is None:
             sys.stderr.write("Error: daily challenge returned None\n")
