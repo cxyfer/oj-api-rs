@@ -8,7 +8,7 @@ import time
 import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from bs4 import BeautifulSoup
 
@@ -18,6 +18,8 @@ from utils.database import ProblemsDatabaseManager
 from utils.logger import get_leetcode_logger
 
 logger = get_leetcode_logger()
+
+ProgressSaveMode = Literal["complete", "keep", "trim"]
 
 CURL_IMPERSONATE = "chrome124"
 
@@ -292,6 +294,10 @@ class LuoguClient(BaseCrawler):
             "similar_questions": None,
         }
 
+    @staticmethod
+    def _page_count(total_count: int) -> int:
+        return math.ceil(total_count / 50)
+
     def get_progress(self) -> dict:
         if not self.progress_file.exists():
             return {
@@ -312,20 +318,7 @@ class LuoguClient(BaseCrawler):
                 "last_updated": None,
             }
 
-    def save_progress(
-        self,
-        page: int,
-        total_count: Optional[int] = None,
-    ) -> None:
-        progress = self.get_progress()
-        completed = set(progress.get("completed_pages", []))
-        completed.add(str(page))
-        progress["completed_pages"] = sorted(completed, key=lambda x: int(x))
-        progress["last_completed_page"] = page
-        progress["last_updated"] = datetime.now(timezone.utc).isoformat()
-        if total_count is not None:
-            progress["total_count_snapshot"] = total_count
-        progress.pop("tags_map", None)
+    def _write_progress(self, progress: dict) -> None:
         tmp_path = self.progress_file.with_suffix(".tmp")
         try:
             with tmp_path.open("w", encoding="utf-8") as f:
@@ -341,11 +334,76 @@ class LuoguClient(BaseCrawler):
             except OSError:
                 pass
 
+    def _refresh_progress_snapshot(self, total_count: int) -> set[str]:
+        progress = self.get_progress()
+        completed = set(progress.get("completed_pages", []))
+        previous_total_count = progress.get("total_count_snapshot")
+        current_total_pages = self._page_count(total_count)
+
+        if previous_total_count is not None:
+            previous_total_pages = self._page_count(previous_total_count)
+            if previous_total_pages < current_total_pages:
+                completed.discard(str(previous_total_pages))
+
+        completed_pages = sorted(completed, key=int)
+        last_completed_page = max(map(int, completed), default=None)
+        changed = (
+            progress.get("completed_pages", []) != completed_pages
+            or progress.get("last_completed_page") != last_completed_page
+            or progress.get("total_count_snapshot") != total_count
+            or "tags_map" in progress
+        )
+        if not changed:
+            return set(completed_pages)
+
+        progress["completed_pages"] = completed_pages
+        progress["last_completed_page"] = last_completed_page
+        progress["total_count_snapshot"] = total_count
+        progress["last_updated"] = datetime.now(timezone.utc).isoformat()
+        progress.pop("tags_map", None)
+        self._write_progress(progress)
+        return set(completed_pages)
+
+    def save_progress(
+        self,
+        page: int,
+        total_count: Optional[int] = None,
+        mode: ProgressSaveMode = "complete",
+    ) -> None:
+        progress = self.get_progress()
+        completed = set(progress.get("completed_pages", []))
+        last_completed_page = progress.get("last_completed_page")
+
+        if mode == "complete":
+            completed.add(str(page))
+            last_completed_page = page
+        elif mode == "trim":
+            completed = {p for p in completed if int(p) < page}
+            last_completed_page = max(map(int, completed), default=None)
+
+        completed_pages = sorted(completed, key=int)
+        changed = (
+            progress.get("completed_pages", []) != completed_pages
+            or progress.get("last_completed_page") != last_completed_page
+            or (
+                total_count is not None
+                and progress.get("total_count_snapshot") != total_count
+            )
+            or "tags_map" in progress
+        )
+        if not changed:
+            return
+
+        progress["completed_pages"] = completed_pages
+        progress["last_completed_page"] = last_completed_page
+        progress["last_updated"] = datetime.now(timezone.utc).isoformat()
+        if total_count is not None:
+            progress["total_count_snapshot"] = total_count
+        progress.pop("tags_map", None)
+        self._write_progress(progress)
+
     async def sync(self, overwrite: bool = False) -> None:
         async with self._create_curl_session(impersonate=CURL_IMPERSONATE) as session:
-            progress = self.get_progress()
-            completed_pages = set(progress.get("completed_pages", []))
-
             # Fetch first page to determine total (also establishes session cookies)
             url = f"{self.PROBLEM_LIST_URL}?page=1"
             html = await self._fetch_text(
@@ -362,14 +420,16 @@ class LuoguClient(BaseCrawler):
             if total_count == 0:
                 logger.warning("Total count is 0, nothing to sync")
                 return
-            total_pages = math.ceil(total_count / 50)
+            total_pages = self._page_count(total_count)
+            completed_pages = self._refresh_progress_snapshot(total_count)
             logger.info("Total problems: %s, pages: %s", total_count, total_pages)
 
             # Fetch tags after session is established
             tag_map = await self._fetch_tags_map(session)
 
-            # Process first page if not already done
-            if "1" not in completed_pages:
+            # Process first page unless it is already a saved stable page.
+            should_process_page_1 = "1" not in completed_pages or total_pages == 1
+            if should_process_page_1:
                 result = problems_data.get("result", [])
                 mapped = [p for raw in result if (p := self._map_problem(raw, tag_map))]
                 if mapped:
@@ -378,11 +438,21 @@ class LuoguClient(BaseCrawler):
                     )
                     verb = "upserted" if overwrite else "inserted"
                     logger.info("Page 1: %s %s/%s problems", verb, count, len(mapped))
-                self.save_progress(1, total_count=total_count)
+            if total_pages == 1:
+                page_1_mode = "trim"
+            elif "1" not in completed_pages:
+                page_1_mode = "complete"
+            else:
+                page_1_mode = "keep"
+            self.save_progress(
+                1,
+                total_count=total_count,
+                mode=page_1_mode,
+            )
 
             page = 2
             while page <= total_pages:
-                if str(page) in completed_pages:
+                if str(page) in completed_pages and page < total_pages:
                     page += 1
                     continue
                 url = f"{self.PROBLEM_LIST_URL}?page={page}"
@@ -405,7 +475,7 @@ class LuoguClient(BaseCrawler):
                 new_count = problems_data.get("count", total_count)
                 if new_count != total_count:
                     total_count = new_count
-                    total_pages = math.ceil(total_count / 50)
+                    total_pages = self._page_count(total_count)
                 mapped = [p for raw in result if (p := self._map_problem(raw, tag_map))]
                 if mapped:
                     count = self.problems_db.update_problems(
@@ -420,7 +490,11 @@ class LuoguClient(BaseCrawler):
                         count,
                         len(mapped),
                     )
-                self.save_progress(page)
+                self.save_progress(
+                    page,
+                    total_count=total_count,
+                    mode="complete" if page < total_pages else "trim",
+                )
                 page += 1
 
         logger.info("Sync completed")
@@ -535,7 +609,7 @@ class LuoguClient(BaseCrawler):
             if total_count == 0:
                 logger.warning("SPOJ total count is 0, nothing to sync")
                 return
-            total_pages = math.ceil(total_count / 50)
+            total_pages = self._page_count(total_count)
             logger.info("SPOJ total problems: %s, pages: %s", total_count, total_pages)
 
             if "1" not in completed_pages:
@@ -577,7 +651,7 @@ class LuoguClient(BaseCrawler):
                 new_count = problems_data.get("count", total_count)
                 if new_count != total_count:
                     total_count = new_count
-                    total_pages = math.ceil(total_count / 50)
+                    total_pages = self._page_count(total_count)
                 mapped = [
                     p
                     for raw in result
