@@ -12,6 +12,7 @@ use crate::models::{
     CrawlerJob, CrawlerPhase, CrawlerProgress, CrawlerStatus, EmbeddingJob, EmbeddingProgress,
     JobArtifactMetadata, JobArtifactPaths, JobType,
 };
+use crate::AppState;
 
 #[cfg(test)]
 pub(crate) static TEST_PATH_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -432,6 +433,8 @@ pub async fn persist_job_metadata(
 
 pub const RETAINED_JOB_HISTORY_LIMIT: usize = 50;
 pub const JOB_RETENTION: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+pub const REQUEST_PATH_RETAINED_SUMMARY_SYNC_INTERVAL: Duration = Duration::from_secs(3);
+pub const REQUEST_PATH_RETAINED_CLEANUP_INTERVAL: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Default)]
 pub struct RetainedJobState {
@@ -439,13 +442,39 @@ pub struct RetainedJobState {
     pub embedding_history: VecDeque<EmbeddingJob>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct RetainedRefreshState {
+    pub last_summary_sync: Option<tokio::time::Instant>,
+    pub last_cleanup: Option<tokio::time::Instant>,
+}
+
+impl RetainedRefreshState {
+    pub fn take_due_work(&mut self, now: tokio::time::Instant) -> (bool, bool) {
+        let should_sync = self
+            .last_summary_sync
+            .is_none_or(|last| now.duration_since(last) >= REQUEST_PATH_RETAINED_SUMMARY_SYNC_INTERVAL);
+        let should_cleanup = self
+            .last_cleanup
+            .is_none_or(|last| now.duration_since(last) >= REQUEST_PATH_RETAINED_CLEANUP_INTERVAL);
+
+        if should_sync {
+            self.last_summary_sync = Some(now);
+        }
+        if should_cleanup {
+            self.last_cleanup = Some(now);
+        }
+
+        (should_sync, should_cleanup)
+    }
+}
+
 pub async fn reconstruct_retained_job_state(
     root: impl AsRef<Path>,
 ) -> io::Result<RetainedJobState> {
     let root = root.as_ref();
     Ok(RetainedJobState {
-        crawler_history: reconstruct_crawler_history(root).await?,
-        embedding_history: reconstruct_embedding_history(root).await?,
+        crawler_history: reconstruct_crawler_history(root, false).await?,
+        embedding_history: reconstruct_embedding_history(root, false).await?,
     })
 }
 
@@ -462,36 +491,137 @@ pub async fn reconcile_retained_job_state(
     cleanup_expired_job_artifacts(root, active_jobs, crawler_history, embedding_history).await
 }
 
+pub async fn refresh_retained_job_state_now(
+    state: &AppState,
+    refresh_summary: bool,
+    cleanup: bool,
+) -> io::Result<()> {
+    let active_jobs = if cleanup {
+        Some(collect_active_jobs(state).await)
+    } else {
+        None
+    };
+
+    if refresh_summary {
+        let retained = reconstruct_retained_job_state(crate::models::JOB_ARTIFACTS_ROOT).await?;
+        merge_retained_histories_into_state(state, retained).await;
+    }
+
+    if let Some(active_jobs) = active_jobs.as_ref() {
+        let cleanup_result =
+            cleanup_expired_job_artifacts_scan(crate::models::JOB_ARTIFACTS_ROOT, active_jobs)
+                .await?;
+        let mut crawler_history = state.crawler_history.lock().await;
+        let mut embedding_history = state.embedding_history.lock().await;
+        apply_cleanup_expired_job_artifacts(
+            cleanup_result,
+            &mut crawler_history,
+            &mut embedding_history,
+        );
+    }
+
+    Ok(())
+}
+
+pub async fn maybe_refresh_retained_job_state(state: &AppState) -> io::Result<()> {
+    let now = tokio::time::Instant::now();
+    let (should_sync, should_cleanup) = {
+        let mut refresh = state.retained_refresh.lock().await;
+        refresh.take_due_work(now)
+    };
+
+    if !should_sync && !should_cleanup {
+        return Ok(());
+    }
+
+    refresh_retained_job_state_now(state, should_sync, should_cleanup).await
+}
+
+async fn collect_active_jobs(state: &AppState) -> HashSet<(JobType, String)> {
+    let crawler_jobs = state.crawler_jobs.lock().await;
+    let embedding_job = state.embedding_lock.lock().await;
+    let mut active_jobs = HashSet::new();
+    active_jobs.extend(
+        crawler_jobs
+            .values()
+            .filter(|job| job.status == CrawlerStatus::Running)
+            .map(|job| (JobType::Crawler, job.job_id.clone())),
+    );
+    if let Some(job) = embedding_job
+        .as_ref()
+        .filter(|job| job.status == CrawlerStatus::Running)
+    {
+        active_jobs.insert((JobType::Embedding, job.job_id.clone()));
+    }
+    active_jobs
+}
+
+async fn merge_retained_histories_into_state(state: &AppState, retained: RetainedJobState) {
+    let mut crawler_history = state.crawler_history.lock().await;
+    merge_crawler_history(&mut crawler_history, retained.crawler_history);
+    drop(crawler_history);
+
+    let mut embedding_history = state.embedding_history.lock().await;
+    merge_embedding_history(&mut embedding_history, retained.embedding_history);
+}
+
+struct CleanupExpiredJobArtifactsResult {
+    existing_crawler_ids: HashSet<String>,
+    existing_embedding_ids: HashSet<String>,
+}
+
 pub async fn cleanup_expired_job_artifacts(
     root: impl AsRef<Path>,
     active_jobs: &HashSet<(JobType, String)>,
     crawler_history: &mut VecDeque<CrawlerJob>,
     embedding_history: &mut VecDeque<EmbeddingJob>,
 ) -> io::Result<()> {
+    let cleanup_result = cleanup_expired_job_artifacts_scan(root, active_jobs).await?;
+    apply_cleanup_expired_job_artifacts(cleanup_result, crawler_history, embedding_history);
+    Ok(())
+}
+
+async fn cleanup_expired_job_artifacts_scan(
+    root: impl AsRef<Path>,
+    active_jobs: &HashSet<(JobType, String)>,
+) -> io::Result<CleanupExpiredJobArtifactsResult> {
     let root = root.as_ref();
     let now = SystemTime::now();
 
     cleanup_expired_job_dirs_for_type(root, JobType::Crawler, active_jobs, now).await?;
     cleanup_expired_job_dirs_for_type(root, JobType::Embedding, active_jobs, now).await?;
 
-    let existing_crawler_ids = existing_job_ids(root, JobType::Crawler).await?;
-    let existing_embedding_ids = existing_job_ids(root, JobType::Embedding).await?;
-
-    crawler_history.retain(|job| existing_crawler_ids.contains(&job.job_id));
-    embedding_history.retain(|job| existing_embedding_ids.contains(&job.job_id));
-    trim_history(crawler_history);
-    trim_history(embedding_history);
-
-    Ok(())
+    Ok(CleanupExpiredJobArtifactsResult {
+        existing_crawler_ids: existing_job_ids(root, JobType::Crawler).await?,
+        existing_embedding_ids: existing_job_ids(root, JobType::Embedding).await?,
+    })
 }
 
-async fn reconstruct_crawler_history(root: &Path) -> io::Result<VecDeque<CrawlerJob>> {
+fn apply_cleanup_expired_job_artifacts(
+    cleanup_result: CleanupExpiredJobArtifactsResult,
+    crawler_history: &mut VecDeque<CrawlerJob>,
+    embedding_history: &mut VecDeque<EmbeddingJob>,
+) {
+    crawler_history.retain(|job| cleanup_result.existing_crawler_ids.contains(&job.job_id));
+    embedding_history.retain(|job| cleanup_result.existing_embedding_ids.contains(&job.job_id));
+    trim_history(crawler_history);
+    trim_history(embedding_history);
+}
+
+async fn reconstruct_crawler_history(
+    root: &Path,
+    include_output: bool,
+) -> io::Result<VecDeque<CrawlerJob>> {
     let mut jobs = Vec::new();
     for paths in list_job_dirs(root, JobType::Crawler).await? {
         let Some(progress) = read_json_file::<CrawlerProgress>(&paths.progress).await? else {
             continue;
         };
-        let output = read_job_output(&paths, None, None).await?;
+        let output = if include_output {
+            read_job_output(&paths, None, None).await?
+        } else {
+            None
+        };
         if let Some(job) = crawler_job_from_progress(&paths, progress, output) {
             jobs.push(job);
         }
@@ -504,13 +634,20 @@ async fn reconstruct_crawler_history(root: &Path) -> io::Result<VecDeque<Crawler
     Ok(limit_history(jobs))
 }
 
-async fn reconstruct_embedding_history(root: &Path) -> io::Result<VecDeque<EmbeddingJob>> {
+async fn reconstruct_embedding_history(
+    root: &Path,
+    include_output: bool,
+) -> io::Result<VecDeque<EmbeddingJob>> {
     let mut jobs = Vec::new();
     for paths in list_job_dirs(root, JobType::Embedding).await? {
         let Some(progress) = read_json_file::<EmbeddingProgress>(&paths.progress).await? else {
             continue;
         };
-        let output = read_job_output(&paths, None, None).await?;
+        let output = if include_output {
+            read_job_output(&paths, None, None).await?
+        } else {
+            None
+        };
         if let Some(job) = embedding_job_from_progress(&paths, progress, output) {
             jobs.push(job);
         }
@@ -533,7 +670,7 @@ async fn cleanup_expired_job_dirs_for_type(
         if active_jobs.contains(&(job_type, paths.job_id.clone())) {
             continue;
         }
-        if !job_dir_is_terminal(&paths).await? || !job_dir_is_expired(&paths, now)? {
+        if !job_dir_is_terminal(&paths).await? || !job_dir_is_expired(&paths, now).await? {
             continue;
         }
         match tokio::fs::remove_dir_all(&paths.job_dir).await {
@@ -680,8 +817,8 @@ async fn job_dir_is_terminal(paths: &JobArtifactPaths) -> io::Result<bool> {
     }
 }
 
-fn job_dir_is_expired(paths: &JobArtifactPaths, now: SystemTime) -> io::Result<bool> {
-    let Some(modified) = latest_job_artifact_mtime(paths)? else {
+async fn job_dir_is_expired(paths: &JobArtifactPaths, now: SystemTime) -> io::Result<bool> {
+    let Some(modified) = latest_job_artifact_mtime(paths).await? else {
         return Ok(false);
     };
     Ok(match now.duration_since(modified) {
@@ -690,7 +827,7 @@ fn job_dir_is_expired(paths: &JobArtifactPaths, now: SystemTime) -> io::Result<b
     })
 }
 
-fn latest_job_artifact_mtime(paths: &JobArtifactPaths) -> io::Result<Option<SystemTime>> {
+async fn latest_job_artifact_mtime(paths: &JobArtifactPaths) -> io::Result<Option<SystemTime>> {
     let mut latest = None;
 
     for path in [
@@ -699,7 +836,7 @@ fn latest_job_artifact_mtime(paths: &JobArtifactPaths) -> io::Result<Option<Syst
         &paths.stderr,
         &paths.python_log,
     ] {
-        let modified = match std::fs::metadata(path) {
+        let modified = match tokio::fs::metadata(path).await {
             Ok(metadata) => Some(metadata.modified()?),
             Err(err) if err.kind() == io::ErrorKind::NotFound => None,
             Err(err) => return Err(err),
@@ -717,7 +854,7 @@ fn latest_job_artifact_mtime(paths: &JobArtifactPaths) -> io::Result<Option<Syst
         return Ok(latest);
     }
 
-    match std::fs::metadata(&paths.job_dir) {
+    match tokio::fs::metadata(&paths.job_dir).await {
         Ok(metadata) => Ok(Some(metadata.modified()?)),
         Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(err) => Err(err),
@@ -828,7 +965,8 @@ mod tests {
         natural_sort_key, persist_crawler_running_progress, persist_crawler_terminal_progress,
         persist_job_metadata, read_job_output, reconstruct_retained_job_state,
         start_live_output_capture, write_crawler_progress, write_embedding_progress,
-        OUTPUT_TAIL_MAX_BYTES,
+        RetainedRefreshState, REQUEST_PATH_RETAINED_CLEANUP_INTERVAL,
+        REQUEST_PATH_RETAINED_SUMMARY_SYNC_INTERVAL, OUTPUT_TAIL_MAX_BYTES,
     };
     use crate::models::{
         CrawlerJob, CrawlerPhase, CrawlerProgress, CrawlerStatus, CrawlerTrigger, EmbeddingJob,
@@ -1542,14 +1680,8 @@ mod tests {
             retained.crawler_history[1].trigger,
             CrawlerTrigger::DailyFallback
         );
-        assert_eq!(
-            retained.crawler_history[0].stdout.as_deref(),
-            Some("stdout-crawler-old")
-        );
-        assert_eq!(
-            retained.crawler_history[2].stderr.as_deref(),
-            Some("stderr-crawler-new")
-        );
+        assert_eq!(retained.crawler_history[0].stdout, None);
+        assert_eq!(retained.crawler_history[2].stderr, None);
 
         let embedding_ids: Vec<_> = retained
             .embedding_history
@@ -1563,6 +1695,26 @@ mod tests {
         );
 
         let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[test]
+    fn retained_refresh_state_throttles_summary_and_cleanup() {
+        let base = tokio::time::Instant::now();
+        let mut refresh = RetainedRefreshState::default();
+
+        assert_eq!(refresh.take_due_work(base), (true, true));
+        assert_eq!(
+            refresh.take_due_work(base + Duration::from_secs(1)),
+            (false, false)
+        );
+        assert_eq!(
+            refresh.take_due_work(base + REQUEST_PATH_RETAINED_SUMMARY_SYNC_INTERVAL),
+            (true, false)
+        );
+        assert_eq!(
+            refresh.take_due_work(base + REQUEST_PATH_RETAINED_CLEANUP_INTERVAL),
+            (true, true)
+        );
     }
 
     #[tokio::test]

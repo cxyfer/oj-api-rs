@@ -32,6 +32,7 @@ pub struct AppState {
     pub active_crawler_pids: tokio::sync::Mutex<HashMap<String, models::ActiveCrawlerPid>>,
     pub active_embedding_pid: tokio::sync::Mutex<Option<u32>>,
     pub daily_fallback: tokio::sync::Mutex<HashMap<String, models::DailyFallbackEntry>>,
+    pub retained_refresh: tokio::sync::Mutex<utils::RetainedRefreshState>,
     pub embed_semaphore: Semaphore,
     pub token_auth_enabled: Arc<AtomicBool>,
     pub admin_sessions: Arc<RwLock<HashMap<String, i64>>>,
@@ -101,6 +102,10 @@ async fn main() {
             err
         );
     }
+    let retained_refresh = tokio::sync::Mutex::new(crate::utils::RetainedRefreshState {
+        last_summary_sync: Some(tokio::time::Instant::now()),
+        last_cleanup: Some(tokio::time::Instant::now()),
+    });
 
     // 11. Build AppState
     let config_path_for_children = Some(config.config_path.to_string_lossy().into_owned());
@@ -117,6 +122,7 @@ async fn main() {
         active_crawler_pids: tokio::sync::Mutex::new(HashMap::new()),
         active_embedding_pid: tokio::sync::Mutex::new(None),
         daily_fallback: tokio::sync::Mutex::new(HashMap::new()),
+        retained_refresh,
         embed_semaphore: Semaphore::new(config.embedding.concurrency as usize),
         token_auth_enabled: token_auth_flag.clone(),
         admin_sessions: admin_sessions.clone(),

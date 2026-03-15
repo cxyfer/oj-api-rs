@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -279,11 +279,12 @@ fn push_or_replace_embedding_history(
     history.push_back(job);
 }
 
+#[cfg(test)]
 fn collect_running_job_keys<'a>(
     crawler_jobs: impl IntoIterator<Item = &'a CrawlerJob>,
     embedding_job: Option<&EmbeddingJob>,
-) -> HashSet<(JobType, String)> {
-    let mut active_jobs = HashSet::new();
+) -> std::collections::HashSet<(JobType, String)> {
+    let mut active_jobs = std::collections::HashSet::new();
     active_jobs.extend(
         crawler_jobs
             .into_iter()
@@ -625,27 +626,11 @@ pub async fn trigger_crawler(
         }
         return ProblemDetail::internal("failed to persist crawler metadata").into_response();
     }
-    let embedding_job = { state.embedding_lock.lock().await.clone() };
-    let active_jobs = {
-        let crawler_jobs = state.crawler_jobs.lock().await;
-        collect_running_job_keys(crawler_jobs.values(), embedding_job.as_ref())
-    };
-    {
-        let mut history = state.crawler_history.lock().await;
-        let mut embedding_history = state.embedding_history.lock().await;
-        if let Err(err) = crate::utils::reconcile_retained_job_state(
-            crate::models::JOB_ARTIFACTS_ROOT,
-            &active_jobs,
-            &mut history,
-            &mut embedding_history,
-        )
-        .await
-        {
-            tracing::warn!(
-                "failed to reconcile retained job history before crawler launch: {}",
-                err
-            );
-        }
+    if let Err(err) = crate::utils::refresh_retained_job_state_now(state.as_ref(), true, true).await {
+        tracing::warn!(
+            "failed to reconcile retained job history before crawler launch: {}",
+            err
+        );
     }
 
     let script = source.script_name();
@@ -878,27 +863,11 @@ pub async fn cancel_crawler(State(state): State<Arc<AppState>>) -> impl IntoResp
 }
 
 pub async fn crawler_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    {
-        let active_jobs = {
-            let crawler_jobs = state.crawler_jobs.lock().await;
-            let embedding_job = state.embedding_lock.lock().await;
-            collect_running_job_keys(crawler_jobs.values(), embedding_job.as_ref())
-        };
-        let mut crawler_history = state.crawler_history.lock().await;
-        let mut embedding_history = state.embedding_history.lock().await;
-        if let Err(err) = crate::utils::reconcile_retained_job_state(
-            crate::models::JOB_ARTIFACTS_ROOT,
-            &active_jobs,
-            &mut crawler_history,
-            &mut embedding_history,
-        )
-        .await
-        {
-            tracing::warn!(
-                "failed to reconcile retained job state for crawler_status: {}",
-                err
-            );
-        }
+    if let Err(err) = crate::utils::maybe_refresh_retained_job_state(state.as_ref()).await {
+        tracing::warn!(
+            "failed to reconcile retained job state for crawler_status: {}",
+            err
+        );
     }
 
     let mut running_jobs: Vec<_> = {
@@ -1180,26 +1149,11 @@ pub async fn trigger_embedding(
     }
     drop(lock);
     drop(launch_guard);
-    let active_jobs = {
-        let crawler_jobs = state.crawler_jobs.lock().await;
-        collect_running_job_keys(crawler_jobs.values(), Some(&job))
-    };
-    {
-        let mut crawler_history = state.crawler_history.lock().await;
-        let mut history = state.embedding_history.lock().await;
-        if let Err(err) = crate::utils::reconcile_retained_job_state(
-            crate::models::JOB_ARTIFACTS_ROOT,
-            &active_jobs,
-            &mut crawler_history,
-            &mut history,
-        )
-        .await
-        {
-            tracing::warn!(
-                "failed to reconcile retained job history before embedding launch: {}",
-                err
-            );
-        }
+    if let Err(err) = crate::utils::refresh_retained_job_state_now(state.as_ref(), true, true).await {
+        tracing::warn!(
+            "failed to reconcile retained job history before embedding launch: {}",
+            err
+        );
     }
 
     let state_clone = state.clone();
@@ -1399,68 +1353,52 @@ pub async fn cancel_embedding(State(state): State<Arc<AppState>>) -> impl IntoRe
 }
 
 pub async fn embedding_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    {
-        let active_jobs = {
-            let crawler_jobs = state.crawler_jobs.lock().await;
-            let embedding_job = state.embedding_lock.lock().await;
-            collect_running_job_keys(crawler_jobs.values(), embedding_job.as_ref())
-        };
-        let mut crawler_history = state.crawler_history.lock().await;
-        let mut embedding_history = state.embedding_history.lock().await;
-        if let Err(err) = crate::utils::reconcile_retained_job_state(
-            crate::models::JOB_ARTIFACTS_ROOT,
-            &active_jobs,
-            &mut crawler_history,
-            &mut embedding_history,
-        )
-        .await
-        {
-            tracing::warn!(
-                "failed to reconcile retained job state for embedding_status: {}",
-                err
-            );
-        }
+    if let Err(err) = crate::utils::maybe_refresh_retained_job_state(state.as_ref()).await {
+        tracing::warn!(
+            "failed to reconcile retained job state for embedding_status: {}",
+            err
+        );
     }
 
-    let lock = state.embedding_lock.lock().await;
-    let history = state.embedding_history.lock().await;
-    let history_vec: Vec<_> = history
-        .iter()
-        .rev()
-        .map(|j| {
-            let mut j = j.clone();
-            j.stdout = None;
-            j.stderr = None;
-            j
-        })
-        .collect();
+    let current_job = state.embedding_lock.lock().await.clone();
+    let history_vec: Vec<_> = {
+        let history = state.embedding_history.lock().await;
+        history
+            .iter()
+            .rev()
+            .map(|j| {
+                let mut j = j.clone();
+                j.stdout = None;
+                j.stderr = None;
+                j
+            })
+            .collect()
+    };
 
-    match &*lock {
-        Some(job) if job.status == CrawlerStatus::Running => {
-            let mut current = job.clone();
-            current.stdout = None;
-            current.stderr = None;
+    match current_job {
+        Some(mut job) if job.status == CrawlerStatus::Running => {
+            job.stdout = None;
+            job.stderr = None;
             let progress = read_embedding_progress_json(&job.job_id)
                 .await
                 .unwrap_or_else(|| serde_json::json!({ "phase": "queued" }));
             Json(serde_json::json!({
                 "running": true,
-                "current_job": current,
+                "current_job": job,
                 "progress": progress,
                 "history": history_vec,
             }))
             .into_response()
         }
-        Some(job) => {
-            let mut last = job.clone();
-            last.stdout = None;
-            last.stderr = None;
+        Some(mut job) => {
+            job.stdout = None;
+            job.stderr = None;
             let progress = read_embedding_progress_json(&job.job_id)
                 .await
                 .unwrap_or_else(|| serde_json::json!({ "phase": "unknown" }));
             Json(serde_json::json!({
                 "running": false,
-                "last_job": last,
+                "last_job": job,
                 "progress": progress,
                 "history": history_vec,
             }))
@@ -1584,6 +1522,7 @@ pub async fn embedding_progress(Path(job_id): Path<String>) -> impl IntoResponse
 }
 
 #[cfg(test)]
+#[allow(clippy::await_holding_lock)]
 mod tests {
     use std::collections::{HashMap, HashSet, VecDeque};
     #[cfg(unix)]
@@ -1630,6 +1569,7 @@ mod tests {
             active_crawler_pids: tokio::sync::Mutex::new(HashMap::new()),
             active_embedding_pid: tokio::sync::Mutex::new(None),
             daily_fallback: tokio::sync::Mutex::new(HashMap::new()),
+            retained_refresh: tokio::sync::Mutex::new(crate::utils::RetainedRefreshState::default()),
             embed_semaphore: Semaphore::new(1),
             token_auth_enabled: Arc::new(AtomicBool::new(true)),
             admin_sessions: Arc::new(RwLock::new(HashMap::new())),
@@ -2267,15 +2207,24 @@ mod tests {
     #[cfg(unix)]
     async fn wait_for_manual_job_terminal(state: &Arc<AppState>, runtime_key: &str) {
         for _ in 0..100 {
-            let done = {
+            let finished = {
                 let crawler_jobs = state.crawler_jobs.lock().await;
                 crawler_jobs
                     .get(runtime_key)
                     .map(|job| job.finished_at.is_some())
                     .unwrap_or(false)
             };
-            if done {
-                return;
+            if finished {
+                let (_, progress) = read_crawler_progress_from_state(state, runtime_key).await;
+                if matches!(
+                    progress.phase,
+                    CrawlerPhase::Completed
+                        | CrawlerPhase::Failed
+                        | CrawlerPhase::Cancelled
+                        | CrawlerPhase::TimedOut
+                ) {
+                    return;
+                }
             }
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }

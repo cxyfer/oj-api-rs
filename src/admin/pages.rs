@@ -185,37 +185,11 @@ struct CrawlersTemplate {
 }
 
 pub async fn crawlers_page(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    {
-        let active_jobs = {
-            let jobs = state.crawler_jobs.lock().await;
-            let embedding_job = state.embedding_lock.lock().await;
-            jobs.values()
-                .filter(|job| job.status == crate::models::CrawlerStatus::Running)
-                .map(|job| (crate::models::JobType::Crawler, job.job_id.clone()))
-                .chain(
-                    embedding_job
-                        .as_ref()
-                        .filter(|job| job.status == crate::models::CrawlerStatus::Running)
-                        .map(|job| (crate::models::JobType::Embedding, job.job_id.clone()))
-                        .into_iter(),
-                )
-                .collect()
-        };
-        let mut crawler_history = state.crawler_history.lock().await;
-        let mut embedding_history = state.embedding_history.lock().await;
-        if let Err(err) = crate::utils::reconcile_retained_job_state(
-            crate::models::JOB_ARTIFACTS_ROOT,
-            &active_jobs,
-            &mut crawler_history,
-            &mut embedding_history,
-        )
-        .await
-        {
-            tracing::warn!(
-                "failed to reconcile retained job state for crawlers_page: {}",
-                err
-            );
-        }
+    if let Err(err) = crate::utils::maybe_refresh_retained_job_state(state.as_ref()).await {
+        tracing::warn!(
+            "failed to reconcile retained job state for crawlers_page: {}",
+            err
+        );
     }
 
     let mut running_jobs: Vec<CrawlerJob> = {
@@ -272,38 +246,11 @@ struct EmbeddingsTemplate {
 }
 
 pub async fn embeddings_page(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    {
-        let active_jobs = {
-            let crawler_jobs = state.crawler_jobs.lock().await;
-            let embedding_job = state.embedding_lock.lock().await;
-            crawler_jobs
-                .values()
-                .filter(|job| job.status == crate::models::CrawlerStatus::Running)
-                .map(|job| (crate::models::JobType::Crawler, job.job_id.clone()))
-                .chain(
-                    embedding_job
-                        .as_ref()
-                        .filter(|job| job.status == crate::models::CrawlerStatus::Running)
-                        .map(|job| (crate::models::JobType::Embedding, job.job_id.clone()))
-                        .into_iter(),
-                )
-                .collect()
-        };
-        let mut crawler_history = state.crawler_history.lock().await;
-        let mut embedding_history = state.embedding_history.lock().await;
-        if let Err(err) = crate::utils::reconcile_retained_job_state(
-            crate::models::JOB_ARTIFACTS_ROOT,
-            &active_jobs,
-            &mut crawler_history,
-            &mut embedding_history,
-        )
-        .await
-        {
-            tracing::warn!(
-                "failed to reconcile retained job state for embeddings_page: {}",
-                err
-            );
-        }
+    if let Err(err) = crate::utils::maybe_refresh_retained_job_state(state.as_ref()).await {
+        tracing::warn!(
+            "failed to reconcile retained job state for embeddings_page: {}",
+            err
+        );
     }
 
     let lock = state.embedding_lock.lock().await;

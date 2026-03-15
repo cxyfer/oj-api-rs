@@ -89,7 +89,7 @@ def _read_existing_progress(path: str) -> dict:
         return data if isinstance(data, dict) else {}
     except FileNotFoundError:
         return {}
-    except Exception:
+    except (json.JSONDecodeError, OSError):
         return {}
 
 

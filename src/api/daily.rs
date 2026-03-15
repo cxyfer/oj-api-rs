@@ -139,6 +139,49 @@ fn schedule_daily_fallback_cleanup(
     });
 }
 
+async fn handle_daily_fallback_terminal_failure(
+    state: &Arc<AppState>,
+    runtime_key: &str,
+    job_id: &str,
+    started_at: tokio::time::Instant,
+    artifact_paths: &crate::models::JobArtifactPaths,
+) {
+    let mut fallback = state.daily_fallback.lock().await;
+    if let Some(entry) = fallback.get_mut(runtime_key) {
+        entry.status = crate::models::CrawlerStatus::Failed;
+        entry.cooldown_until = Some(started_at + Duration::from_secs(30));
+        entry.completed.store(true, Ordering::Release);
+        entry.notify.notify_waiters();
+    }
+    drop(fallback);
+
+    let finished_job = {
+        let mut crawler_jobs = state.crawler_jobs.lock().await;
+        if let Some(job) = crawler_jobs.get_mut(runtime_key) {
+            if !crawler_status_is_terminal(&job.status) {
+                job.status = crate::models::CrawlerStatus::Failed;
+            }
+            if job.finished_at.is_none() {
+                job.finished_at = Some(chrono::Utc::now().to_rfc3339());
+            }
+            Some(job.clone())
+        } else {
+            None
+        }
+    };
+    if let Some(job) = finished_job {
+        crate::utils::persist_crawler_terminal_progress(artifact_paths, &job).await;
+        let mut history = state.crawler_history.lock().await;
+        crate::utils::push_or_replace_crawler_history(&mut history, job);
+    }
+    schedule_daily_fallback_cleanup(
+        state.clone(),
+        runtime_key.to_string(),
+        job_id.to_string(),
+        started_at,
+    );
+}
+
 pub async fn get_daily(
     State(state): State<Arc<AppState>>,
     Query(query): Query<DailyQuery>,
@@ -315,34 +358,8 @@ pub async fn get_daily(
         Ok(c) => c,
         Err(e) => {
             tracing::error!("failed to spawn daily fallback crawler: {}", e);
-            let mut fallback = state.daily_fallback.lock().await;
-            if let Some(entry) = fallback.get_mut(&key) {
-                entry.status = crate::models::CrawlerStatus::Failed;
-                entry.cooldown_until = Some(now + Duration::from_secs(30));
-                entry.completed.store(true, Ordering::Release);
-                entry.notify.notify_waiters();
-            }
-            drop(fallback);
-            let finished_job = {
-                let mut crawler_jobs = state.crawler_jobs.lock().await;
-                if let Some(job) = crawler_jobs.get_mut(&key) {
-                    if !crawler_status_is_terminal(&job.status) {
-                        job.status = crate::models::CrawlerStatus::Failed;
-                    }
-                    if job.finished_at.is_none() {
-                        job.finished_at = Some(chrono::Utc::now().to_rfc3339());
-                    }
-                    Some(job.clone())
-                } else {
-                    None
-                }
-            };
-            if let Some(job) = finished_job {
-                crate::utils::persist_crawler_terminal_progress(&artifact_paths, &job).await;
-                let mut history = state.crawler_history.lock().await;
-                crate::utils::push_or_replace_crawler_history(&mut history, job);
-            }
-            schedule_daily_fallback_cleanup(state.clone(), key.clone(), job_id.clone(), now);
+            handle_daily_fallback_terminal_failure(&state, &key, &job_id, now, &artifact_paths)
+                .await;
             if should_wait {
                 return (
                     axum::http::StatusCode::ACCEPTED,
@@ -361,34 +378,8 @@ pub async fn get_daily(
                 crate::utils::kill_pgid(pid);
             }
             let _ = child.wait().await;
-            let mut fallback = state.daily_fallback.lock().await;
-            if let Some(entry) = fallback.get_mut(&key) {
-                entry.status = crate::models::CrawlerStatus::Failed;
-                entry.cooldown_until = Some(now + Duration::from_secs(30));
-                entry.completed.store(true, Ordering::Release);
-                entry.notify.notify_waiters();
-            }
-            drop(fallback);
-            let finished_job = {
-                let mut crawler_jobs = state.crawler_jobs.lock().await;
-                if let Some(job) = crawler_jobs.get_mut(&key) {
-                    if !crawler_status_is_terminal(&job.status) {
-                        job.status = crate::models::CrawlerStatus::Failed;
-                    }
-                    if job.finished_at.is_none() {
-                        job.finished_at = Some(chrono::Utc::now().to_rfc3339());
-                    }
-                    Some(job.clone())
-                } else {
-                    None
-                }
-            };
-            if let Some(job) = finished_job {
-                crate::utils::persist_crawler_terminal_progress(&artifact_paths, &job).await;
-                let mut history = state.crawler_history.lock().await;
-                crate::utils::push_or_replace_crawler_history(&mut history, job);
-            }
-            schedule_daily_fallback_cleanup(state.clone(), key.clone(), job_id.clone(), now);
+            handle_daily_fallback_terminal_failure(&state, &key, &job_id, now, &artifact_paths)
+                .await;
             if should_wait {
                 return (
                     axum::http::StatusCode::ACCEPTED,
@@ -596,11 +587,12 @@ fn apply_daily_fallback_terminal_update(
 }
 
 #[cfg(test)]
+#[allow(clippy::await_holding_lock)]
 mod tests {
     use std::collections::{HashMap, VecDeque};
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
-    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
 
     use axum::extract::{Query, State};
@@ -609,7 +601,9 @@ mod tests {
     use rand::Rng;
     use tokio::sync::{Notify, RwLock, Semaphore};
 
-    use super::{apply_daily_fallback_terminal_update, DailyQuery};
+    use super::{
+        apply_daily_fallback_terminal_update, handle_daily_fallback_terminal_failure, DailyQuery,
+    };
     use crate::config::Config;
     use crate::models::{
         daily_fallback_crawler_runtime_key, CrawlerPhase, CrawlerProgress, CrawlerStatus,
@@ -646,6 +640,7 @@ mod tests {
             active_crawler_pids: tokio::sync::Mutex::new(HashMap::new()),
             active_embedding_pid: tokio::sync::Mutex::new(None),
             daily_fallback: tokio::sync::Mutex::new(HashMap::new()),
+            retained_refresh: tokio::sync::Mutex::new(crate::utils::RetainedRefreshState::default()),
             embed_semaphore: Semaphore::new(1),
             token_auth_enabled: Arc::new(AtomicBool::new(true)),
             admin_sessions: Arc::new(RwLock::new(HashMap::new())),
@@ -834,6 +829,72 @@ mod tests {
         );
 
         assert!(!crawler_jobs.contains_key(&runtime_key));
+    }
+
+    #[tokio::test]
+    async fn handle_daily_fallback_terminal_failure_marks_job_and_history_failed() {
+        let _root_lock = crate::utils::TEST_JOB_ARTIFACTS_ROOT_MUTEX
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        let state = test_state();
+        let runtime_key = daily_fallback_crawler_runtime_key("com", "2026-03-14");
+        let started_at = tokio::time::Instant::now();
+        let job_id = uuid::Uuid::new_v4().to_string();
+        let paths = crate::utils::canonical_job_artifact_paths(JobType::Crawler, &job_id).unwrap();
+        let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
+
+        state.daily_fallback.lock().await.insert(
+            runtime_key.clone(),
+            DailyFallbackEntry {
+                job_id: job_id.clone(),
+                status: CrawlerStatus::Running,
+                started_at,
+                cooldown_until: None,
+                notify: Arc::new(Notify::new()),
+                completed: Arc::new(AtomicBool::new(false)),
+                stdout: None,
+                stderr: None,
+            },
+        );
+        state.crawler_jobs.lock().await.insert(
+            runtime_key.clone(),
+            crate::models::CrawlerJob {
+                job_id: job_id.clone(),
+                source: "leetcode".to_string(),
+                args: vec!["--daily".to_string()],
+                trigger: CrawlerTrigger::DailyFallback,
+                started_at: chrono::Utc::now().to_rfc3339(),
+                finished_at: None,
+                status: CrawlerStatus::Running,
+                stdout: None,
+                stderr: None,
+            },
+        );
+
+        handle_daily_fallback_terminal_failure(&state, &runtime_key, &job_id, started_at, &paths)
+            .await;
+
+        {
+            let fallback = state.daily_fallback.lock().await;
+            let entry = fallback.get(&runtime_key).unwrap();
+            assert_eq!(entry.status, CrawlerStatus::Failed);
+            assert!(entry.cooldown_until.is_some());
+            assert!(entry.completed.load(Ordering::Acquire));
+        }
+        {
+            let crawler_jobs = state.crawler_jobs.lock().await;
+            let job = crawler_jobs.get(&runtime_key).unwrap();
+            assert_eq!(job.status, CrawlerStatus::Failed);
+            assert!(job.finished_at.is_some());
+        }
+        {
+            let history = state.crawler_history.lock().await;
+            assert!(history
+                .iter()
+                .any(|job| job.job_id == job_id && job.status == CrawlerStatus::Failed));
+        }
+
+        let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
     }
 
     #[cfg(unix)]
