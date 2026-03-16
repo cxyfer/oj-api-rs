@@ -2577,6 +2577,7 @@ mod tests {
         );
 
         drop(fake_uv);
+        let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
     }
 
     #[tokio::test]
@@ -2615,6 +2616,8 @@ mod tests {
             payload["progress"]["phase"],
             serde_json::Value::String("queued".to_string())
         );
+
+        let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
     }
 
     #[tokio::test]
@@ -2658,6 +2661,8 @@ mod tests {
             payload["python_log"],
             serde_json::Value::String(String::new())
         );
+
+        let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
     }
 
     #[tokio::test]
@@ -2694,6 +2699,8 @@ mod tests {
             .await
             .into_response();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+        let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
     }
 
     #[cfg(unix)]
@@ -2754,6 +2761,7 @@ mod tests {
         assert_eq!(payload["python_log"], serde_json::Value::String(python_log));
 
         drop(fake_uv);
+        let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
     }
 
     #[cfg(unix)]
@@ -2809,6 +2817,7 @@ mod tests {
         assert!(payload["updated_at"].is_string());
 
         drop(fake_uv);
+        let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
     }
 
     #[cfg(unix)]
@@ -2852,7 +2861,7 @@ mod tests {
             job.job_id.clone()
         };
 
-        let response = super::embedding_progress(Path(job_id))
+        let response = super::embedding_progress(Path(job_id.clone()))
             .await
             .into_response();
         assert_eq!(response.status(), StatusCode::OK);
@@ -2863,6 +2872,9 @@ mod tests {
             serde_json::Value::String("failed".to_string())
         );
         assert!(payload["metadata"]["finished_at"].is_string());
+
+        let paths = crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
+        let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
     }
 
     #[cfg(unix)]
@@ -3000,6 +3012,8 @@ mod tests {
             payload["phase"],
             serde_json::Value::String("unknown".to_string())
         );
+
+        let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
     }
 
     #[tokio::test]
