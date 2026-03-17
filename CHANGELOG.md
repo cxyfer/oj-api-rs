@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0] - 2026-03-18
+
+### Features
+
+- **admin**: add cancel controls for crawler and embedding jobs, with shutdown cleanup to prevent orphaned subprocesses (#10)
+- **admin**: unify retained crawler and embedding job logs with live multi-stream viewing and `python.log` support (#12)
+
+### Bug Fixes
+
+- **luogu**: avoid prematurely marking the final page as complete during sync, and retry it when total page count grows (#11)
+- **admin**: harden job progress persistence, log polling, and embedding terminal-progress visibility during retained job recovery (#12)
+
+### Docs
+
+- **readme**: refresh platform status and include `luogu.py` in the crawler script list
+
 ## [0.2.1] - 2026-03-01
 
 ### Features
