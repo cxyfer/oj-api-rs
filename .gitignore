@@ -242,6 +242,8 @@ __marimo__/
 .claude/
 .codex/
 .gemini/
+.omc/
+.omx/
 
 # Data
 data/*.db*

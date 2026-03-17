@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 from utils.base_crawler import BaseCrawler
 from utils.config import get_config
 from utils.database import ProblemsDatabaseManager
+from utils.job_progress import append_crawler_progress
 from utils.logger import get_leetcode_logger
 
 logger = get_leetcode_logger()
@@ -326,6 +327,7 @@ class LuoguClient(BaseCrawler):
                 f.flush()
                 os.fsync(f.fileno())
             tmp_path.replace(self.progress_file)
+            append_crawler_progress(f"Completed page {page}")
         except Exception as exc:
             logger.warning("Failed to write progress file: %s", exc)
             try:

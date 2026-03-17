@@ -23,13 +23,16 @@ pub struct AppState {
     pub ro_pool: db::DbPool,
     pub rw_pool: db::DbPool,
     pub config: config::Config,
-    pub crawler_lock: tokio::sync::Mutex<Option<models::CrawlerJob>>,
+    pub crawler_jobs: tokio::sync::Mutex<HashMap<String, models::CrawlerJob>>,
+    pub manual_crawler_guard: tokio::sync::Mutex<Option<String>>,
     pub crawler_history: tokio::sync::Mutex<VecDeque<models::CrawlerJob>>,
     pub embedding_lock: tokio::sync::Mutex<Option<models::EmbeddingJob>>,
+    pub embedding_launch_guard: tokio::sync::Mutex<Option<String>>,
     pub embedding_history: tokio::sync::Mutex<VecDeque<models::EmbeddingJob>>,
-    pub active_crawler_pid: tokio::sync::Mutex<Option<u32>>,
+    pub active_crawler_pids: tokio::sync::Mutex<HashMap<String, models::ActiveCrawlerPid>>,
     pub active_embedding_pid: tokio::sync::Mutex<Option<u32>>,
     pub daily_fallback: tokio::sync::Mutex<HashMap<String, models::DailyFallbackEntry>>,
+    pub retained_refresh: tokio::sync::Mutex<utils::RetainedRefreshState>,
     pub embed_semaphore: Semaphore,
     pub token_auth_enabled: Arc<AtomicBool>,
     pub admin_sessions: Arc<RwLock<HashMap<String, i64>>>,
@@ -85,6 +88,24 @@ async fn main() {
     // 10. Build shared auth state
     let admin_sessions = Arc::new(RwLock::new(HashMap::<String, i64>::new()));
     let token_auth_flag = Arc::new(AtomicBool::new(auth_enabled));
+    let mut retained_jobs = crate::utils::RetainedJobState::default();
+    if let Err(err) = crate::utils::reconcile_retained_job_state(
+        crate::models::JOB_ARTIFACTS_ROOT,
+        &std::collections::HashSet::new(),
+        &mut retained_jobs.crawler_history,
+        &mut retained_jobs.embedding_history,
+    )
+    .await
+    {
+        tracing::warn!(
+            "failed to reconstruct retained job history at startup: {}",
+            err
+        );
+    }
+    let retained_refresh = tokio::sync::Mutex::new(crate::utils::RetainedRefreshState {
+        last_summary_sync: Some(tokio::time::Instant::now()),
+        last_cleanup: Some(tokio::time::Instant::now()),
+    });
 
     // 11. Build AppState
     let config_path_for_children = Some(config.config_path.to_string_lossy().into_owned());
@@ -92,13 +113,16 @@ async fn main() {
         ro_pool: ro_pool.clone(),
         rw_pool,
         config: config.clone(),
-        crawler_lock: tokio::sync::Mutex::new(None),
-        crawler_history: tokio::sync::Mutex::new(VecDeque::new()),
+        crawler_jobs: tokio::sync::Mutex::new(HashMap::new()),
+        manual_crawler_guard: tokio::sync::Mutex::new(None),
+        crawler_history: tokio::sync::Mutex::new(retained_jobs.crawler_history),
         embedding_lock: tokio::sync::Mutex::new(None),
-        embedding_history: tokio::sync::Mutex::new(VecDeque::new()),
-        active_crawler_pid: tokio::sync::Mutex::new(None),
+        embedding_launch_guard: tokio::sync::Mutex::new(None),
+        embedding_history: tokio::sync::Mutex::new(retained_jobs.embedding_history),
+        active_crawler_pids: tokio::sync::Mutex::new(HashMap::new()),
         active_embedding_pid: tokio::sync::Mutex::new(None),
         daily_fallback: tokio::sync::Mutex::new(HashMap::new()),
+        retained_refresh,
         embed_semaphore: Semaphore::new(config.embedding.concurrency as usize),
         token_auth_enabled: token_auth_flag.clone(),
         admin_sessions: admin_sessions.clone(),
@@ -188,8 +212,41 @@ async fn shutdown_signal(state: Arc<AppState>, timeout_secs: u64) {
 }
 
 async fn cleanup_active_jobs(state: &Arc<AppState>) {
-    cleanup_active_job(&state.active_crawler_pid, "crawler").await;
+    cleanup_active_crawler_jobs(&state.active_crawler_pids).await;
     cleanup_active_job(&state.active_embedding_pid, "embedding").await;
+}
+
+async fn cleanup_active_crawler_jobs(
+    pid_lock: &tokio::sync::Mutex<HashMap<String, models::ActiveCrawlerPid>>,
+) {
+    let pids = {
+        let mut lock = pid_lock.lock().await;
+        std::mem::take(&mut *lock)
+    };
+
+    if pids.is_empty() {
+        tracing::debug!("shutdown cleanup found no active crawler process");
+        return;
+    }
+
+    for (runtime_key, active_pid) in pids {
+        let killed = crate::utils::kill_pgid(active_pid.pid);
+        if killed {
+            tracing::info!(
+                "shutdown cleanup killed active crawler process group for {} (job {}, pid {})",
+                runtime_key,
+                active_pid.job_id,
+                active_pid.pid
+            );
+        } else {
+            tracing::warn!(
+                "shutdown cleanup failed to kill active crawler process group for {} (job {}, pid {})",
+                runtime_key,
+                active_pid.job_id,
+                active_pid.pid
+            );
+        }
+    }
 }
 
 async fn cleanup_active_job(pid_lock: &tokio::sync::Mutex<Option<u32>>, job_type: &str) {

@@ -20,7 +20,7 @@
             <label data-i18n="crawlers.control.args">Arguments</label>
             <div id="crawler-args-options" class="args-grid"></div>
         </div>
-        <button class="btn btn-primary" id="crawler-trigger-btn"{% if is_running %} disabled{% endif %} data-i18n="crawlers.control.trigger">Trigger</button>
+        <button class="btn btn-primary" id="crawler-trigger-btn"{% if is_manual_running %} disabled{% endif %} data-i18n="crawlers.control.trigger">Trigger</button>
     </div>
 </div>
 
@@ -28,11 +28,13 @@
     {% if is_running %}
     {% match current_job %}{% when Some with (job) %}
     <div class="status-header running" data-i18n="crawlers.status.running">Running
-        <button class="btn btn-sm btn-danger cancel-crawler-btn" data-i18n="crawlers.control.cancel">Cancel</button>
+        <button class="btn btn-sm btn-view-log" data-job-id="{{ job.job_id }}" data-i18n="common.view">View</button>
+        {% if can_cancel_current_job %}<button class="btn btn-sm btn-danger cancel-crawler-btn" data-i18n="crawlers.control.cancel">Cancel</button>{% endif %}
     </div>
     <div class="status-details">
         <span><strong data-i18n="crawlers.status.job">Job</strong>: {{ job.job_id }}</span>
         <span><strong data-i18n="crawlers.status.source">Source</strong>: {{ job.source }}</span>
+        <span><strong data-i18n="crawlers.history_table.trigger">Trigger</strong>: {{ job.trigger }}</span>
         <span><strong data-i18n="crawlers.status.args">Args</strong>: {{ job.args.join(" ") }}</span>
         <span><strong data-i18n="crawlers.status.started">Started</strong>: {{ job.started_at }}</span>
     </div>
@@ -65,9 +67,7 @@
                     <span class="badge badge-crawler-{{ job.status }}">{{ job.status }}</span>
                 </td>
                 <td>
-                    {% if job.status.to_string() != "running" %}
                     <button class="btn btn-sm btn-view-log" data-job-id="{{ job.job_id }}" data-i18n="common.view">View</button>
-                    {% else %}-{% endif %}
                 </td>
             </tr>
             {% endfor %}
@@ -84,10 +84,12 @@
         <div class="log-tabs">
             <button class="btn btn-sm log-tab active" data-tab="stdout">stdout</button>
             <button class="btn btn-sm log-tab" data-tab="stderr">stderr</button>
+            <button class="btn btn-sm log-tab" data-tab="python-log">python.log</button>
         </div>
         <div class="log-content">
             <pre id="log-stdout" class="log-pre"></pre>
             <pre id="log-stderr" class="log-pre log-stderr" style="display:none"></pre>
+            <pre id="log-python-log" class="log-pre" style="display:none"></pre>
         </div>
     </div>
 </div>

@@ -17,6 +17,7 @@ from utils.html_converter import (
     normalize_newlines,
     table_to_markdown,
 )
+from utils.job_progress import append_crawler_progress
 from utils.logger import get_leetcode_logger
 
 logger = get_leetcode_logger()
@@ -421,6 +422,7 @@ class AtCoderClient(BaseCrawler):
         progress["last_updated"] = datetime.now(timezone.utc).isoformat()
         with self.progress_file.open("w", encoding="utf-8") as f:
             json.dump(progress, f, indent=2, sort_keys=True)
+        append_crawler_progress(f"Fetched contest {contest_id}")
 
     async def fetch_single_contest(self, contest_id: str) -> int:
         async with self._create_aiohttp_session() as session:

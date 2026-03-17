@@ -471,62 +471,133 @@
             }
         }
 
+        var crawlerLogPollId = null;
+        var currentCrawlerLogJobId = null;
+
+        function hasManualRunningJob(runningJobs) {
+            return (runningJobs || []).some(function(job) { return job.trigger === 'admin'; });
+        }
+
+        function currentCrawlerJob(runningJobs) {
+            var jobs = runningJobs || [];
+            for (var i = 0; i < jobs.length; i++) {
+                if (jobs[i].trigger === 'admin') return jobs[i];
+            }
+            return jobs.length ? jobs[0] : null;
+        }
+
+        function mergeCrawlerJobs(runningJobs, history) {
+            var merged = [];
+            var seen = {};
+            (runningJobs || []).concat(history || []).forEach(function(job) {
+                if (!job || seen[job.job_id]) return;
+                seen[job.job_id] = true;
+                merged.push(job);
+            });
+            return merged;
+        }
+
         function pollStatus() {
             api('/admin/api/crawlers/status').then(function(res) {
                 if (!res.ok) return;
                 return res.json();
             }).then(function(data) {
                 if (!data) return;
-                updateStatusCard(data);
-                updateHistoryTable(data.history || []);
-                if (!data.running) {
+                var runningJobs = data.running_jobs || [];
+                updateStatusCard(runningJobs);
+                updateHistoryTable(mergeCrawlerJobs(runningJobs, data.history || []));
+                triggerBtn.disabled = hasManualRunningJob(runningJobs);
+                if (!runningJobs.length) {
                     stopPolling();
-                    triggerBtn.disabled = false;
                 }
             });
         }
 
-            function updateStatusCard(data) {
-                var card = document.getElementById('crawler-status-card');
-                if (!card) return;
-                if (data.running && data.current_job) {
-                    var job = data.current_job;
-                    card.style.display = '';
-                    card.innerHTML =
-                        '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') +
-                        ' <button class="btn btn-sm btn-danger cancel-crawler-btn" data-i18n="crawlers.control.cancel">' + i18n.t('crawlers.control.cancel') + '</button></div>' +
-                        '<div class="status-details">' +
-                        '<span><strong data-i18n="crawlers.status.job">' + i18n.t('crawlers.status.job') + '</strong>: ' + job.job_id + '</span> ' +
-                        '<span><strong data-i18n="crawlers.status.source">' + i18n.t('crawlers.control.source') + '</strong>: ' + job.source + '</span> ' +
-                        '<span><strong data-i18n="crawlers.status.args">' + i18n.t('crawlers.status.args') + '</strong>: ' + (job.args || []).join(' ') + '</span> ' +
-                        '<span><strong data-i18n="crawlers.status.started">' + i18n.t('crawlers.status.started') + '</strong>: ' + job.started_at + '</span>' +
-                        '</div>';
-                } else {
-                    card.style.display = 'none';
+        function updateStatusCard(runningJobs) {
+            var card = document.getElementById('crawler-status-card');
+            if (!card) return;
+            var job = currentCrawlerJob(runningJobs);
+            if (job) {
+                var actions = '<button class="btn btn-sm btn-view-log" data-job-id="' + esc(job.job_id) + '" data-live="true" data-i18n="common.view">' + i18n.t('common.view') + '</button>';
+                if (job.trigger === 'admin') {
+                    actions += ' <button class="btn btn-sm btn-danger cancel-crawler-btn" data-i18n="crawlers.control.cancel">' + i18n.t('crawlers.control.cancel') + '</button>';
                 }
+                card.style.display = '';
+                card.innerHTML =
+                    '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') + ' ' + actions + '</div>' +
+                    '<div class="status-details">' +
+                    '<span><strong data-i18n="crawlers.status.job">' + i18n.t('crawlers.status.job') + '</strong>: ' + job.job_id + '</span> ' +
+                    '<span><strong data-i18n="crawlers.status.source">' + i18n.t('crawlers.control.source') + '</strong>: ' + job.source + '</span> ' +
+                    '<span><strong data-i18n="crawlers.history_table.trigger">' + i18n.t('crawlers.history_table.trigger') + '</strong>: ' + job.trigger + '</span> ' +
+                    '<span><strong data-i18n="crawlers.status.args">' + i18n.t('crawlers.status.args') + '</strong>: ' + (job.args || []).join(' ') + '</span> ' +
+                    '<span><strong data-i18n="crawlers.status.started">' + i18n.t('crawlers.status.started') + '</strong>: ' + job.started_at + '</span>' +
+                    '</div>';
+            } else {
+                card.style.display = 'none';
             }
-        
-            function updateHistoryTable(history) {
-                var tbody = document.querySelector('#crawler-history-table tbody');
-                if (!tbody) return;
-                tbody.innerHTML = '';
-                history.forEach(function(job) {
-                    var tr = document.createElement('tr');
-                    var logBtn = job.status !== 'running'
-                        ? '<button class="btn btn-sm btn-view-log" data-job-id="' + esc(job.job_id) + '" data-i18n="common.view">' + i18n.t('common.view') + '</button>'
-                        : '-';
-                    tr.innerHTML =
-                        '<td>' + esc(job.source) + '</td>' +
-                        '<td>' + esc((job.args || []).join(' ')) + '</td>' +
-                        '<td>' + esc(job.trigger) + '</td>' +
-                        '<td>' + esc(job.started_at) + '</td>' +
-                        '<td>' + esc(job.finished_at || '-') + '</td>' +
-                        '<td><span class="badge badge-crawler-' + esc(job.status) + '">' + esc(job.status) + '</span></td>' +
-                        '<td>' + logBtn + '</td>';
-                    tbody.appendChild(tr);
-                });
+        }
+
+        function updateHistoryTable(history) {
+            var tbody = document.querySelector('#crawler-history-table tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            history.forEach(function(job) {
+                var tr = document.createElement('tr');
+                var logBtn = '<button class="btn btn-sm btn-view-log" data-job-id="' + esc(job.job_id) + '" data-i18n="common.view">' + i18n.t('common.view') + '</button>';
+                tr.innerHTML =
+                    '<td>' + esc(job.source) + '</td>' +
+                    '<td>' + esc((job.args || []).join(' ')) + '</td>' +
+                    '<td>' + esc(job.trigger) + '</td>' +
+                    '<td>' + esc(job.started_at) + '</td>' +
+                    '<td>' + esc(job.finished_at || '-') + '</td>' +
+                    '<td><span class="badge badge-crawler-' + esc(job.status) + '">' + esc(job.status) + '</span></td>' +
+                    '<td>' + logBtn + '</td>';
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateCrawlerLogModal(data) {
+            document.getElementById('log-stdout').textContent = data.stdout || '(empty)';
+            document.getElementById('log-stderr').textContent = data.stderr || '(empty)';
+            document.getElementById('log-python-log').textContent = data.python_log || '(empty)';
+        }
+
+        function fetchCrawlerLog(jobId) {
+            var stdoutPre = document.getElementById('log-stdout');
+            api('/admin/api/crawlers/' + encodeURIComponent(jobId) + '/output').then(function(res) {
+                if (!res.ok) {
+                    stdoutPre.textContent = i18n.t('messages.failed_load_output') + ' (HTTP ' + res.status + ')';
+                    stopCrawlerLogPolling();
+                    return null;
+                }
+                return res.json();
+            }).then(function(data) {
+                if (!data) return;
+                updateCrawlerLogModal(data);
+            }).catch(function() {
+                stdoutPre.textContent = i18n.t('messages.failed_load_output');
+                stopCrawlerLogPolling();
+            });
+        }
+
+        function stopCrawlerLogPolling() {
+            if (crawlerLogPollId) {
+                clearInterval(crawlerLogPollId);
+                crawlerLogPollId = null;
             }
-                // Log modal
+            currentCrawlerLogJobId = null;
+        }
+
+        function startCrawlerLogPolling(jobId) {
+            stopCrawlerLogPolling();
+            currentCrawlerLogJobId = jobId;
+            fetchCrawlerLog(jobId);
+            crawlerLogPollId = setInterval(function() {
+                fetchCrawlerLog(jobId);
+            }, 3000);
+        }
+
+        // Log modal
         document.addEventListener('click', function(e) {
             if (!e.target.classList.contains('btn-view-log')) return;
             var jobId = e.target.dataset.jobId;
@@ -534,59 +605,53 @@
             var modal = document.getElementById('log-modal');
             if (!modal) return;
 
-            var stdoutPre = document.getElementById('log-stdout');
-            var stderrPre = document.getElementById('log-stderr');
-            stdoutPre.textContent = i18n.t('common.loading');
-            stderrPre.textContent = '';
-            stderrPre.style.display = 'none';
-            stdoutPre.style.display = '';
+            document.getElementById('log-stdout').textContent = i18n.t('common.loading');
+            document.getElementById('log-stderr').textContent = '';
+            document.getElementById('log-python-log').textContent = '';
+            document.getElementById('log-stdout').style.display = '';
+            document.getElementById('log-stderr').style.display = 'none';
+            document.getElementById('log-python-log').style.display = 'none';
 
-            // Reset tabs
             modal.querySelectorAll('.log-tab').forEach(function(t) { t.classList.remove('active'); });
             modal.querySelector('[data-tab="stdout"]').classList.add('active');
-
             modal.classList.add('active');
-
-            api('/admin/api/crawlers/' + encodeURIComponent(jobId) + '/output').then(function(res) {
-                if (!res.ok) {
-                    stdoutPre.textContent = i18n.t('messages.failed_load_output') + ' (HTTP ' + res.status + ')';
-                    return;
-                }
-                return res.json();
-            }).then(function(data) {
-                if (!data) return;
-                stdoutPre.textContent = data.stdout || '(empty)';
-                stderrPre.textContent = data.stderr || '(empty)';
-            }).catch(function() {
-                stdoutPre.textContent = i18n.t('messages.failed_load_output');
-            });
+            if (e.target.dataset.live === 'true') {
+                startCrawlerLogPolling(jobId);
+            } else {
+                stopCrawlerLogPolling();
+                fetchCrawlerLog(jobId);
+            }
         });
 
         // Log modal tabs
         document.addEventListener('click', function(e) {
             if (!e.target.classList.contains('log-tab')) return;
-            var tab = e.target.dataset.tab;
-            var modal = document.getElementById('log-modal');
+            var modal = e.target.closest('#log-modal');
             if (!modal) return;
+            var tab = e.target.dataset.tab;
             modal.querySelectorAll('.log-tab').forEach(function(t) { t.classList.remove('active'); });
             e.target.classList.add('active');
             document.getElementById('log-stdout').style.display = tab === 'stdout' ? '' : 'none';
             document.getElementById('log-stderr').style.display = tab === 'stderr' ? '' : 'none';
+            document.getElementById('log-python-log').style.display = tab === 'python-log' ? '' : 'none';
         });
 
         // Close log modal
         document.addEventListener('click', function(e) {
             if (e.target.classList.contains('btn-close-log')) {
                 document.getElementById('log-modal').classList.remove('active');
+                stopCrawlerLogPolling();
             }
             if (e.target.id === 'log-modal') {
                 e.target.classList.remove('active');
+                stopCrawlerLogPolling();
             }
         });
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 var modal = document.getElementById('log-modal');
                 if (modal) modal.classList.remove('active');
+                stopCrawlerLogPolling();
             }
         });
 
@@ -602,6 +667,14 @@
     if (embedTriggerBtn) {
         var embedPollId = null;
         var currentEmbedJobId = null;
+        var embedLogPollId = null;
+
+        function stopEmbedLogPolling() {
+            if (embedLogPollId) {
+                clearInterval(embedLogPollId);
+                embedLogPollId = null;
+            }
+        }
 
         // Load stats on page load
         function loadEmbeddingStats() {
@@ -725,6 +798,8 @@
                 html = '<div class="progress-label">' + i18n.t('embeddings.progress.completed') + '</div>';
             } else if (prog.phase === 'failed') {
                 html = '<div class="progress-label" style="color:var(--color-danger)">' + i18n.t('embeddings.progress.failed') + '</div>';
+            } else if (prog.phase === 'cancelled' || prog.phase === 'timed_out') {
+                html = '<div class="progress-label">' + esc(prog.phase) + '</div>';
             } else {
                 if (prog.rewrite_progress && prog.rewrite_progress.total > 0) {
                     var rp = prog.rewrite_progress;
@@ -754,6 +829,7 @@
                 card.style.display = '';
                 card.innerHTML =
                     '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') +
+                    ' <button class="btn btn-sm btn-view-embed-log" data-job-id="' + esc(job.job_id) + '" data-live="true" data-i18n="common.view">' + i18n.t('common.view') + '</button>' +
                     ' <button class="btn btn-sm btn-danger cancel-embedding-btn" data-i18n="crawlers.control.cancel">' + i18n.t('crawlers.control.cancel') + '</button></div>' +
                     '<div class="status-details">' +
                     '<span><strong data-i18n="crawlers.status.job">' + i18n.t('crawlers.status.job') + '</strong>: ' + job.job_id + '</span> ' +
@@ -784,9 +860,7 @@
             tbody.innerHTML = '';
             history.forEach(function(job) {
                 var tr = document.createElement('tr');
-                var logBtn = job.status !== 'running'
-                    ? '<button class="btn btn-sm btn-view-embed-log" data-job-id="' + esc(job.job_id) + '" data-i18n="common.view">' + i18n.t('common.view') + '</button>'
-                    : '-';
+                var logBtn = '<button class="btn btn-sm btn-view-embed-log" data-job-id="' + esc(job.job_id) + '" data-i18n="common.view">' + i18n.t('common.view') + '</button>';
                 tr.innerHTML =
                     '<td>' + esc(job.source) + '</td>' +
                     '<td>' + esc((job.args || []).join(' ')) + '</td>' +
@@ -808,29 +882,42 @@
 
             var stdoutPre = document.getElementById('embed-log-stdout');
             var stderrPre = document.getElementById('embed-log-stderr');
+            var pythonLogPre = document.getElementById('embed-log-python-log');
             stdoutPre.textContent = i18n.t('common.loading');
             stderrPre.textContent = '';
+            pythonLogPre.textContent = '';
             stderrPre.style.display = 'none';
+            pythonLogPre.style.display = 'none';
             stdoutPre.style.display = '';
 
             modal.querySelectorAll('.log-tab').forEach(function(t) { t.classList.remove('active'); });
             modal.querySelector('[data-tab="embed-stdout"]').classList.add('active');
 
-            modal.classList.add('active');
+            function fetchEmbedLog() {
+                api('/admin/api/embeddings/' + encodeURIComponent(jobId) + '/output').then(function(res) {
+                    if (!res.ok) {
+                        stdoutPre.textContent = i18n.t('messages.failed_load_output') + ' (HTTP ' + res.status + ')';
+                        stopEmbedLogPolling();
+                        return null;
+                    }
+                    return res.json();
+                }).then(function(data) {
+                    if (!data) return;
+                    stdoutPre.textContent = data.stdout || '(empty)';
+                    stderrPre.textContent = data.stderr || '(empty)';
+                    pythonLogPre.textContent = data.python_log || '(empty)';
+                }).catch(function() {
+                    stdoutPre.textContent = i18n.t('messages.failed_load_output');
+                    stopEmbedLogPolling();
+                });
+            }
 
-            api('/admin/api/embeddings/' + encodeURIComponent(jobId) + '/output').then(function(res) {
-                if (!res.ok) {
-                    stdoutPre.textContent = i18n.t('messages.failed_load_output') + ' (HTTP ' + res.status + ')';
-                    return;
-                }
-                return res.json();
-            }).then(function(data) {
-                if (!data) return;
-                stdoutPre.textContent = data.stdout || '(empty)';
-                stderrPre.textContent = data.stderr || '(empty)';
-            }).catch(function() {
-                stdoutPre.textContent = i18n.t('messages.failed_load_output');
-            });
+            modal.classList.add('active');
+            stopEmbedLogPolling();
+            fetchEmbedLog();
+            if (e.target.dataset.live === 'true') {
+                embedLogPollId = setInterval(fetchEmbedLog, 3000);
+            }
         });
 
         // Embed log tabs
@@ -839,6 +926,7 @@
             var tab = e.target.dataset.tab;
             document.getElementById('embed-log-stdout').style.display = tab === 'embed-stdout' ? '' : 'none';
             document.getElementById('embed-log-stderr').style.display = tab === 'embed-stderr' ? '' : 'none';
+            document.getElementById('embed-log-python-log').style.display = tab === 'embed-python-log' ? '' : 'none';
             e.target.closest('.log-tabs').querySelectorAll('.log-tab').forEach(function(t) { t.classList.remove('active'); });
             e.target.classList.add('active');
         });
@@ -847,9 +935,18 @@
         document.addEventListener('click', function(e) {
             if (e.target.classList.contains('btn-close-embed-log')) {
                 document.getElementById('embed-log-modal').classList.remove('active');
+                stopEmbedLogPolling();
             }
             if (e.target.id === 'embed-log-modal') {
                 e.target.classList.remove('active');
+                stopEmbedLogPolling();
+            }
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                var modal = document.getElementById('embed-log-modal');
+                if (modal) modal.classList.remove('active');
+                stopEmbedLogPolling();
             }
         });
 

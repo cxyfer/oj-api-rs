@@ -62,6 +62,7 @@
     {% if is_running %}
     {% match current_job %}{% when Some with (job) %}
     <div class="status-header running" data-i18n="crawlers.status.running">Running
+        <button class="btn btn-sm btn-view-embed-log" data-job-id="{{ job.job_id }}" data-i18n="common.view">View</button>
         <button class="btn btn-sm btn-danger cancel-embedding-btn" data-i18n="crawlers.control.cancel">Cancel</button>
     </div>
     <div class="status-details">
@@ -97,9 +98,7 @@
                     <span class="badge badge-crawler-{{ job.status }}">{{ job.status }}</span>
                 </td>
                 <td>
-                    {% if job.status.to_string() != "running" %}
                     <button class="btn btn-sm btn-view-embed-log" data-job-id="{{ job.job_id }}" data-i18n="common.view">View</button>
-                    {% else %}-{% endif %}
                 </td>
             </tr>
             {% endfor %}
@@ -116,10 +115,12 @@
         <div class="log-tabs">
             <button class="btn btn-sm log-tab active" data-tab="embed-stdout">stdout</button>
             <button class="btn btn-sm log-tab" data-tab="embed-stderr">stderr</button>
+            <button class="btn btn-sm log-tab" data-tab="embed-python-log">python.log</button>
         </div>
         <div class="log-content">
             <pre id="embed-log-stdout" class="log-pre"></pre>
             <pre id="embed-log-stderr" class="log-pre log-stderr" style="display:none"></pre>
+            <pre id="embed-log-python-log" class="log-pre" style="display:none"></pre>
         </div>
     </div>
 </div>
