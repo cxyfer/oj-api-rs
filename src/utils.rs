@@ -396,7 +396,6 @@ async fn lock_progress_guard(path: &Path) -> std::io::Result<std::fs::File> {
     .map_err(|err| io::Error::other(err.to_string()))?
 }
 
-
 pub async fn update_json_atomic<T>(
     path: impl AsRef<Path>,
     mut update: impl FnMut(Option<T>) -> std::io::Result<T>,

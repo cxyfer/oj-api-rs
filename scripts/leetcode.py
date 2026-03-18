@@ -456,7 +456,9 @@ class LeetCodeClient(BaseCrawler):
                 f"Problem {problem_id_for_log} still not have detail information, "
                 "fetching problem detail from LeetCode API..."
             )
-            problem_detail = await self.fetch_problem_detail(problem["slug"], domain=domain)
+            problem_detail = await self.fetch_problem_detail(
+                problem["slug"], domain=domain
+            )
             if problem_detail:
                 for key, value in problem_detail.items():
                     problem[key] = problem.get(key, value) or value
@@ -687,9 +689,7 @@ class LeetCodeClient(BaseCrawler):
                 return None
             link = f"{base_url}/problems/{question['titleSlug']}/"
         else:
-            question_info = raw_data["data"][
-                "activeDailyCodingChallengeQuestion"
-            ]
+            question_info = raw_data["data"]["activeDailyCodingChallengeQuestion"]
             question = question_info["question"]
             link = f"{base_url}{question_info['link']}"
 
@@ -705,9 +705,7 @@ class LeetCodeClient(BaseCrawler):
             title_cn=question.get("titleCn", ""),
             difficulty=question["difficulty"],
             rating=None,  # This will be fetched from get_problem
-            ac_rate=question["acRate"]
-            if domain == "com"
-            else question["acRate"] * 100,
+            ac_rate=question["acRate"] if domain == "com" else question["acRate"] * 100,
             slug=slug,
             link=link,
             tags=[tag["name"] for tag in question["topicTags"]],
@@ -742,11 +740,7 @@ class LeetCodeClient(BaseCrawler):
         if domain is None:
             domain = self.domain
 
-        tz = (
-            pytz.timezone("Asia/Shanghai")
-            if domain == "cn"
-            else pytz.timezone("UTC")
-        )
+        tz = pytz.timezone("Asia/Shanghai") if domain == "cn" else pytz.timezone("UTC")
         today = datetime.now(tz).strftime("%Y-%m-%d")
 
         # If date_str is not provided, use today's date
@@ -1232,19 +1226,23 @@ class LeetCodeClient(BaseCrawler):
 
             for record in records:
                 question = record.get("question", {})
-                formatted_data["challenges"].append({
-                    "date": record.get("date"),
-                    "user_status": record.get("userStatus"),
-                    "question_id": question.get("questionFrontendId"),
-                    "title": question.get("title"),
-                    "title_cn": question.get("translatedTitle"),
-                    "slug": question.get("titleSlug"),
-                })
+                formatted_data["challenges"].append(
+                    {
+                        "date": record.get("date"),
+                        "user_status": record.get("userStatus"),
+                        "question_id": question.get("questionFrontendId"),
+                        "title": question.get("title"),
+                        "title_cn": question.get("translatedTitle"),
+                        "slug": question.get("titleSlug"),
+                    }
+                )
 
             return formatted_data
 
         except Exception as e:
-            logger.error(f"Error fetching cn monthly challenges: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error fetching cn monthly challenges: {str(e)}", exc_info=True
+            )
             return {}
 
     async def _process_remaining_monthly_challenges(

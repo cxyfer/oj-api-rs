@@ -2873,7 +2873,8 @@ mod tests {
         );
         assert!(payload["metadata"]["finished_at"].is_string());
 
-        let paths = crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
+        let paths =
+            crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
         let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
     }
 
