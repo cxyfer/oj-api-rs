@@ -327,7 +327,9 @@ class LuoguClient(BaseCrawler):
                 f.flush()
                 os.fsync(f.fileno())
             tmp_path.replace(self.progress_file)
-            append_crawler_progress(f"Completed page {page}")
+            last_completed_page = progress.get("last_completed_page")
+            if last_completed_page is not None:
+                append_crawler_progress(f"Completed page {last_completed_page}")
         except Exception as exc:
             logger.warning("Failed to write progress file: %s", exc)
             try:
