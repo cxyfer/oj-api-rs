@@ -138,7 +138,9 @@ def _write_progress(job_id: str, data: dict, allow_terminal_phase: bool = True) 
     payload.setdefault("updated_at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
     with _progress_lock(path):
         merged = _merge_progress(
-            _read_existing_progress(path), payload, allow_terminal_phase=allow_terminal_phase
+            _read_existing_progress(path),
+            payload,
+            allow_terminal_phase=allow_terminal_phase,
         )
         fd, tmp = tempfile.mkstemp(dir=progress_dir, suffix=".tmp")
         try:

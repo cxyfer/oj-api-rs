@@ -327,7 +327,9 @@ class LuoguClient(BaseCrawler):
                 f.flush()
                 os.fsync(f.fileno())
             tmp_path.replace(self.progress_file)
-            append_crawler_progress(f"Completed page {page}")
+            last_completed_page = progress.get("last_completed_page")
+            if last_completed_page is not None:
+                append_crawler_progress(f"Completed page {last_completed_page}")
         except Exception as exc:
             logger.warning("Failed to write progress file: %s", exc)
             try:
@@ -519,7 +521,9 @@ class LuoguClient(BaseCrawler):
             if not html:
                 logger.error("Failed to fetch training list %s", tid)
                 return
-            ctx = self._extract_fe_injection(html) or self._extract_lentille_context(html)
+            ctx = self._extract_fe_injection(html) or self._extract_lentille_context(
+                html
+            )
 
             mapped = []
             skipped = 0
@@ -617,16 +621,16 @@ class LuoguClient(BaseCrawler):
             if "1" not in completed_pages:
                 result = problems_data.get("result", [])
                 mapped = [
-                    p
-                    for raw in result
-                    if (p := self._map_spoj_problem(raw, tag_map))
+                    p for raw in result if (p := self._map_spoj_problem(raw, tag_map))
                 ]
                 if mapped:
                     count = self.problems_db.update_problems(
                         mapped, force_update=overwrite
                     )
                     verb = "upserted" if overwrite else "inserted"
-                    logger.info("SPOJ page 1: %s %s/%s problems", verb, count, len(mapped))
+                    logger.info(
+                        "SPOJ page 1: %s %s/%s problems", verb, count, len(mapped)
+                    )
                 self.save_progress(1, total_count=total_count)
 
             page = 2
@@ -643,7 +647,9 @@ class LuoguClient(BaseCrawler):
                     break
                 ctx = self._extract_lentille_context(html)
                 if not ctx:
-                    logger.warning("No lentille-context on SPOJ page %s, stopping", page)
+                    logger.warning(
+                        "No lentille-context on SPOJ page %s, stopping", page
+                    )
                     break
                 problems_data = ctx.get("data", {}).get("problems", {})
                 result = problems_data.get("result", [])
@@ -655,9 +661,7 @@ class LuoguClient(BaseCrawler):
                     total_count = new_count
                     total_pages = self._page_count(total_count)
                 mapped = [
-                    p
-                    for raw in result
-                    if (p := self._map_spoj_problem(raw, tag_map))
+                    p for raw in result if (p := self._map_spoj_problem(raw, tag_map))
                 ]
                 if mapped:
                     count = self.problems_db.update_problems(
