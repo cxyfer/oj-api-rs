@@ -480,9 +480,13 @@ pub async fn get_problem_detail(
     }
 
     let pool = state.ro_pool.clone();
-    let result =
-        tokio::task::spawn_blocking(move || crate::db::problems::get_problem(&pool, &source, &id))
-            .await;
+    let result = tokio::task::spawn_blocking(move || {
+        let record = crate::db::problems::get_problem_record(&pool, &source, &id)?;
+        Some(crate::api::problems::build_problem_detail_response(
+            &pool, record,
+        ))
+    })
+    .await;
 
     match result {
         Ok(Some(problem)) => Json(problem).into_response(),
