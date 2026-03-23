@@ -160,44 +160,6 @@ impl From<Problem> for ProblemRecord {
     }
 }
 
-impl ProblemRecord {
-    pub fn to_summary(&self) -> ProblemSummary {
-        ProblemSummary {
-            id: self.id.clone(),
-            source: self.source.clone(),
-            slug: self.slug.clone(),
-            title: self.title.clone(),
-            title_cn: self.title_cn.clone(),
-            difficulty: self.difficulty.clone(),
-            ac_rate: self.ac_rate,
-            rating: self.rating,
-            contest: self.contest.clone(),
-            problem_index: self.problem_index.clone(),
-            tags: self.tags.clone(),
-            link: self.link.clone(),
-        }
-    }
-}
-
-impl Problem {
-    pub fn to_summary(&self) -> ProblemSummary {
-        ProblemSummary {
-            id: self.id.clone(),
-            source: self.source.clone(),
-            slug: self.slug.clone(),
-            title: self.title.clone(),
-            title_cn: self.title_cn.clone(),
-            difficulty: self.difficulty.clone(),
-            ac_rate: self.ac_rate,
-            rating: self.rating,
-            contest: self.contest.clone(),
-            problem_index: self.problem_index.clone(),
-            tags: self.tags.clone(),
-            link: self.link.clone(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize)]
 pub struct ProblemSummary {
     pub id: String,
@@ -308,44 +270,6 @@ impl From<DailyChallenge> for DailyChallengeRecord {
             content: daily.content,
             content_cn: daily.content_cn,
             similar_questions: daily.similar_questions,
-        }
-    }
-}
-
-impl DailyChallengeRecord {
-    pub fn to_summary(&self) -> ProblemSummary {
-        ProblemSummary {
-            id: self.id.clone(),
-            source: "leetcode".to_string(),
-            slug: self.slug.clone(),
-            title: self.title.clone(),
-            title_cn: self.title_cn.clone(),
-            difficulty: self.difficulty.clone(),
-            ac_rate: self.ac_rate,
-            rating: self.rating,
-            contest: self.contest.clone(),
-            problem_index: self.problem_index.clone(),
-            tags: self.tags.clone(),
-            link: self.link.clone(),
-        }
-    }
-}
-
-impl DailyChallenge {
-    pub fn to_summary(&self) -> ProblemSummary {
-        ProblemSummary {
-            id: self.id.clone(),
-            source: "leetcode".to_string(),
-            slug: self.slug.clone(),
-            title: self.title.clone(),
-            title_cn: self.title_cn.clone(),
-            difficulty: self.difficulty.clone(),
-            ac_rate: self.ac_rate,
-            rating: self.rating,
-            contest: self.contest.clone(),
-            problem_index: self.problem_index.clone(),
-            tags: self.tags.clone(),
-            link: self.link.clone(),
         }
     }
 }

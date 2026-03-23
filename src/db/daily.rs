@@ -1,10 +1,7 @@
 use rusqlite::params;
 
 use super::DbPool;
-use crate::models::{
-    parse_similar_question_slugs, parse_string_array, DailyChallenge, DailyChallengeRecord,
-};
-
+use crate::models::{parse_similar_question_slugs, parse_string_array, DailyChallengeRecord};
 pub fn get_daily_record(pool: &DbPool, domain: &str, date: &str) -> Option<DailyChallengeRecord> {
     let conn = pool.get().ok()?;
     conn.query_row(
@@ -48,10 +45,6 @@ pub fn get_daily_record(pool: &DbPool, domain: &str, date: &str) -> Option<Daily
         },
     )
     .ok()
-}
-
-pub fn get_daily(pool: &DbPool, domain: &str, date: &str) -> Option<DailyChallenge> {
-    get_daily_record(pool, domain, date).map(Into::into)
 }
 
 #[cfg(test)]
