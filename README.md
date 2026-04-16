@@ -114,6 +114,34 @@ GET /api/v1/problems/{source}         # List problems
 GET /api/v1/tags/{source}             # List all tags for a source
 ```
 
+`GET /api/v1/problems/{source}/{id}` returns the full problem record. As of 2026-03-24, the `similar_questions` field is a hydrated object array, not a slug string array:
+
+```json
+{
+  "id": "1",
+  "source": "leetcode",
+  "slug": "two-sum",
+  "similar_questions": [
+    {
+      "id": "15",
+      "source": "leetcode",
+      "slug": "3sum",
+      "title": "3Sum",
+      "title_cn": "三数之和",
+      "difficulty": "Medium",
+      "ac_rate": 35.8,
+      "rating": 1456.0,
+      "contest": null,
+      "problem_index": null,
+      "tags": ["Array", "Two Pointers"],
+      "link": "https://leetcode.com/problems/3sum/"
+    }
+  ]
+}
+```
+
+This is a breaking response-schema change for detail consumers that previously treated `similar_questions` as `string[]`.
+
 <details>
 <summary>GET /api/v1/problems/{source} — Query Parameters</summary>
 
@@ -142,6 +170,8 @@ GET /api/v1/daily                     # LeetCode daily challenge
 When today's challenge is not yet in the database, the API triggers a background Python crawler and waits up to 10 s for it to complete before responding. If the crawler succeeds within the window the response is HTTP 200; otherwise HTTP 202 is returned.
 
 Pass `?async=true` to skip waiting and receive HTTP 202 immediately.
+
+The successful daily challenge response uses the same hydrated `similar_questions: ProblemSummary[]` structure as `GET /api/v1/problems/{source}/{id}`.
 
 ### Similarity Search
 
@@ -173,6 +203,8 @@ GET /api/v1/resolve/{query}           # Auto-detect source from URL, prefix, or 
 ```
 
 Accepts URLs (`leetcode.com/problems/two-sum`), prefixed IDs (`atcoder:abc321_a`), or bare patterns (`123A` -> Codeforces, pure digits -> LeetCode). LeetCode URL slugs are automatically resolved to numeric problem IDs via DB lookup.
+
+When `problem` is present, it follows the same detail schema as `GET /api/v1/problems/{source}/{id}`, including hydrated `similar_questions` summary objects.
 
 ### System Status
 

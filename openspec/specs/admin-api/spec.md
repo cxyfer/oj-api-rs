@@ -35,11 +35,15 @@ The system SHALL provide an admin-scoped API endpoint `GET /admin/api/problems/{
 
 #### Scenario: Successful detail request
 - **WHEN** authenticated admin requests `GET /admin/api/problems/leetcode/1`
-- **THEN** the system SHALL return `200 OK` with a Problem object excluding `content` and `content_cn` fields
+- **THEN** the system SHALL return `200 OK` with the full problem detail object, including hydrated `similar_questions` summary objects
 
-#### Scenario: Detail response excludes content fields
+#### Scenario: Detail response includes content fields
 - **WHEN** the system fetches a problem from the database that has non-empty `content` and `content_cn`
-- **THEN** the API response SHALL NOT include `content` or `content_cn` fields in the JSON
+- **THEN** the API response SHALL include `content` and `content_cn` in the JSON payload
+
+#### Scenario: Detail response hydrates similar questions
+- **WHEN** the stored problem has similar question slugs that can be matched in the same source
+- **THEN** the API response SHALL return `similar_questions` as hydrated summary objects instead of raw slug strings
 
 #### Scenario: Problem not found
 - **WHEN** admin requests a problem ID that does not exist for the given source
@@ -100,4 +104,3 @@ The system SHALL use read-only connection pool (`ro_pool`) with `spawn_blocking`
 #### Scenario: Blocking task execution
 - **WHEN** admin API endpoint performs database query
 - **THEN** it SHALL wrap the query in `spawn_blocking` to avoid blocking the async runtime
-
