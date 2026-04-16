@@ -1,6 +1,11 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.1] - 2026-04-17
+
+### Bug Fixes
+
+- **luogu**: fix progress logging output and apply formatting cleanup (#14)
+- **api**: normalize and hydrate `similar_questions` across detail-style responses, including admin detail, daily, and resolve endpoints (#15)
 
 ### Breaking Changes
 
