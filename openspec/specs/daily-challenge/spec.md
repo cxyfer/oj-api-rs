@@ -4,7 +4,7 @@
 TBD - created by archiving change oj-api-rs-v1. Update Purpose after archive.
 ## Requirements
 ### Requirement: Daily challenge retrieval
-The system SHALL return the LeetCode daily challenge via `GET /api/v1/daily?domain={com|cn}&date={YYYY-MM-DD}`. The `domain` parameter SHALL be parsed as a `LeetCodeDomain` enum (`Com`, `Cn`). An optional `source` parameter SHALL be accepted as an alias (`leetcode.com` → `Com`, `leetcode.cn` → `Cn`).
+The system SHALL return the LeetCode daily challenge via `GET /api/v1/daily?domain={com|cn}&date={YYYY-MM-DD}`. The `domain` parameter SHALL be parsed as a `LeetCodeDomain` enum (`Com`, `Cn`). An optional `source` parameter SHALL be accepted as an alias (`leetcode.com` → `Com`, `leetcode.cn` → `Cn`). The response SHALL expose `similar_questions` as a hydrated array of `ProblemSummary` objects resolved from the stored slug list.
 
 #### Scenario: Today's daily (default)
 - **WHEN** client sends `GET /api/v1/daily` without parameters
@@ -33,6 +33,10 @@ The system SHALL return the LeetCode daily challenge via `GET /api/v1/daily?doma
 #### Scenario: Domain takes precedence over source when equal
 - **WHEN** client sends `GET /api/v1/daily?domain=cn&source=leetcode.cn`
 - **THEN** system returns the daily challenge from leetcode.cn (no conflict)
+
+#### Scenario: Daily response includes hydrated similar questions
+- **WHEN** the stored daily challenge has similar question slugs that exist in the LeetCode problem table
+- **THEN** the response returns `similar_questions` as hydrated summary objects in the same order as the stored slug list
 
 ### Requirement: Daily challenge date validation
 The system SHALL validate the `date` parameter format as `YYYY-MM-DD` and enforce range `[2020-04-01, domain-aware today]`. For `domain=cn`, "today" SHALL be computed using UTC+8. For `domain=com`, "today" SHALL be computed using UTC.
@@ -239,4 +243,3 @@ All completion paths (success, failure, timeout, spawn error) SHALL call
 #### Scenario: notify_waiters called on spawn failure
 - **WHEN** `spawn_with_pgid(cmd)` returns `Err(_)`
 - **THEN** `entry.notify.notify_waiters()` is called within the error handler
-

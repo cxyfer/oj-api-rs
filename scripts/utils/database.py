@@ -11,6 +11,59 @@ from .logger import get_database_logger
 logger = get_database_logger()
 
 
+def _normalize_json_string_list(values):
+    """Normalize list-like inputs from crawlers or stored JSON strings."""
+    if not values:
+        return []
+    if isinstance(values, str):
+        try:
+            parsed_values = json.loads(values)
+        except json.JSONDecodeError:
+            values = [values]
+        else:
+            if isinstance(parsed_values, list):
+                values = parsed_values
+            else:
+                values = [parsed_values]
+    return [str(value).strip() for value in values if str(value).strip()]
+
+
+def _normalize_similar_questions(values):
+    if isinstance(values, str):
+        try:
+            values = json.loads(values)
+        except json.JSONDecodeError:
+            return []
+
+    if not values:
+        return []
+
+    normalized = []
+    for value in values:
+        if isinstance(value, str):
+            slug = value.strip()
+        elif isinstance(value, dict):
+            slug = (
+                value.get("titleSlug")
+                or value.get("title_slug")
+                or value.get("slug")
+                or ""
+            ).strip()
+        else:
+            slug = ""
+        if slug:
+            normalized.append(slug)
+    return normalized
+
+
+def _prefer_non_empty(new_value, existing_value):
+    if isinstance(new_value, list):
+        return new_value if new_value else (existing_value or [])
+    if new_value in (None, ""):
+        return existing_value
+    return new_value
+
+
 class SettingsDatabaseManager:
     """
     This class manages server settings in the database.
@@ -300,6 +353,9 @@ class ProblemsDatabaseManager:
             PRIMARY KEY (source, id)
         )
         """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_problems_source_slug ON problems(source, slug)"
+        )
         conn.commit()
         conn.close()
         logger.debug("Problems table initialized")
@@ -343,13 +399,15 @@ class ProblemsDatabaseManager:
                     problem.get("rating"),
                     problem.get("contest"),
                     problem.get("problem_index"),
-                    problem.get("tags"),
+                    json.dumps(_normalize_json_string_list(problem.get("tags"))),
                     problem.get("link"),
                     problem.get("category"),
                     problem.get("paid_only"),
                     problem.get("content"),
                     problem.get("content_cn"),
-                    problem.get("similar_questions", None),
+                    json.dumps(
+                        _normalize_similar_questions(problem.get("similar_questions"))
+                    ),
                 )
             )
 
@@ -373,9 +431,13 @@ class ProblemsDatabaseManager:
                 link=excluded.link,
                 category=excluded.category,
                 paid_only=excluded.paid_only,
-                content=COALESCE(excluded.content, problems.content),
-                content_cn=COALESCE(excluded.content_cn, problems.content_cn),
-                similar_questions=COALESCE(excluded.similar_questions, problems.similar_questions)
+                content=COALESCE(NULLIF(excluded.content, ''), problems.content),
+                content_cn=COALESCE(NULLIF(excluded.content_cn, ''), problems.content_cn),
+                similar_questions=CASE
+                    WHEN excluded.similar_questions IS NULL OR excluded.similar_questions = '[]'
+                        THEN problems.similar_questions
+                    ELSE excluded.similar_questions
+                END
             """
         else:
             sql = """
@@ -430,16 +492,26 @@ class ProblemsDatabaseManager:
         problem_id = str(problem_id)
         problem["source"] = problem_source
 
+        problem["tags"] = _normalize_json_string_list(problem.get("tags"))
+        problem["similar_questions"] = _normalize_similar_questions(
+            problem.get("similar_questions")
+        )
+
         # If not force update, get existing data and merge
         if not force_update:
             existing_problem = self.get_problem(id=problem_id, source=problem_source)
             if existing_problem:
-                # Merge update: if new data field is empty, keep old data
                 for key in existing_problem:
-                    if key != "id" and (
-                        key not in problem or problem[key] is None or problem[key] == ""
-                    ):
-                        problem[key] = existing_problem[key]
+                    if key == "id":
+                        continue
+                    problem[key] = _prefer_non_empty(
+                        problem.get(key), existing_problem.get(key)
+                    )
+
+                problem["tags"] = _normalize_json_string_list(problem.get("tags"))
+                problem["similar_questions"] = _normalize_similar_questions(
+                    problem.get("similar_questions")
+                )
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -506,11 +578,11 @@ class ProblemsDatabaseManager:
         conn.close()
         if row:
             problem = self._row_to_dict(row)
-            problem["tags"] = json.loads(problem["tags"]) if problem["tags"] else []
-            problem["similar_questions"] = (
-                json.loads(problem["similar_questions"])
-                if problem["similar_questions"]
-                else []
+            problem["tags"] = _normalize_json_string_list(
+                json.loads(problem["tags"]) if problem["tags"] else []
+            )
+            problem["similar_questions"] = _normalize_similar_questions(
+                problem["similar_questions"]
             )
             return problem
         return None
@@ -1043,12 +1115,39 @@ class DailyChallengeDatabaseManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         try:
+            normalized_tags = _normalize_json_string_list(daily.get("tags"))
+            normalized_similar = _normalize_similar_questions(
+                daily.get("similar_questions")
+            )
             cursor.execute(
                 """
             INSERT INTO daily_challenge
             (date, domain, id, slug, title, title_cn, difficulty, ac_rate, rating, contest,
              problem_index, tags, link, category, paid_only, content, content_cn, similar_questions)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(date, domain) DO UPDATE SET
+                id = COALESCE(excluded.id, daily_challenge.id),
+                slug = COALESCE(NULLIF(excluded.slug, ''), daily_challenge.slug),
+                title = COALESCE(NULLIF(excluded.title, ''), daily_challenge.title),
+                title_cn = COALESCE(NULLIF(excluded.title_cn, ''), daily_challenge.title_cn),
+                difficulty = COALESCE(NULLIF(excluded.difficulty, ''), daily_challenge.difficulty),
+                ac_rate = COALESCE(excluded.ac_rate, daily_challenge.ac_rate),
+                rating = COALESCE(excluded.rating, daily_challenge.rating),
+                contest = COALESCE(NULLIF(excluded.contest, ''), daily_challenge.contest),
+                problem_index = COALESCE(NULLIF(excluded.problem_index, ''), daily_challenge.problem_index),
+                tags = CASE
+                    WHEN excluded.tags IS NULL OR excluded.tags = '[]' THEN daily_challenge.tags
+                    ELSE excluded.tags
+                END,
+                link = COALESCE(NULLIF(excluded.link, ''), daily_challenge.link),
+                category = COALESCE(NULLIF(excluded.category, ''), daily_challenge.category),
+                paid_only = COALESCE(excluded.paid_only, daily_challenge.paid_only),
+                content = COALESCE(NULLIF(excluded.content, ''), daily_challenge.content),
+                content_cn = COALESCE(NULLIF(excluded.content_cn, ''), daily_challenge.content_cn),
+                similar_questions = CASE
+                    WHEN excluded.similar_questions IS NULL OR excluded.similar_questions = '[]' THEN daily_challenge.similar_questions
+                    ELSE excluded.similar_questions
+                END
             """,
                 (
                     daily.get("date"),
@@ -1062,13 +1161,13 @@ class DailyChallengeDatabaseManager:
                     daily.get("rating"),
                     daily.get("contest"),
                     daily.get("problem_index"),
-                    json.dumps(daily.get("tags", [])),
+                    json.dumps(normalized_tags),
                     daily.get("link"),
                     daily.get("category"),
                     daily.get("paid_only"),
                     daily.get("content"),
                     daily.get("content_cn"),
-                    json.dumps(daily.get("similar_questions", [])),
+                    json.dumps(normalized_similar),
                 ),
             )
             conn.commit()
@@ -1113,11 +1212,11 @@ class DailyChallengeDatabaseManager:
                 "similar_questions",
             ]
             result = dict(zip(keys, row))
-            result["tags"] = json.loads(result["tags"]) if result["tags"] else []
-            result["similar_questions"] = (
-                json.loads(result["similar_questions"])
-                if result["similar_questions"]
-                else []
+            result["tags"] = _normalize_json_string_list(
+                json.loads(result["tags"]) if result["tags"] else []
+            )
+            result["similar_questions"] = _normalize_similar_questions(
+                result["similar_questions"]
             )
             return result
         return None

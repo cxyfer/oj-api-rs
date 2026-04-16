@@ -383,6 +383,14 @@ class LeetCodeClient(BaseCrawler):
                         q = data.get("data", {}).get("question")
                         if not q:
                             raise Exception(f"Question not found for slug '{slug}'")
+                        similar_questions = []
+                        for item in json.loads(q.get("similarQuestions", "[]")):
+                            if not isinstance(item, dict):
+                                continue
+                            similar_slug = item.get("titleSlug") or item.get("title_slug") or item.get("slug")
+                            if similar_slug:
+                                similar_questions.append(similar_slug)
+
                         return {
                             "id": q.get("questionFrontendId"),
                             "category": q.get("categoryTitle", "").title(),
@@ -396,9 +404,7 @@ class LeetCodeClient(BaseCrawler):
                             "content": q.get("content"),
                             "content_cn": q.get("translatedContent"),
                             "stats": q.get("stats"),
-                            "similar_questions": json.loads(
-                                q.get("similarQuestions", "[]")
-                            ),
+                            "similar_questions": similar_questions,
                             "tags": [tag["name"] for tag in q.get("topicTags", [])],
                             "paid_only": 1 if q.get("isPaidOnly") else 0,
                         }

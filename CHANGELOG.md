@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Breaking Changes
+
+- **api**: change `similar_questions` in problem-detail responses from `string[]` to hydrated summary objects for `GET /api/v1/problems/{source}/{id}`, `GET /api/v1/daily`, `GET /api/v1/resolve/{query}`, and `GET /admin/api/problems/{source}/{id}`. Clients must now read `similar_questions[*].slug` / `title` / `link` instead of treating the field as a plain slug array.
+
+### Docs
+
+- **api**: document the hydrated `similar_questions` response contract in README and OpenSpec specs
+- **changelog**: explicitly record the `similar_questions` response-schema change as a breaking API update
+
 ## [0.3.0] - 2026-03-18
 
 ### Features

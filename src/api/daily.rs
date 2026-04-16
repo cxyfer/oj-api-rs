@@ -9,7 +9,63 @@ use serde::Deserialize;
 use tokio::sync::Notify;
 
 use crate::api::error::ProblemDetail;
-use crate::models::{ActiveCrawlerPid, JobType, LeetCodeDomain};
+use crate::models::{
+    ActiveCrawlerPid, DailyChallengeRecord, JobType, LeetCodeDomain, ProblemSummary,
+};
+
+#[derive(serde::Serialize)]
+struct DailyChallengeResponse {
+    date: String,
+    domain: String,
+    id: String,
+    slug: String,
+    title: Option<String>,
+    title_cn: Option<String>,
+    difficulty: Option<String>,
+    ac_rate: Option<f64>,
+    rating: Option<f64>,
+    contest: Option<String>,
+    problem_index: Option<String>,
+    tags: Vec<String>,
+    link: Option<String>,
+    category: Option<String>,
+    paid_only: Option<i32>,
+    content: Option<String>,
+    content_cn: Option<String>,
+    similar_questions: Vec<ProblemSummary>,
+}
+
+fn build_daily_response(
+    pool: &crate::db::DbPool,
+    record: DailyChallengeRecord,
+) -> DailyChallengeResponse {
+    let similar_questions = crate::db::problems::resolve_similar_question_summaries(
+        pool,
+        "leetcode",
+        &record.similar_questions,
+    );
+
+    DailyChallengeResponse {
+        date: record.date,
+        domain: record.domain,
+        id: record.id,
+        slug: record.slug,
+        title: record.title,
+        title_cn: record.title_cn,
+        difficulty: record.difficulty,
+        ac_rate: record.ac_rate,
+        rating: record.rating,
+        contest: record.contest,
+        problem_index: record.problem_index,
+        tags: record.tags,
+        link: record.link,
+        category: record.category,
+        paid_only: record.paid_only,
+        content: record.content,
+        content_cn: record.content_cn,
+        similar_questions,
+    }
+}
 
 #[cfg(test)]
 const DAILY_FALLBACK_CLEANUP_DELAY: Duration = Duration::from_millis(20);
@@ -69,7 +125,7 @@ async fn wait_and_fetch(
     state: &Arc<AppState>,
     domain_str: String,
     date: String,
-) -> Option<crate::models::DailyChallenge> {
+) -> Option<DailyChallengeResponse> {
     // Register interest before checking completed flag to avoid race where
     // notify_waiters() fires between the flag check and notified() setup.
     let notification = notify.notified();
@@ -86,9 +142,12 @@ async fn wait_and_fetch(
     }
 
     let pool = state.ro_pool.clone();
-    tokio::task::spawn_blocking(move || crate::db::daily::get_daily(&pool, &domain_str, &date))
-        .await
-        .unwrap_or(None)
+    tokio::task::spawn_blocking(move || {
+        let record = crate::db::daily::get_daily_record(&pool, &domain_str, &date)?;
+        Some(build_daily_response(&pool, record))
+    })
+    .await
+    .unwrap_or(None)
 }
 
 fn resolve_daily_fallback_terminal_status(
@@ -223,13 +282,14 @@ pub async fn get_daily(
     let domain_str = domain.to_string();
     let date_owned = date.to_string();
     let result = tokio::task::spawn_blocking(move || {
-        crate::db::daily::get_daily(&pool, &domain_str, &date_owned)
+        let record = crate::db::daily::get_daily_record(&pool, &domain_str, &date_owned)?;
+        Some(build_daily_response(&pool, record))
     })
     .await
     .unwrap_or(None);
 
-    if let Some(d) = result {
-        return Json(d).into_response();
+    if let Some(daily) = result {
+        return Json(daily).into_response();
     }
 
     // Fallback: spawn crawler

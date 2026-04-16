@@ -73,11 +73,15 @@ The system SHALL infer source from ID patterns when no URL or prefix is provided
 - **THEN** system returns `(source: "leetcode", id: "two-sum")`
 
 ### Requirement: Resolve endpoint
-The system SHALL expose `GET /api/v1/resolve/{query}` that applies source detection and returns the identified source, ID, and problem data if available. The `{query}` path parameter SHALL support URL-encoded values.
+The system SHALL expose `GET /api/v1/resolve/{query}` that applies source detection and returns the identified source, ID, and problem data if available. The `{query}` path parameter SHALL support URL-encoded values. When `problem` is present, it SHALL use the same response contract as `GET /api/v1/problems/{source}/{id}`, including hydrated `similar_questions` summary objects.
 
 #### Scenario: Resolve with existing problem
 - **WHEN** client sends `GET /api/v1/resolve/2000` and LeetCode problem 2000 exists in DB
 - **THEN** system returns HTTP 200 with `{"source": "leetcode", "id": "2000", "problem": {...}}`
+
+#### Scenario: Resolve preserves hydrated similar questions
+- **WHEN** client resolves an existing problem whose stored `similar_questions` slugs can be matched in the database
+- **THEN** `problem.similar_questions` is returned as hydrated summary objects instead of raw slug strings
 
 #### Scenario: Resolve with non-existent problem
 - **WHEN** client sends `GET /api/v1/resolve/abc999_z` and that AtCoder problem does not exist
@@ -97,4 +101,3 @@ The system SHALL produce identical results for `resolve(url_encode(query))` and 
 #### Scenario: Encoded vs decoded parity
 - **WHEN** the same query is sent both URL-encoded and raw
 - **THEN** both requests return the same `source` and `id`
-

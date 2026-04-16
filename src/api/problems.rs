@@ -6,7 +6,60 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::api::error::ProblemDetail;
+use crate::models::{ProblemRecord, ProblemSummary};
 use crate::AppState;
+
+#[derive(Serialize)]
+pub(crate) struct ProblemDetailResponse {
+    pub id: String,
+    pub source: String,
+    pub slug: String,
+    pub title: Option<String>,
+    pub title_cn: Option<String>,
+    pub difficulty: Option<String>,
+    pub ac_rate: Option<f64>,
+    pub rating: Option<f64>,
+    pub contest: Option<String>,
+    pub problem_index: Option<String>,
+    pub tags: Vec<String>,
+    pub link: Option<String>,
+    pub category: Option<String>,
+    pub paid_only: Option<i32>,
+    pub content: Option<String>,
+    pub content_cn: Option<String>,
+    pub similar_questions: Vec<ProblemSummary>,
+}
+
+pub(crate) fn build_problem_detail_response(
+    pool: &crate::db::DbPool,
+    record: ProblemRecord,
+) -> ProblemDetailResponse {
+    let similar_questions = crate::db::problems::resolve_similar_question_summaries(
+        pool,
+        &record.source,
+        &record.similar_questions,
+    );
+
+    ProblemDetailResponse {
+        id: record.id,
+        source: record.source,
+        slug: record.slug,
+        title: record.title,
+        title_cn: record.title_cn,
+        difficulty: record.difficulty,
+        ac_rate: record.ac_rate,
+        rating: record.rating,
+        contest: record.contest,
+        problem_index: record.problem_index,
+        tags: record.tags,
+        link: record.link,
+        category: record.category,
+        paid_only: record.paid_only,
+        content: record.content,
+        content_cn: record.content_cn,
+        similar_questions,
+    }
+}
 
 #[derive(Deserialize)]
 pub struct ListQuery {
@@ -74,13 +127,15 @@ pub async fn get_problem(
     }
 
     let pool = state.ro_pool.clone();
-    let result =
-        tokio::task::spawn_blocking(move || crate::db::problems::get_problem(&pool, &source, &id))
-            .await
-            .unwrap_or(None);
+    let result = tokio::task::spawn_blocking(move || {
+        let record = crate::db::problems::get_problem_record(&pool, &source, &id)?;
+        Some(build_problem_detail_response(&pool, record))
+    })
+    .await
+    .unwrap_or(None);
 
     match result {
-        Some(p) => Json(p).into_response(),
+        Some(problem) => Json(problem).into_response(),
         None => ProblemDetail::not_found("problem not found").into_response(),
     }
 }

@@ -41,6 +41,19 @@
         return d.innerHTML;
     }
 
+    function safeExternalUrl(raw) {
+        if (!raw) return null;
+        try {
+            var url = new URL(raw, window.location.origin);
+            if (url.protocol === 'http:' || url.protocol === 'https:') {
+                return url.href;
+            }
+        } catch (e) {
+            return null;
+        }
+        return null;
+    }
+
     function copyToClipboard(text) {
         if (navigator.clipboard) {
             navigator.clipboard.writeText(text).then(function() {
@@ -1488,7 +1501,22 @@
                     }
                     if (p.similar_questions && p.similar_questions.length) {
                         rows += '<div class="detail-row"><dt>' + esc(i18n.t('problems.detail.similar')) + '</dt><dd>' +
-                            p.similar_questions.map(function(q) { return '<span class="detail-tag">' + esc(q) + '</span>'; }).join('') +
+                            p.similar_questions.map(function(q) {
+                                if (q && typeof q === 'object') {
+                                    var text = q.slug || '-';
+                                    if (i18n.getLanguage() !== 'en' && q.title_cn) {
+                                        text = q.title_cn;
+                                    } else if (q.title) {
+                                        text = q.title;
+                                    }
+                                    var safeLink = safeExternalUrl(q.link);
+                                    if (safeLink) {
+                                        return '<a class="detail-tag" href="' + esc(safeLink) + '" target="_blank" rel="noopener noreferrer">' + esc(text) + '</a>';
+                                    }
+                                    return '<span class="detail-tag">' + esc(text) + '</span>';
+                                }
+                                return '<span class="detail-tag">' + esc(String(q || '-')) + '</span>';
+                            }).join('') +
                             '</dd></div>';
                     }
                     fieldsEl.innerHTML = rows;
