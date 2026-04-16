@@ -12,8 +12,19 @@ logger = get_database_logger()
 
 
 def _normalize_json_string_list(values):
+    """Normalize list-like inputs from crawlers or stored JSON strings."""
     if not values:
         return []
+    if isinstance(values, str):
+        try:
+            parsed_values = json.loads(values)
+        except json.JSONDecodeError:
+            values = [values]
+        else:
+            if isinstance(parsed_values, list):
+                values = parsed_values
+            else:
+                values = [parsed_values]
     return [str(value).strip() for value in values if str(value).strip()]
 
 
@@ -342,6 +353,9 @@ class ProblemsDatabaseManager:
             PRIMARY KEY (source, id)
         )
         """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_problems_source_slug ON problems(source, slug)"
+        )
         conn.commit()
         conn.close()
         logger.debug("Problems table initialized")
@@ -498,41 +512,6 @@ class ProblemsDatabaseManager:
                 problem["similar_questions"] = _normalize_similar_questions(
                     problem.get("similar_questions")
                 )
-
-                if not problem.get("slug"):
-                    problem["slug"] = existing_problem.get("slug")
-                if not problem.get("title"):
-                    problem["title"] = existing_problem.get("title")
-                if not problem.get("title_cn"):
-                    problem["title_cn"] = existing_problem.get("title_cn")
-                if not problem.get("difficulty"):
-                    problem["difficulty"] = existing_problem.get("difficulty")
-                if problem.get("ac_rate") is None:
-                    problem["ac_rate"] = existing_problem.get("ac_rate")
-                if problem.get("rating") is None:
-                    problem["rating"] = existing_problem.get("rating")
-                if not problem.get("contest"):
-                    problem["contest"] = existing_problem.get("contest")
-                if not problem.get("problem_index"):
-                    problem["problem_index"] = existing_problem.get("problem_index")
-                if not problem.get("link"):
-                    problem["link"] = existing_problem.get("link")
-                if not problem.get("category"):
-                    problem["category"] = existing_problem.get("category")
-                if problem.get("paid_only") is None:
-                    problem["paid_only"] = existing_problem.get("paid_only")
-                if not problem.get("content"):
-                    problem["content"] = existing_problem.get("content")
-                if not problem.get("content_cn"):
-                    problem["content_cn"] = existing_problem.get("content_cn")
-                if not problem.get("source"):
-                    problem["source"] = existing_problem.get("source")
-                if not problem.get("similar_questions"):
-                    problem["similar_questions"] = existing_problem.get(
-                        "similar_questions", []
-                    )
-                if not problem.get("tags"):
-                    problem["tags"] = existing_problem.get("tags", [])
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

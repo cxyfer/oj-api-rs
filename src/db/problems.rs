@@ -164,7 +164,7 @@ pub fn resolve_similar_question_summaries(
         if let Some(summary) = resolved_by_slug.get(slug) {
             resolved.push(summary.clone());
         } else if missing_logged.insert(slug.clone()) {
-            tracing::warn!(
+            tracing::debug!(
                 "failed to resolve similar question slug '{}' for source '{}'",
                 slug,
                 source

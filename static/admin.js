@@ -41,6 +41,19 @@
         return d.innerHTML;
     }
 
+    function safeExternalUrl(raw) {
+        if (!raw) return null;
+        try {
+            var url = new URL(raw, window.location.origin);
+            if (url.protocol === 'http:' || url.protocol === 'https:') {
+                return url.href;
+            }
+        } catch (e) {
+            return null;
+        }
+        return null;
+    }
+
     function copyToClipboard(text) {
         if (navigator.clipboard) {
             navigator.clipboard.writeText(text).then(function() {
@@ -1496,8 +1509,9 @@
                                     } else if (q.title) {
                                         text = q.title;
                                     }
-                                    if (q.link) {
-                                        return '<a class="detail-tag" href="' + esc(q.link) + '" target="_blank" rel="noopener noreferrer">' + esc(text) + '</a>';
+                                    var safeLink = safeExternalUrl(q.link);
+                                    if (safeLink) {
+                                        return '<a class="detail-tag" href="' + esc(safeLink) + '" target="_blank" rel="noopener noreferrer">' + esc(text) + '</a>';
                                     }
                                     return '<span class="detail-tag">' + esc(text) + '</span>';
                                 }
