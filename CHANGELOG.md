@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.2] - 2026-04-18
+
+### Features
+
+- **api**: add native HTTP MCP support at `/mcp`, so MCP clients can use the same server process, auth gate, and data path as the REST API (#16)
+
+### Bug Fixes
+
+- **mcp**: harden review follow-up helpers by tightening HTML detection, preserving SSE test payload formatting, and clarifying byte-based output truncation behavior (#16)
+
+### Docs
+
+- **readme**: add native HTTP MCP setup instructions for Claude Code and Codex (#16)
+
 ## [0.3.1] - 2026-04-17
 
 ### Bug Fixes
