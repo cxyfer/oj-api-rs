@@ -3,14 +3,14 @@ use std::sync::Arc;
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::Json;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::AppState;
 
-#[derive(Serialize)]
-struct StatusResponse {
-    version: &'static str,
-    platforms: Vec<crate::db::problems::PlatformStats>,
+#[derive(Serialize, Deserialize)]
+pub(crate) struct StatusResponse {
+    pub(crate) version: String,
+    pub(crate) platforms: Vec<crate::db::problems::PlatformStats>,
 }
 
 pub async fn get_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
@@ -20,7 +20,7 @@ pub async fn get_status(State(state): State<Arc<AppState>>) -> impl IntoResponse
         .unwrap_or_default();
 
     Json(StatusResponse {
-        version: env!("CARGO_PKG_VERSION"),
+        version: env!("CARGO_PKG_VERSION").to_string(),
         platforms,
     })
 }

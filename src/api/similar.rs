@@ -24,20 +24,20 @@ pub struct SimilarByTextQuery {
     pub source: Option<String>,
 }
 
-#[derive(Serialize)]
-struct SimilarResponse {
-    rewritten_query: Option<String>,
-    results: Vec<SimilarResult>,
+#[derive(Serialize, Deserialize)]
+pub(crate) struct SimilarResponse {
+    pub(crate) rewritten_query: Option<String>,
+    pub(crate) results: Vec<SimilarResult>,
 }
 
-#[derive(Serialize)]
-struct SimilarResult {
-    source: String,
-    id: String,
-    title: Option<String>,
-    difficulty: Option<String>,
-    link: Option<String>,
-    similarity: f32,
+#[derive(Serialize, Deserialize)]
+pub(crate) struct SimilarResult {
+    pub(crate) source: String,
+    pub(crate) id: String,
+    pub(crate) title: Option<String>,
+    pub(crate) difficulty: Option<String>,
+    pub(crate) link: Option<String>,
+    pub(crate) similarity: f32,
 }
 
 #[derive(Deserialize)]

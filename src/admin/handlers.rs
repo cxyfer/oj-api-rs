@@ -2140,8 +2140,8 @@ mod tests {
                 .unwrap()
                 .join(crate::models::JOB_ARTIFACTS_ROOT);
             let backup = if tokio::fs::metadata(&root).await.is_ok() {
-                let backup = std::env::temp_dir().join(format!(
-                    "oj-api-rs-job-artifacts-backup-{}-{}",
+                let backup = root.with_file_name(format!(
+                    ".job-artifacts-backup-{}-{}",
                     std::process::id(),
                     rand::thread_rng().r#gen::<u64>()
                 ));

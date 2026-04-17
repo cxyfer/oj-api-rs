@@ -3,16 +3,16 @@ use std::sync::Arc;
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use axum::Json;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use crate::api::problems::{ProblemDetailResponse, build_problem_detail_response};
+use crate::api::problems::{build_problem_detail_response, ProblemDetailResponse};
 use crate::AppState;
 
-#[derive(Serialize)]
-struct ResolveResponse {
-    source: String,
-    id: String,
-    problem: Option<ProblemDetailResponse>,
+#[derive(Serialize, Deserialize)]
+pub(crate) struct ResolveResponse {
+    pub(crate) source: String,
+    pub(crate) id: String,
+    pub(crate) problem: Option<ProblemDetailResponse>,
 }
 
 pub async fn resolve(
@@ -56,8 +56,8 @@ pub async fn resolve(
 mod tests {
     use std::collections::{HashMap, VecDeque};
     use std::fs;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
 
     use axum::body::to_bytes;
     use axum::http::StatusCode;
@@ -143,7 +143,10 @@ mod tests {
     #[tokio::test]
     async fn resolve_returns_hydrated_similar_questions_for_numeric_id() {
         let (state, path) = test_state();
-        insert_problem(&state, sample_problem("1", "two-sum", vec!["3sum".to_string()]));
+        insert_problem(
+            &state,
+            sample_problem("1", "two-sum", vec!["3sum".to_string()]),
+        );
         insert_problem(&state, sample_problem("15", "3sum", Vec::new()));
 
         let response = super::resolve(State(state.clone()), Path("1".to_string()))
@@ -166,7 +169,10 @@ mod tests {
     #[tokio::test]
     async fn resolve_slug_lookup_keeps_hydrated_similar_questions() {
         let (state, path) = test_state();
-        insert_problem(&state, sample_problem("1", "two-sum", vec!["3sum".to_string()]));
+        insert_problem(
+            &state,
+            sample_problem("1", "two-sum", vec!["3sum".to_string()]),
+        );
         insert_problem(&state, sample_problem("15", "3sum", Vec::new()));
 
         let response = super::resolve(State(state.clone()), Path("two-sum".to_string()))

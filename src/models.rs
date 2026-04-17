@@ -160,7 +160,7 @@ impl From<Problem> for ProblemRecord {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProblemSummary {
     pub id: String,
     pub source: String,

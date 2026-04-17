@@ -1,14 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
 use rusqlite::{params, Row};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::DbPool;
 use crate::models::{
     parse_similar_question_slugs, parse_string_array, Problem, ProblemRecord, ProblemSummary,
 };
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PlatformStats {
     pub source: String,
     pub total: u32,

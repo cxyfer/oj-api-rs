@@ -26,3 +26,6 @@ urlencoding = "2"
 toml = "1"
 libc = "0.2"
 fs2 = "0.4"
+rmcp = { version = "1.5.0", features = ["macros", "server", "tower", "transport-streamable-http-server"] }
+htmd = "0.5"
+ammonia = "4"

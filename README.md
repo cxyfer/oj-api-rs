@@ -22,6 +22,7 @@ Built with Rust (axum + SQLite), featuring vector similarity search, a tri-lingu
 - **Vector Search** — sqlite-vec (768-dim Gemini embeddings, KNN with over-fetch strategy)
 - **Templates** — Askama (compile-time, type-safe admin dashboard)
 - **Auth** — Bearer token (toggleable via admin UI) + session-based admin auth (HttpOnly cookie)
+- **MCP** — Native Streamable HTTP MCP endpoint at `/mcp` with the same token policy as `/api/v1/*`
 - **Crawlers** — Python scripts (`scripts/`) spawned via `tokio::process::Command`, per-source CLI argument whitelisting
 - **i18n** — Client-side JSON translations (zh-TW / zh-CN / en) with `data-i18n` attributes
 
@@ -213,6 +214,82 @@ GET /status                           # Requires Bearer token (same as /api/v1/*
 ```
 
 Returns API version and per-platform statistics (total problems, missing content, not-embedded counts).
+
+### MCP (HTTP)
+
+```
+POST /mcp                            # Streamable HTTP MCP endpoint
+GET  /mcp                            # SSE resume / session stream
+```
+
+- Reuses the same server process and listener as the REST API.
+- Uses the same Bearer-token gate as `/api/v1/*` and `/status`: when token auth is enabled, `/mcp` also requires `Authorization: Bearer <token>`.
+- Exposes 5 tools: `resolve_problem`, `get_problem`, `get_daily_challenge`, `find_similar_problems`, `get_platform_status`.
+
+Example client config (HTTP MCP):
+
+```json
+{
+  "servers": {
+    "oj": {
+      "type": "http",
+      "url": "https://your-host.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN"
+      }
+    }
+  }
+}
+```
+
+#### Client configuration examples
+
+<details>
+<summary><b>Claude Code</b></summary>
+
+With Bearer token auth:
+
+```bash
+export OJ_API_TOKEN="YOUR_TOKEN"
+claude mcp add --transport http oj https://your-host.example.com/mcp \
+  --header "Authorization: Bearer $OJ_API_TOKEN"
+```
+
+Without token auth:
+
+```bash
+claude mcp add --transport http oj https://your-host.example.com/mcp
+```
+
+If you want the server available outside the current project, add `--scope user`:
+
+```bash
+claude mcp add --scope user --transport http oj https://your-host.example.com/mcp
+```
+</details>
+
+<details>
+<summary><b>Codex</b></summary>
+
+With Bearer token auth:
+
+```bash
+export OJ_API_TOKEN="YOUR_TOKEN"
+codex mcp add oj --url https://your-host.example.com/mcp --bearer-token-env-var OJ_API_TOKEN
+```
+
+Without token auth:
+
+```bash
+codex mcp add oj --url https://your-host.example.com/mcp
+```
+
+Confirm the server is registered:
+
+```bash
+codex mcp list
+```
+</details>
 
 ### Health Check
 
