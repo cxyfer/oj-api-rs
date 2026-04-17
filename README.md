@@ -242,6 +242,55 @@ Example client config (HTTP MCP):
 }
 ```
 
+#### Client configuration examples
+
+<details>
+<summary><b>Claude Code</b></summary>
+
+With Bearer token auth:
+
+```bash
+export OJ_API_TOKEN="YOUR_TOKEN"
+claude mcp add --transport http oj https://your-host.example.com/mcp \
+  --header "Authorization: Bearer $OJ_API_TOKEN"
+```
+
+Without token auth:
+
+```bash
+claude mcp add --transport http oj https://your-host.example.com/mcp
+```
+
+If you want the server available outside the current project, add `--scope user`:
+
+```bash
+claude mcp add --scope user --transport http oj https://your-host.example.com/mcp
+```
+</details>
+
+<details>
+<summary><b>Codex</b></summary>
+
+With Bearer token auth:
+
+```bash
+export OJ_API_TOKEN="YOUR_TOKEN"
+codex mcp add oj --url https://your-host.example.com/mcp --bearer-token-env-var OJ_API_TOKEN
+```
+
+Without token auth:
+
+```bash
+codex mcp add oj --url https://your-host.example.com/mcp
+```
+
+Confirm the server is registered:
+
+```bash
+codex mcp list
+```
+</details>
+
 ### Health Check
 
 ```
