@@ -80,6 +80,12 @@ batch_timeout_secs = 600    # admin batch embedding job timeout
 over_fetch_factor = 4
 concurrency = 4
 
+[mcp]
+# Optional allow-list for Host header validation on /mcp.
+# Leave empty to allow any host (recommended only behind a trusted reverse proxy).
+# Example: ["oj.example.com", "localhost:7856"]
+allowed_hosts = []
+
 [logging]
 rust_log = "info"
 level = "INFO"

@@ -16,6 +16,7 @@ mod config;
 mod db;
 mod detect;
 mod health;
+mod mcp;
 mod models;
 mod utils;
 
@@ -144,6 +145,8 @@ async fn main() {
         .merge(api::public_router())
         // Admin — admin secret auth, no CORS
         .merge(admin::admin_router())
+        // MCP — streamable HTTP over the same server
+        .merge(mcp::router(state.clone(), &config.mcp))
         // Static files
         .nest_service("/static", ServeDir::new("static"))
         // Extensions for auth middleware

@@ -13,26 +13,26 @@ use crate::models::{
     ActiveCrawlerPid, DailyChallengeRecord, JobType, LeetCodeDomain, ProblemSummary,
 };
 
-#[derive(serde::Serialize)]
-struct DailyChallengeResponse {
-    date: String,
-    domain: String,
-    id: String,
-    slug: String,
-    title: Option<String>,
-    title_cn: Option<String>,
-    difficulty: Option<String>,
-    ac_rate: Option<f64>,
-    rating: Option<f64>,
-    contest: Option<String>,
-    problem_index: Option<String>,
-    tags: Vec<String>,
-    link: Option<String>,
-    category: Option<String>,
-    paid_only: Option<i32>,
-    content: Option<String>,
-    content_cn: Option<String>,
-    similar_questions: Vec<ProblemSummary>,
+#[derive(serde::Serialize, serde::Deserialize)]
+pub(crate) struct DailyChallengeResponse {
+    pub(crate) date: String,
+    pub(crate) domain: String,
+    pub(crate) id: String,
+    pub(crate) slug: String,
+    pub(crate) title: Option<String>,
+    pub(crate) title_cn: Option<String>,
+    pub(crate) difficulty: Option<String>,
+    pub(crate) ac_rate: Option<f64>,
+    pub(crate) rating: Option<f64>,
+    pub(crate) contest: Option<String>,
+    pub(crate) problem_index: Option<String>,
+    pub(crate) tags: Vec<String>,
+    pub(crate) link: Option<String>,
+    pub(crate) category: Option<String>,
+    pub(crate) paid_only: Option<i32>,
+    pub(crate) content: Option<String>,
+    pub(crate) content_cn: Option<String>,
+    pub(crate) similar_questions: Vec<ProblemSummary>,
 }
 
 fn build_daily_response(

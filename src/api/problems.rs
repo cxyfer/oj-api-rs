@@ -9,25 +9,25 @@ use crate::api::error::ProblemDetail;
 use crate::models::{ProblemRecord, ProblemSummary};
 use crate::AppState;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub(crate) struct ProblemDetailResponse {
-    pub id: String,
-    pub source: String,
-    pub slug: String,
-    pub title: Option<String>,
-    pub title_cn: Option<String>,
-    pub difficulty: Option<String>,
-    pub ac_rate: Option<f64>,
-    pub rating: Option<f64>,
-    pub contest: Option<String>,
-    pub problem_index: Option<String>,
-    pub tags: Vec<String>,
-    pub link: Option<String>,
-    pub category: Option<String>,
-    pub paid_only: Option<i32>,
-    pub content: Option<String>,
-    pub content_cn: Option<String>,
-    pub similar_questions: Vec<ProblemSummary>,
+    pub(crate) id: String,
+    pub(crate) source: String,
+    pub(crate) slug: String,
+    pub(crate) title: Option<String>,
+    pub(crate) title_cn: Option<String>,
+    pub(crate) difficulty: Option<String>,
+    pub(crate) ac_rate: Option<f64>,
+    pub(crate) rating: Option<f64>,
+    pub(crate) contest: Option<String>,
+    pub(crate) problem_index: Option<String>,
+    pub(crate) tags: Vec<String>,
+    pub(crate) link: Option<String>,
+    pub(crate) category: Option<String>,
+    pub(crate) paid_only: Option<i32>,
+    pub(crate) content: Option<String>,
+    pub(crate) content_cn: Option<String>,
+    pub(crate) similar_questions: Vec<ProblemSummary>,
 }
 
 pub(crate) fn build_problem_detail_response(
@@ -75,7 +75,7 @@ pub struct ListQuery {
     pub rating_max: Option<f64>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub(crate) struct ListMeta {
     pub total: u32,
     pub page: u32,
@@ -83,7 +83,7 @@ pub(crate) struct ListMeta {
     pub total_pages: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub(crate) struct ListResponse<T: Serialize> {
     pub data: Vec<T>,
     pub meta: ListMeta,

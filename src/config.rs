@@ -91,6 +91,12 @@ impl Default for LoggingConfig {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(default)]
+pub struct McpConfig {
+    pub allowed_hosts: Vec<String>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -99,6 +105,7 @@ pub struct Config {
     pub crawler: CrawlerConfig,
     pub embedding: EmbeddingConfig,
     pub logging: LoggingConfig,
+    pub mcp: McpConfig,
     #[serde(skip)]
     pub config_path: PathBuf,
 }
@@ -111,6 +118,7 @@ impl Default for Config {
             crawler: CrawlerConfig::default(),
             embedding: EmbeddingConfig::default(),
             logging: LoggingConfig::default(),
+            mcp: McpConfig::default(),
             config_path: PathBuf::from("config.toml"),
         }
     }

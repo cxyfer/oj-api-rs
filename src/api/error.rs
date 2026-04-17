@@ -1,8 +1,8 @@
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ProblemDetail {
     #[serde(rename = "type")]
     pub error_type: String,
@@ -13,7 +13,7 @@ pub struct ProblemDetail {
     pub errors: Option<Vec<FieldError>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FieldError {
     pub field: String,
     pub message: String,
