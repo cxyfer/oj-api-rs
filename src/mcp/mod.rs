@@ -29,7 +29,7 @@ use crate::{
 };
 
 const MAX_RESPONSE_BODY: usize = 1_048_576;
-const MAX_OUTPUT_CHARS: usize = 102_400;
+const MAX_OUTPUT_BYTES: usize = 102_400;
 
 pub fn router(state: Arc<AppState>, config: &McpConfig) -> Router<Arc<AppState>> {
     let mut server_config = StreamableHttpServerConfig::default();
@@ -423,16 +423,22 @@ fn format_problem_detail_error(status: StatusCode, detail: &ProblemDetail) -> St
 
 fn looks_like_html(s: &str) -> bool {
     let trimmed = s.trim();
-    if !trimmed.contains('<') {
+    if !trimmed.contains('<') || !trimmed.contains('>') {
         return false;
     }
-    const TAGS: &[&str] = &[
-        "<p>", "<p ", "<div", "<ul", "<ol", "<li", "<table", "<br", "<h1", "<h2", "<h3", "<h4",
-        "<h5", "<h6", "<pre>", "<pre ", "<code>", "<code ", "<strong", "<em>", "<em ", "<span",
-        "<img", "<a ",
-    ];
-    let lower = trimmed.to_ascii_lowercase();
-    TAGS.iter().any(|tag| lower.contains(tag))
+    let mut inside_tag = false;
+    let mut saw_alpha_tag_name = false;
+
+    for ch in trimmed.chars() {
+        match ch {
+            '<' => inside_tag = true,
+            '>' if inside_tag => return saw_alpha_tag_name,
+            c if inside_tag && c.is_ascii_alphabetic() => saw_alpha_tag_name = true,
+            _ => {}
+        }
+    }
+
+    false
 }
 
 fn html_to_markdown(content: &str) -> String {
@@ -633,10 +639,10 @@ fn format_number(value: u64) -> String {
 }
 
 fn truncate_output(text: String) -> String {
-    if text.len() <= MAX_OUTPUT_CHARS {
+    if text.len() <= MAX_OUTPUT_BYTES {
         return text;
     }
-    let boundary = text.floor_char_boundary(MAX_OUTPUT_CHARS);
+    let boundary = text.floor_char_boundary(MAX_OUTPUT_BYTES);
     let mut truncated = text[..boundary].to_owned();
     truncated.push_str("\n\n... (truncated)");
     truncated
@@ -763,10 +769,7 @@ mod tests {
             .filter_map(|line| line.strip_prefix("data:"))
             .map(str::trim_start)
             .collect::<Vec<_>>()
-            .join(
-                "
-",
-            );
+            .join("\n");
         serde_json::from_str(&payload).unwrap_or_else(|err| {
             panic!("failed to parse SSE payload: {err}; body={body:?}; payload={payload:?}")
         })
