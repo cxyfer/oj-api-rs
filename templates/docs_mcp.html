@@ -190,8 +190,8 @@
 <script>
     function openByHash() {
         var hash = window.location.hash;
-        if (!hash) return;
-        var container = document.querySelector(hash);
+        if (!hash || hash.length <= 1) return;
+        var container = document.getElementById(hash.slice(1));
         if (!container || !container.classList.contains('reference-card')) return;
         var details = container.querySelector('.reference-details');
         if (details) {

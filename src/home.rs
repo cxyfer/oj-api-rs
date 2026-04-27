@@ -3,13 +3,13 @@ use std::sync::Arc;
 
 use askama::Template;
 use axum::extract::State;
+use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse};
 use axum::routing::get;
 use axum::Router;
 
 use crate::AppState;
 
-const README_URL: &str = "https://github.com/cxyfer/oj-api-rs#api-endpoints";
 pub(crate) const API_DOCS_PATH: &str = "/docs/api";
 pub(crate) const MCP_DOCS_PATH: &str = "/docs/mcp";
 
@@ -82,7 +82,7 @@ pub(crate) struct McpToolCard {
     pub(crate) usage_note_i18n: &'static str,
 }
 
-const SUPPORTED_PUBLIC_SOURCES: &[&str] = &["leetcode", "codeforces", "atcoder", "luogu", "spoj"];
+const SUPPORTED_PUBLIC_SOURCES: &[&str] = crate::api::problems::VALID_SOURCES;
 
 const HOMEPAGE_CARDS: [HomepageCard; 3] = [
     HomepageCard {
@@ -390,14 +390,12 @@ pub fn public_router() -> Router<Arc<AppState>> {
         .route(MCP_DOCS_PATH, get(mcp_docs))
 }
 
-#[allow(dead_code)]
 #[derive(Template)]
 #[template(path = "home.html")]
 struct HomeTemplate {
-    total_problems: u32,
+    total_problems: u64,
     token_auth_enabled: bool,
     version: &'static str,
-    readme_url: &'static str,
     docs: DocsRegistry,
     api_docs_path: &'static str,
     mcp_docs_path: &'static str,
@@ -428,7 +426,7 @@ pub async fn index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let total_problems = tokio::task::spawn_blocking(move || {
         let conn = pool.get().ok()?;
         conn.query_row("SELECT COUNT(*) FROM problems", [], |row| {
-            row.get::<_, u32>(0)
+            row.get::<_, u64>(0)
         })
         .ok()
     })
@@ -438,53 +436,49 @@ pub async fn index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
 
     let token_auth_enabled = state.token_auth_enabled.load(Ordering::Acquire);
 
-    Html(
-        HomeTemplate {
-            total_problems,
-            token_auth_enabled,
-            version: env!("CARGO_PKG_VERSION"),
-            readme_url: README_URL,
-            docs: docs_registry(),
-            api_docs_path: API_DOCS_PATH,
-            mcp_docs_path: MCP_DOCS_PATH,
-        }
-        .render()
-        .unwrap_or_default(),
-    )
+    HomeTemplate {
+        total_problems,
+        token_auth_enabled,
+        version: env!("CARGO_PKG_VERSION"),
+        docs: docs_registry(),
+        api_docs_path: API_DOCS_PATH,
+        mcp_docs_path: MCP_DOCS_PATH,
+    }
+    .render()
+    .map(Html)
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
     .into_response()
 }
 
 pub async fn api_docs(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let token_auth_enabled = state.token_auth_enabled.load(Ordering::Acquire);
 
-    Html(
-        ApiDocsTemplate {
-            docs: docs_registry(),
-            version: env!("CARGO_PKG_VERSION"),
-            home_path: "/",
-            mcp_docs_path: MCP_DOCS_PATH,
-            token_auth_enabled,
-        }
-        .render()
-        .unwrap_or_default(),
-    )
+    ApiDocsTemplate {
+        docs: docs_registry(),
+        version: env!("CARGO_PKG_VERSION"),
+        home_path: "/",
+        mcp_docs_path: MCP_DOCS_PATH,
+        token_auth_enabled,
+    }
+    .render()
+    .map(Html)
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
     .into_response()
 }
 
 pub async fn mcp_docs(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let token_auth_enabled = state.token_auth_enabled.load(Ordering::Acquire);
 
-    Html(
-        McpDocsTemplate {
-            docs: docs_registry(),
-            version: env!("CARGO_PKG_VERSION"),
-            home_path: "/",
-            api_docs_path: API_DOCS_PATH,
-            token_auth_enabled,
-        }
-        .render()
-        .unwrap_or_default(),
-    )
+    McpDocsTemplate {
+        docs: docs_registry(),
+        version: env!("CARGO_PKG_VERSION"),
+        home_path: "/",
+        api_docs_path: API_DOCS_PATH,
+        token_auth_enabled,
+    }
+    .render()
+    .map(Html)
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
     .into_response()
 }
 
@@ -550,7 +544,6 @@ mod tests {
             total_problems: 42,
             token_auth_enabled: true,
             version: "0.3.2-test",
-            readme_url: README_URL,
             docs: docs_registry(),
             api_docs_path: API_DOCS_PATH,
             mcp_docs_path: MCP_DOCS_PATH,
@@ -574,7 +567,6 @@ mod tests {
             total_problems: 42,
             token_auth_enabled: false,
             version: "0.3.2-test",
-            readme_url: README_URL,
             docs: docs_registry(),
             api_docs_path: API_DOCS_PATH,
             mcp_docs_path: MCP_DOCS_PATH,
@@ -769,7 +761,6 @@ mod tests {
             total_problems: 42,
             token_auth_enabled: true,
             version: "0.3.2-test",
-            readme_url: README_URL,
             docs: docs_registry(),
             api_docs_path: API_DOCS_PATH,
             mcp_docs_path: MCP_DOCS_PATH,
