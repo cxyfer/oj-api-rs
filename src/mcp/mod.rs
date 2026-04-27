@@ -86,6 +86,7 @@ struct GetProblemParams {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema, Default)]
 #[serde(rename_all = "lowercase")]
+#[schemars(inline)]
 enum Domain {
     #[default]
     Com,
@@ -101,14 +102,19 @@ impl std::fmt::Display for Domain {
     }
 }
 
+fn remove_default(schema: &mut schemars::Schema) {
+    schema.remove("default");
+}
+
 #[derive(Debug, Deserialize, schemars::JsonSchema, Default)]
 struct DailyParams {
     #[serde(default)]
     #[schemars(
         description = "LeetCode domain: 'com' (default) or 'cn'. Daily challenge switches at 00:00 in the respective domain timezone"
     )]
-    domain: Option<Domain>,
+    domain: Domain,
     #[serde(default)]
+    #[schemars(with = "String", transform = remove_default)]
     #[schemars(
         description = "Date in YYYY-MM-DD format. Defaults to today for the selected domain"
     )]
@@ -118,27 +124,37 @@ struct DailyParams {
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct SimilarParams {
     #[serde(default)]
+    #[schemars(with = "String", transform = remove_default)]
     #[schemars(
         description = "Problem source: leetcode, codeforces, atcoder, luogu, or spoj (required for ID-based search)"
     )]
     source: Option<String>,
     #[serde(default)]
+    #[schemars(with = "String", transform = remove_default)]
     #[schemars(
         description = "Problem ID on the platform, e.g. '1' (leetcode), '1A' (codeforces), 'abc001_1' (atcoder), 'P1001' (luogu). Required for ID-based search"
     )]
     id: Option<String>,
     #[serde(default)]
+    #[schemars(with = "String", transform = remove_default)]
     #[schemars(
         description = "Text query for semantic search (3-2000 chars, takes priority over source+id)"
     )]
     query: Option<String>,
     #[serde(default)]
+    #[schemars(with = "u32", range(min = 1, max = 50), transform = remove_default)]
     #[schemars(description = "Maximum results to return (1-50, default: 10)")]
     limit: Option<u32>,
     #[serde(default)]
+    #[schemars(
+        with = "f32",
+        range(min = 0.0, max = 1.0),
+        transform = remove_default
+    )]
     #[schemars(description = "Minimum similarity threshold (0.0-1.0, default: 0.0)")]
     threshold: Option<f32>,
     #[serde(default)]
+    #[schemars(with = "String", transform = remove_default)]
     #[schemars(
         description = "Comma-separated platform filter (e.g. 'leetcode,codeforces,atcoder,luogu')"
     )]
@@ -218,7 +234,7 @@ impl OjMcpServer {
         let response = daily::get_daily(
             axum::extract::State(self.state.clone()),
             axum::extract::Query(daily::DailyQuery {
-                domain: Some(params.0.domain.unwrap_or_default().to_string()),
+                domain: Some(params.0.domain.to_string()),
                 source: None,
                 date: params.0.date,
                 r#async: Some(false),
@@ -929,6 +945,28 @@ mod tests {
         assert!(tool_names.contains(&"find_similar_problems"));
         assert!(tool_names.contains(&"get_platform_status"));
 
+        for tool in tools_json["result"]["tools"].as_array().unwrap() {
+            let input_schema = &tool["inputSchema"];
+            assert_gemini_compatible_schema(
+                input_schema,
+                &format!("tool {}", tool["name"].as_str().unwrap()),
+            );
+        }
+        assert_eq!(
+            tool_input_schema_snapshot(&tools_json),
+            expected_tool_input_schema_snapshot()
+        );
+
+        let daily_tool = tools_json["result"]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|tool| tool["name"] == "get_daily_challenge")
+            .unwrap();
+        let domain_schema = &daily_tool["inputSchema"]["properties"]["domain"];
+        assert_eq!(domain_schema["type"], Value::String("string".to_string()));
+        assert_eq!(domain_schema["enum"], serde_json::json!(["com", "cn"]));
+
         let call_response = app
             .clone()
             .oneshot(session_request(
@@ -950,5 +988,141 @@ mod tests {
         assert!(text.contains("Source: leetcode | ID: 1"));
 
         cleanup_db_files(&path);
+    }
+
+    fn tool_input_schema_snapshot(tools_json: &Value) -> Value {
+        let mut snapshot = serde_json::Map::new();
+        for tool in tools_json["result"]["tools"].as_array().unwrap() {
+            snapshot.insert(
+                tool["name"].as_str().unwrap().to_string(),
+                tool["inputSchema"].clone(),
+            );
+        }
+        Value::Object(snapshot)
+    }
+
+    fn expected_tool_input_schema_snapshot() -> Value {
+        serde_json::from_str(
+            r#"{
+  "resolve_problem": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "ResolveProblemParams",
+    "type": "object",
+    "properties": {
+      "query": {
+        "description": "A problem URL, slug, or prefixed ID. Examples: 'https://leetcode.com/problems/two-sum', 'https://codeforces.com/problemset/problem/1/A', 'leetcode/two-sum', 'cf1A', 'P1001'",
+        "type": "string"
+      }
+    },
+    "required": ["query"]
+  },
+  "get_problem": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "GetProblemParams",
+    "type": "object",
+    "properties": {
+      "source": {
+        "description": "Problem source: leetcode, codeforces, atcoder, luogu, or spoj",
+        "type": "string"
+      },
+      "id": {
+        "description": "Problem ID on the platform. Examples: '1' or 'two-sum' (leetcode), '1A' (codeforces), 'abc001_1' (atcoder), 'P1001' (luogu)",
+        "type": "string"
+      }
+    },
+    "required": ["source", "id"]
+  },
+  "get_daily_challenge": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "DailyParams",
+    "type": "object",
+    "properties": {
+      "domain": {
+        "description": "LeetCode domain: 'com' (default) or 'cn'. Daily challenge switches at 00:00 in the respective domain timezone",
+        "type": "string",
+        "enum": ["com", "cn"]
+      },
+      "date": {
+        "description": "Date in YYYY-MM-DD format. Defaults to today for the selected domain",
+        "type": "string"
+      }
+    }
+  },
+  "find_similar_problems": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "SimilarParams",
+    "type": "object",
+    "properties": {
+      "source": {
+        "description": "Problem source: leetcode, codeforces, atcoder, luogu, or spoj (required for ID-based search)",
+        "type": "string"
+      },
+      "id": {
+        "description": "Problem ID on the platform, e.g. '1' (leetcode), '1A' (codeforces), 'abc001_1' (atcoder), 'P1001' (luogu). Required for ID-based search",
+        "type": "string"
+      },
+      "query": {
+        "description": "Text query for semantic search (3-2000 chars, takes priority over source+id)",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum results to return (1-50, default: 10)",
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "threshold": {
+        "description": "Minimum similarity threshold (0.0-1.0, default: 0.0)",
+        "type": "number",
+        "format": "float",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "source_filter": {
+        "description": "Comma-separated platform filter (e.g. 'leetcode,codeforces,atcoder,luogu')",
+        "type": "string"
+      }
+    }
+  },
+  "get_platform_status": {
+    "type": "object",
+    "properties": {}
+  }
+}"#,
+        )
+        .unwrap()
+    }
+
+    fn assert_gemini_compatible_schema(schema: &Value, path: &str) {
+        let Some(obj) = schema.as_object() else {
+            return;
+        };
+
+        assert!(
+            !obj.contains_key("$ref"),
+            "{path} contains unsupported $ref: {schema}"
+        );
+        assert!(
+            !obj.contains_key("anyOf"),
+            "{path} contains unsupported anyOf: {schema}"
+        );
+
+        if let Some(schema_type) = obj.get("type") {
+            assert!(
+                schema_type.is_string(),
+                "{path} has non-string type: {schema_type}"
+            );
+        }
+
+        if let Some(properties) = obj.get("properties").and_then(Value::as_object) {
+            for (name, subschema) in properties {
+                assert_gemini_compatible_schema(subschema, &format!("{path}.{name}"));
+            }
+        }
+
+        if let Some(items) = obj.get("items") {
+            assert_gemini_compatible_schema(items, &format!("{path}[]"));
+        }
     }
 }
