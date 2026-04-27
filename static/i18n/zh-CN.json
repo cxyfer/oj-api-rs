@@ -181,6 +181,7 @@
     "confirm_delete_problem": "确定要删除此题目吗？",
     "problem_deleted": "题目已删除",
     "failed_delete_problem": "无法删除题目",
+    "failed_load_problems": "无法加载题目列表",
     "crawler_triggered": "爬虫已启动",
     "failed_trigger_crawler": "无法启动爬虫",
     "fill_args": "请填写此参数的值：",
@@ -220,6 +221,237 @@
       "failed": "失败",
       "skipped": "已跳过",
       "cancelled": "已取消"
+    }
+  },
+  "home": {
+    "nav": {
+      "overview": "总览",
+      "api_docs": "API 文档",
+      "mcp_docs": "MCP 文档"
+    },
+    "hero": {
+      "eyebrow": "公开 API 文档",
+      "title": "通过单一整合 API 访问程序竞赛题目数据。",
+      "lead": "查询题目数据、获取每日挑战、搜索相似题目，并通过 MCP 连接工具客户端，不必再在零散的数据来源之间切换。"
+    },
+    "stats": {
+      "problems_label": "已索引题目",
+      "sources_label": "核心来源",
+      "version_label": "版本"
+    },
+    "auth": {
+      "kicker": "验证方式",
+      "title": "双状态访问规则",
+      "lead": "文档页面始终公开；API、status 与 MCP 是否需要凭证，取决于部署时是否启用 token auth。",
+      "route": "路径",
+      "mode_disabled": "验证关闭",
+      "mode_enabled": "验证开启",
+      "public": "公开",
+      "protected": "受保护",
+      "current_label": "当前部署",
+      "current_enabled": "已启用 token auth",
+      "current_disabled": "已关闭 token auth"
+    },
+    "featured": {
+      "view_details": "查看详情",
+      "card_1_title": "题目详情",
+      "card_1_summary": "按平台来源与题目 ID 获取标准化题目数据。",
+      "card_2_title": "每日挑战",
+      "card_2_summary": "获取当前的 LeetCode 每日挑战，并保留既有 fallback 行为。",
+      "card_3_title": "相似搜索",
+      "card_3_summary": "使用自由文本查询公开相似度索引中的相关题目。"
+    },
+    "example": {
+      "kicker": "示例",
+      "title": "标准请求",
+      "lead": "先用单一题目详情请求确认验证状态、响应结构与 source key 用法。"
+    },
+    "links": {
+      "api_kicker": "HTTP API",
+      "api_title": "HTTP API 参考",
+      "api_body": "查看全部九个公开 HTTP 路由的路径、验证规则、输入、响应结构与示例。",
+      "mcp_kicker": "MCP",
+      "mcp_title": "MCP 参考",
+      "mcp_body": "查看 transport 指南、工具摘要，以及五个 MCP 工具的使用示例。"
+    }
+  },
+  "docs_api": {
+    "hero": {
+      "kicker": "参考",
+      "title": "HTTP API 参考",
+      "lead": "查看每个公开且非 MCP 的 HTTP 路由，包含用途、认证规则、输入、响应结构与可直接复制的请求示例。",
+      "runtime_enabled": "当前受保护路由需要 bearer auth。",
+      "runtime_disabled": "当前受保护路由未启用 bearer auth。",
+      "supported_sources": "支持的公开来源："
+    },
+    "groups": {
+      "kicker": "路由分组",
+      "problems": "题目 (Problems)",
+      "problems_lead": "查看标准化题目数据、来源列表与标签信息。",
+      "discovery": "探索 (Discovery)",
+      "discovery_lead": "解析未知输入、获取每日挑战，并执行相似题搜索。",
+      "service": "服务 (Service)",
+      "service_lead": "检查服务健康状态与索引覆盖情况，不涉及任何管理端路由。"
+    },
+    "labels": {
+      "auth": "认证",
+      "inputs": "输入",
+      "success": "成功响应",
+      "example": "示例",
+      "supported_sources_for_route": "支持的 {source}："
+    },
+    "details": {
+      "summary": "展开路由详情"
+    },
+    "cards": {
+      "problem_detail": {
+        "title": "题目详情",
+        "purpose": "返回单个标准化题目文档。",
+        "auth_rule": "Bearer auth 取决于现有公开 API middleware 配置。",
+        "inputs": "路径参数：{source}、{id}。",
+        "success_shape": "JSON 对象，包含请求题目的字段数据。"
+      },
+      "problem_list": {
+        "title": "题目列表",
+        "purpose": "按指定来源列出题目，支持分页与筛选。",
+        "auth_rule": "Bearer auth 取决于现有公开 API middleware 配置。",
+        "inputs": "路径参数：{source}。Query 参数可包含分页与可选筛选条件。",
+        "success_shape": "JSON 对象，包含 data[] 与 meta 分页字段。"
+      },
+      "problem_tags": {
+        "title": "标签",
+        "purpose": "列出指定支持来源的标签数据。",
+        "auth_rule": "Bearer auth 取决于现有公开 API middleware 配置。",
+        "inputs": "路径参数：{source}。",
+        "success_shape": "JSON 数组，内容为标签字符串。"
+      },
+      "resolve_problem": {
+        "title": "解析题目",
+        "purpose": "将 URL、slug 或带前缀的标识解析为具体题目。",
+        "auth_rule": "Bearer auth 取决于现有公开 API middleware 配置。",
+        "inputs": "通配路径参数：{query}。",
+        "success_shape": "JSON 对象，包含 source、id 与 problem 字段。"
+      },
+      "daily_challenge": {
+        "title": "每日挑战",
+        "purpose": "获取当前每日挑战，也可按日期或 domain 查询。",
+        "auth_rule": "Bearer auth 取决于现有公开 API middleware 配置。",
+        "inputs": "Query 参数可包含 domain、date 与 async flags。",
+        "success_shape": "每日挑战 JSON 载荷，或 accepted/fetching 状态响应。"
+      },
+      "similar_by_id": {
+        "title": "按 ID 找相似题",
+        "purpose": "以现有题目作为种子查找相似题目。",
+        "auth_rule": "Bearer auth 取决于现有公开 API middleware 配置。",
+        "inputs": "路径参数：{source}、{id}。可用额外 query 参数微调搜索。",
+        "success_shape": "JSON 对象，包含排序后的相似题结果。"
+      },
+      "similar_by_query": {
+        "title": "按查询找相似题",
+        "purpose": "通过自由文本查询查找相似题目。",
+        "auth_rule": "Bearer auth 取决于现有公开 API middleware 配置。",
+        "inputs": "Query 参数可包含 query、limit、threshold 与 source。",
+        "success_shape": "JSON 对象，包含排序后的相似题结果。"
+      },
+      "service_status": {
+        "title": "状态",
+        "purpose": "返回服务版本与各平台索引统计。",
+        "auth_rule": "Bearer auth 取决于现有公开 API middleware 配置。",
+        "inputs": "无输入参数。",
+        "success_shape": "JSON 对象，包含 version 与 platforms[]。"
+      },
+      "service_health": {
+        "title": "健康检查",
+        "purpose": "执行公开健康检查，验证数据库与 sqlite-vec。",
+        "auth_rule": "公开，无需 bearer auth。",
+        "inputs": "无输入参数。",
+        "success_shape": "JSON 对象，包含 status、db、sqlite_vec、vec_dimension 与 version 字段。"
+      }
+    }
+  },
+  "docs_mcp": {
+    "hero": {
+      "kicker": "参考",
+      "title": "MCP 参考",
+      "lead": "当你想通过工具调用方式获取相同的题目、每日挑战、相似题与状态能力时，请使用挂载的 MCP transport。",
+      "runtime_enabled": "当前挂载的 MCP transport 仍使用既有 bearer-auth middleware。",
+      "runtime_disabled": "当前挂载的 MCP transport 可在未提供 bearer auth 的情况下访问。"
+    },
+    "groups": {
+      "kicker": "区段",
+      "transport": "Transport",
+      "transport_lead": "说明挂载的 Streamable HTTP MCP 服务对外提供的两个 HTTP 接口。",
+      "tools": "工具",
+      "tools_lead": "每个 MCP 工具都对应既有公开 REST 能力，同时返回适合工具客户端的文字输出。",
+      "examples": "示例",
+      "examples_lead": "先用一个连接配置示例和一个 JSON-RPC 请求，确认认证、transport 与 tool name 是否正确。"
+    },
+    "labels": {
+      "auth": "认证",
+      "example": "示例",
+      "jump_examples": "跳到示例",
+      "inputs": "输入",
+      "rest_capability": "REST 对应能力",
+      "output_style": "输出形式",
+      "usage_note": "使用说明"
+    },
+    "details": {
+      "summary": "展开详情"
+    },
+    "transport_cards": {
+      "mcp_post": {
+        "title": "Streamable HTTP 入口",
+        "responsibility": "主要的 Streamable HTTP 端点，用于 initialize 与 tool-call 请求。",
+        "auth_rule": "Bearer auth 取决于既有 MCP middleware 配置。"
+      },
+      "mcp_get": {
+        "title": "SSE session stream",
+        "responsibility": "由挂载的 MCP 服务提供的 SSE／session resume 接口。",
+        "auth_rule": "Bearer auth 取决于既有 MCP middleware 配置。"
+      }
+    },
+    "tool_cards": {
+      "resolve_problem": {
+        "title": "从弹性输入解析题目",
+        "required_inputs": "query",
+        "rest_capability": "对应 GET /api/v1/resolve/{*query}。",
+        "output_style": "以文字摘要返回解析后的题目详情。",
+        "usage_note": "当 source／ID 格式不确定，或输入是 URL 时使用。"
+      },
+      "get_problem": {
+        "title": "获取单个标准化题目",
+        "required_inputs": "source, id",
+        "rest_capability": "对应 GET /api/v1/problems/{source}/{id}。",
+        "output_style": "以文字摘要返回指定题目的详情。",
+        "usage_note": "当调用端已经知道标准化 source 与题目 ID 时使用。"
+      },
+      "get_daily_challenge": {
+        "title": "读取当前每日挑战",
+        "required_inputs": "domain?, date?",
+        "rest_capability": "对应 GET /api/v1/daily。",
+        "output_style": "以文字摘要返回每日挑战，或当前抓取状态。",
+        "usage_note": "当调用端想获取每日挑战，但不想自己拼 REST query string 时使用。"
+      },
+      "find_similar_problems": {
+        "title": "搜索相似题目",
+        "required_inputs": "query or source+id, plus limit/threshold/source_filter?",
+        "rest_capability": "对应 GET /api/v1/similar 与 GET /api/v1/similar/{source}/{id}。",
+        "output_style": "以文字排名返回相似题目与相似度分数。",
+        "usage_note": "文本查询模式适合语义搜索；source+id 模式适合从既有题目展开。"
+      },
+      "get_platform_status": {
+        "title": "查看索引平台状态",
+        "required_inputs": "none",
+        "rest_capability": "对应 GET /status。",
+        "output_style": "以文字摘要返回服务版本与平台统计。",
+        "usage_note": "适合快速查看当前可用索引平台的运行概况。"
+      }
+    },
+    "examples": {
+      "connection_title": "连接示例",
+      "connection_lead": "将 MCP client 指向挂载的 HTTP 端点，并带上与受保护公开路由相同的 bearer token。",
+      "request_title": "请求示例",
+      "request_lead": "这个请求要求 MCP 服务器执行精确的 tool name get_problem，并使用与 REST 题目详情端点相同的 source 与 ID。"
     }
   }
 }

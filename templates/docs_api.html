@@ -1,0 +1,218 @@
+{% extends "docs_base.html" %}
+
+{% block title %}HTTP API Reference - OJ API{% endblock %}
+
+{% block nav %}
+<a href="{{ home_path }}" data-i18n="home.nav.overview">Overview</a>
+<a href="{{ mcp_docs_path }}" data-i18n="home.nav.mcp_docs">MCP Docs</a>
+{% endblock %}
+
+{% block content %}
+<section class="docs-section docs-hero-section">
+    <div class="section-kicker" data-i18n="docs_api.hero.kicker">Reference</div>
+    <h1 data-i18n="docs_api.hero.title">HTTP API Reference</h1>
+    <p class="section-lead" data-i18n="docs_api.hero.lead">Review every public non-MCP HTTP route with purpose, auth, inputs, response shape, and a copyable request example.</p>
+    <p class="docs-runtime-note">
+        <span data-i18n="home.stats.version_label">Version</span> {{ version }} ·
+        <span data-i18n="docs_api.hero.runtime_{% if token_auth_enabled %}enabled{% else %}disabled{% endif %}">{% if token_auth_enabled %}Protected routes currently require bearer auth.{% else %}Bearer auth is currently disabled for protected routes.{% endif %}</span>
+    </p>
+    <p class="reference-supported-sources">
+        <span data-i18n="docs_api.hero.supported_sources">Supported public sources:</span>
+        {% for source in docs.supported_sources %}<code>{{ source }}</code>{% if !loop.last %} {% endif %}{% endfor %}
+    </p>
+</section>
+
+<nav class="docs-section toc" aria-label="API reference sections">
+    <div class="section-kicker" data-i18n="docs_api.groups.kicker">Route group</div>
+    <ul class="toc-list">
+        <li><a href="#problems" data-i18n="docs_api.groups.problems">Problems</a></li>
+        <li><a href="#discovery" data-i18n="docs_api.groups.discovery">Discovery</a></li>
+        <li><a href="#service" data-i18n="docs_api.groups.service">Service</a></li>
+    </ul>
+</nav>
+
+<section class="docs-section docs-reference-group" id="problems" aria-labelledby="problems-title">
+    <div class="reference-group-header">
+        <div>
+            <div class="section-kicker" data-i18n="docs_api.groups.kicker">Route group</div>
+            <h2 id="problems-title" data-i18n="docs_api.groups.problems">Problems</h2>
+        </div>
+        <p class="section-lead" data-i18n="docs_api.groups.problems_lead">Read normalized problem records, source listings, and tag metadata.</p>
+    </div>
+    <div class="content-grid docs-reference-grid">
+    {% for card in docs.http_route_cards %}
+        {% if card.group == "Problems" %}
+        <article class="panel reference-card" id="{{ card.fragment_id }}">
+            <div class="reference-card-top">
+                <div>
+                    <div class="method-row">
+                        <span class="method">{{ card.method }}</span>
+                        <code class="endpoint-path">{{ card.path }}</code>
+                    </div>
+                    <h3 data-i18n="{{ card.title_i18n }}">{{ card.title }}</h3>
+                </div>
+                <a class="fragment-link" href="#{{ card.fragment_id }}" aria-label="Link to {{ card.path }}">#</a>
+            </div>
+            <p class="reference-purpose" data-i18n="{{ card.purpose_i18n }}">{{ card.purpose }}</p>
+            <dl class="reference-facts">
+                <div>
+                    <dt data-i18n="docs_api.labels.auth">Auth</dt>
+                    <dd data-i18n="{{ card.auth_rule_i18n }}">{{ card.auth_rule }}</dd>
+                </div>
+                <div>
+                    <dt data-i18n="docs_api.labels.inputs">Inputs</dt>
+                    <dd data-i18n="{{ card.inputs_i18n }}">{{ card.inputs }}</dd>
+                </div>
+            </dl>
+            {% if card.has_source_param %}
+            <p class="reference-supported-sources">
+                <span data-i18n="docs_api.labels.supported_sources_for_route">Supported {source}:</span>
+                {% for source in docs.supported_sources %}<code>{{ source }}</code>{% if !loop.last %} {% endif %}{% endfor %}
+            </p>
+            {% endif %}
+            <details class="reference-details">
+                <summary><span data-i18n="docs_api.details.summary">Expand route details</span></summary>
+                <div class="reference-detail-body">
+                    <div class="reference-detail-block">
+                        <h4 data-i18n="docs_api.labels.success">Success</h4>
+                        <p data-i18n="{{ card.success_shape_i18n }}">{{ card.success_shape }}</p>
+                    </div>
+                    <div class="reference-detail-block">
+                        <h4 data-i18n="docs_api.labels.example">Example</h4>
+                        <pre class="code-block"><code>{{ card.example }}</code></pre>
+                    </div>
+                </div>
+            </details>
+        </article>
+        {% endif %}
+    {% endfor %}
+    </div>
+</section>
+
+<section class="docs-section docs-reference-group" id="discovery" aria-labelledby="discovery-title">
+    <div class="reference-group-header">
+        <div>
+            <div class="section-kicker" data-i18n="docs_api.groups.kicker">Route group</div>
+            <h2 id="discovery-title" data-i18n="docs_api.groups.discovery">Discovery</h2>
+        </div>
+        <p class="section-lead" data-i18n="docs_api.groups.discovery_lead">Resolve unknown inputs, fetch the daily challenge, and run similarity search.</p>
+    </div>
+    <div class="content-grid docs-reference-grid">
+    {% for card in docs.http_route_cards %}
+        {% if card.group == "Discovery" %}
+        <article class="panel reference-card" id="{{ card.fragment_id }}">
+            <div class="reference-card-top">
+                <div>
+                    <div class="method-row">
+                        <span class="method">{{ card.method }}</span>
+                        <code class="endpoint-path">{{ card.path }}</code>
+                    </div>
+                    <h3 data-i18n="{{ card.title_i18n }}">{{ card.title }}</h3>
+                </div>
+                <a class="fragment-link" href="#{{ card.fragment_id }}" aria-label="Link to {{ card.path }}">#</a>
+            </div>
+            <p class="reference-purpose" data-i18n="{{ card.purpose_i18n }}">{{ card.purpose }}</p>
+            <dl class="reference-facts">
+                <div>
+                    <dt data-i18n="docs_api.labels.auth">Auth</dt>
+                    <dd data-i18n="{{ card.auth_rule_i18n }}">{{ card.auth_rule }}</dd>
+                </div>
+                <div>
+                    <dt data-i18n="docs_api.labels.inputs">Inputs</dt>
+                    <dd data-i18n="{{ card.inputs_i18n }}">{{ card.inputs }}</dd>
+                </div>
+            </dl>
+            {% if card.has_source_param %}
+            <p class="reference-supported-sources">
+                <span data-i18n="docs_api.labels.supported_sources_for_route">Supported {source}:</span>
+                {% for source in docs.supported_sources %}<code>{{ source }}</code>{% if !loop.last %} {% endif %}{% endfor %}
+            </p>
+            {% endif %}
+            <details class="reference-details">
+                <summary><span data-i18n="docs_api.details.summary">Expand route details</span></summary>
+                <div class="reference-detail-body">
+                    <div class="reference-detail-block">
+                        <h4 data-i18n="docs_api.labels.success">Success</h4>
+                        <p data-i18n="{{ card.success_shape_i18n }}">{{ card.success_shape }}</p>
+                    </div>
+                    <div class="reference-detail-block">
+                        <h4 data-i18n="docs_api.labels.example">Example</h4>
+                        <pre class="code-block"><code>{{ card.example }}</code></pre>
+                    </div>
+                </div>
+            </details>
+        </article>
+        {% endif %}
+    {% endfor %}
+    </div>
+</section>
+
+<section class="docs-section docs-reference-group" id="service" aria-labelledby="service-title">
+    <div class="reference-group-header">
+        <div>
+            <div class="section-kicker" data-i18n="docs_api.groups.kicker">Route group</div>
+            <h2 id="service-title" data-i18n="docs_api.groups.service">Service</h2>
+        </div>
+        <p class="section-lead" data-i18n="docs_api.groups.service_lead">Check service health and index coverage without touching admin-only surfaces.</p>
+    </div>
+    <div class="content-grid docs-reference-grid">
+    {% for card in docs.http_route_cards %}
+        {% if card.group == "Service" %}
+        <article class="panel reference-card" id="{{ card.fragment_id }}">
+            <div class="reference-card-top">
+                <div>
+                    <div class="method-row">
+                        <span class="method">{{ card.method }}</span>
+                        <code class="endpoint-path">{{ card.path }}</code>
+                    </div>
+                    <h3 data-i18n="{{ card.title_i18n }}">{{ card.title }}</h3>
+                </div>
+                <a class="fragment-link" href="#{{ card.fragment_id }}" aria-label="Link to {{ card.path }}">#</a>
+            </div>
+            <p class="reference-purpose" data-i18n="{{ card.purpose_i18n }}">{{ card.purpose }}</p>
+            <dl class="reference-facts">
+                <div>
+                    <dt data-i18n="docs_api.labels.auth">Auth</dt>
+                    <dd data-i18n="{{ card.auth_rule_i18n }}">{{ card.auth_rule }}</dd>
+                </div>
+                <div>
+                    <dt data-i18n="docs_api.labels.inputs">Inputs</dt>
+                    <dd data-i18n="{{ card.inputs_i18n }}">{{ card.inputs }}</dd>
+                </div>
+            </dl>
+            <details class="reference-details">
+                <summary><span data-i18n="docs_api.details.summary">Expand route details</span></summary>
+                <div class="reference-detail-body">
+                    <div class="reference-detail-block">
+                        <h4 data-i18n="docs_api.labels.success">Success</h4>
+                        <p data-i18n="{{ card.success_shape_i18n }}">{{ card.success_shape }}</p>
+                    </div>
+                    <div class="reference-detail-block">
+                        <h4 data-i18n="docs_api.labels.example">Example</h4>
+                        <pre class="code-block"><code>{{ card.example }}</code></pre>
+                    </div>
+                </div>
+            </details>
+        </article>
+        {% endif %}
+    {% endfor %}
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openByHash() {
+        var hash = window.location.hash;
+        if (!hash) return;
+        var container = document.querySelector(hash);
+        if (!container || !container.classList.contains('reference-card')) return;
+        var details = container.querySelector('.reference-details');
+        if (details) {
+            details.open = true;
+        }
+    }
+    window.addEventListener('hashchange', openByHash);
+    document.addEventListener('DOMContentLoaded', openByHash);
+</script>
+{% endblock %}

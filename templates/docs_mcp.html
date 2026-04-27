@@ -1,0 +1,204 @@
+{% extends "docs_base.html" %}
+
+{% block title %}MCP Reference - OJ API{% endblock %}
+
+{% block nav %}
+<a href="{{ home_path }}" data-i18n="home.nav.overview">Overview</a>
+<a href="{{ api_docs_path }}" data-i18n="home.nav.api_docs">API Docs</a>
+{% endblock %}
+
+{% block content %}
+<section class="docs-section docs-hero-section">
+    <div class="section-kicker" data-i18n="docs_mcp.hero.kicker">Reference</div>
+    <h1 data-i18n="docs_mcp.hero.title">MCP Reference</h1>
+    <p class="section-lead" data-i18n="docs_mcp.hero.lead">Use the mounted MCP transport when you want tool-based access to the same public problem, daily, similarity, and status capabilities.</p>
+    <p class="docs-runtime-note">
+        <span data-i18n="home.stats.version_label">Version</span> {{ version }} ·
+        <span data-i18n="docs_mcp.hero.runtime_{% if token_auth_enabled %}enabled{% else %}disabled{% endif %}">{% if token_auth_enabled %}The mounted MCP transport still uses the existing bearer-auth middleware.{% else %}The mounted MCP transport is currently reachable without bearer auth.{% endif %}</span>
+    </p>
+</section>
+
+<nav class="docs-section toc" aria-label="MCP reference sections">
+    <div class="section-kicker" data-i18n="docs_mcp.groups.kicker">Section</div>
+    <ul class="toc-list">
+        <li><a href="#transport" data-i18n="docs_mcp.groups.transport">Transport</a></li>
+        <li><a href="#tools" data-i18n="docs_mcp.groups.tools">Tools</a></li>
+        <li><a href="#examples" data-i18n="docs_mcp.groups.examples">Examples</a></li>
+    </ul>
+</nav>
+
+<section class="docs-section docs-reference-group" id="transport" aria-labelledby="transport-title">
+    <div class="reference-group-header">
+        <div>
+            <div class="section-kicker" data-i18n="docs_mcp.groups.kicker">Section</div>
+            <h2 id="transport-title" data-i18n="docs_mcp.groups.transport">Transport</h2>
+        </div>
+        <p class="section-lead" data-i18n="docs_mcp.groups.transport_lead">Document the two HTTP surfaces exposed by the mounted Streamable HTTP MCP service.</p>
+    </div>
+    <div class="content-grid docs-reference-grid">
+    {% for card in docs.mcp_transport_cards %}
+        <article class="panel reference-card" id="{{ card.fragment_id }}">
+            <div class="reference-card-top">
+                <div>
+                    <div class="method-row">
+                        <span class="method">{{ card.method }}</span>
+                        <code class="endpoint-path">{{ card.path }}</code>
+                    </div>
+                    <h3 data-i18n="{{ card.title_i18n }}">{{ card.title }}</h3>
+                </div>
+                <a class="fragment-link" href="#{{ card.fragment_id }}" aria-label="Link to {{ card.path }}">#</a>
+            </div>
+            <p class="reference-purpose" data-i18n="{{ card.responsibility_i18n }}">{{ card.responsibility }}</p>
+            <dl class="reference-facts">
+                <div>
+                    <dt data-i18n="docs_mcp.labels.auth">Auth</dt>
+                    <dd data-i18n="{{ card.auth_rule_i18n }}">{{ card.auth_rule }}</dd>
+                </div>
+                <div>
+                    <dt data-i18n="docs_mcp.labels.example">Example</dt>
+                    <dd><a class="fragment-link" href="#examples" data-i18n="docs_mcp.labels.jump_examples">Jump to examples</a></dd>
+                </div>
+            </dl>
+            <details class="reference-details">
+                <summary><span data-i18n="docs_mcp.details.summary">Expand transport details</span></summary>
+                <div class="reference-detail-body">
+                    <div class="reference-detail-block">
+                        <h4 data-i18n="docs_mcp.labels.example">Example</h4>
+                        <pre class="code-block"><code>{{ card.example }}</code></pre>
+                    </div>
+                </div>
+            </details>
+        </article>
+    {% endfor %}
+    </div>
+</section>
+
+<section class="docs-section docs-reference-group" id="tools" aria-labelledby="tools-title">
+    <div class="reference-group-header">
+        <div>
+            <div class="section-kicker" data-i18n="docs_mcp.groups.kicker">Section</div>
+            <h2 id="tools-title" data-i18n="docs_mcp.groups.tools">Tools</h2>
+        </div>
+        <p class="section-lead" data-i18n="docs_mcp.groups.tools_lead">Each MCP tool maps back to an existing public REST capability while returning plain-language output for tool clients.</p>
+    </div>
+    <div class="content-grid docs-reference-grid">
+    {% for card in docs.mcp_tool_cards %}
+        <article class="panel reference-card" id="{{ card.fragment_id }}">
+            <div class="reference-card-top">
+                <div>
+                    <div class="method-row">
+                        <span class="method">TOOL</span>
+                        <code class="endpoint-path">{{ card.name }}</code>
+                    </div>
+                    <h3 data-i18n="{{ card.title_i18n }}">{{ card.title }}</h3>
+                </div>
+                <a class="fragment-link" href="#{{ card.fragment_id }}" aria-label="Link to {{ card.name }}">#</a>
+            </div>
+            <dl class="reference-facts">
+                <div>
+                    <dt data-i18n="docs_mcp.labels.inputs">Inputs</dt>
+                    <dd data-i18n="{{ card.required_inputs_i18n }}">{{ card.required_inputs }}</dd>
+                </div>
+                <div>
+                    <dt data-i18n="docs_mcp.labels.rest_capability">REST capability</dt>
+                    <dd data-i18n="{{ card.rest_capability_i18n }}">{{ card.rest_capability }}</dd>
+                </div>
+            </dl>
+            <details class="reference-details">
+                <summary><span data-i18n="docs_mcp.details.summary">Expand tool details</span></summary>
+                <div class="reference-detail-body">
+                    <div class="reference-detail-block">
+                        <h4 data-i18n="docs_mcp.labels.output_style">Output style</h4>
+                        <p data-i18n="{{ card.output_style_i18n }}">{{ card.output_style }}</p>
+                    </div>
+                    <div class="reference-detail-block">
+                        <h4 data-i18n="docs_mcp.labels.usage_note">Usage note</h4>
+                        <p data-i18n="{{ card.usage_note_i18n }}">{{ card.usage_note }}</p>
+                    </div>
+                </div>
+            </details>
+        </article>
+    {% endfor %}
+    </div>
+</section>
+
+<section class="docs-section docs-reference-group" id="examples" aria-labelledby="examples-title">
+    <div class="reference-group-header">
+        <div>
+            <div class="section-kicker" data-i18n="docs_mcp.groups.kicker">Section</div>
+            <h2 id="examples-title" data-i18n="docs_mcp.groups.examples">Examples</h2>
+        </div>
+        <p class="section-lead" data-i18n="docs_mcp.groups.examples_lead">Start with one connection snippet and one JSON-RPC request to verify auth, transport, and tool naming.</p>
+    </div>
+    <div class="content-grid docs-reference-grid">
+        <article class="panel reference-card" id="connection-example">
+            <div class="reference-card-top">
+                <div>
+                    <div class="method-row">
+                        <span class="method">CONFIG</span>
+                        <code class="endpoint-path">mcpServers.oj-api</code>
+                    </div>
+                    <h3 data-i18n="docs_mcp.examples.connection_title">Connection example</h3>
+                </div>
+                <a class="fragment-link" href="#connection-example" aria-label="Link to connection example">#</a>
+            </div>
+            <p class="reference-purpose" data-i18n="docs_mcp.examples.connection_lead">Point your MCP client at the mounted HTTP endpoint and send the same bearer token you use for protected public routes.</p>
+            <pre class="code-block"><code>{
+  "mcpServers": {
+    "oj-api": {
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://127.0.0.1:7856/mcp",
+        "headers": {
+          "Authorization": "Bearer &lt;token&gt;"
+        }
+      }
+    }
+  }
+}</code></pre>
+        </article>
+        <article class="panel reference-card" id="request-example">
+            <div class="reference-card-top">
+                <div>
+                    <div class="method-row">
+                        <span class="method">JSON-RPC</span>
+                        <code class="endpoint-path">tools/call</code>
+                    </div>
+                    <h3 data-i18n="docs_mcp.examples.request_title">Request example</h3>
+                </div>
+                <a class="fragment-link" href="#request-example" aria-label="Link to request example">#</a>
+            </div>
+            <p class="reference-purpose" data-i18n="docs_mcp.examples.request_lead">This request asks the MCP server to run the exact tool name <code>get_problem</code> with the same source and ID you would send to the REST detail endpoint.</p>
+            <pre class="code-block"><code>{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "get_problem",
+    "arguments": {
+      "source": "leetcode",
+      "id": "1"
+    }
+  }
+}</code></pre>
+        </article>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openByHash() {
+        var hash = window.location.hash;
+        if (!hash) return;
+        var container = document.querySelector(hash);
+        if (!container || !container.classList.contains('reference-card')) return;
+        var details = container.querySelector('.reference-details');
+        if (details) {
+            details.open = true;
+        }
+    }
+    window.addEventListener('hashchange', openByHash);
+    document.addEventListener('DOMContentLoaded', openByHash);
+</script>
+{% endblock %}

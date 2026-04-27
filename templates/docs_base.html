@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}OJ API{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/home.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="home-shell">
+        <div class="home-wrap">
+            <header class="home-header">
+                <a class="home-brand" href="/">OJ API</a>
+                <nav class="home-nav" aria-label="Documentation navigation">
+                    {% block nav %}
+                    <a href="/docs/api">API Reference</a>
+                    <a href="/docs/mcp">MCP Reference</a>
+                    {% endblock %}
+                </nav>
+                <button class="lang-toggle" type="button" onclick="i18n.cycleLanguage()">
+                    <span data-i18n="common.language">Language</span>
+                    <span class="lang-current" id="current-lang-display">English</span>
+                </button>
+            </header>
+
+            <main>
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <script src="/static/i18n.js"></script>
+    <script>
+        function updateDocsExamplesBaseUrl() {
+            var origin = window.location.origin;
+            if (!origin) return;
+            var targets = document.querySelectorAll('pre code');
+            for (var i = 0; i < targets.length; i++) {
+                var el = targets[i];
+                if (el.textContent.indexOf('http://127.0.0.1:7856') !== -1) {
+                    el.textContent = el.textContent.replaceAll('http://127.0.0.1:7856', origin);
+                }
+            }
+        }
+
+        document.addEventListener('languageChanged', function(e) {
+            var display = 'English';
+            if (e.detail === 'zh-TW') display = '繁體中文';
+            if (e.detail === 'zh-CN') display = '简体中文';
+            var el = document.getElementById('current-lang-display');
+            if (el) el.textContent = display;
+        });
+
+        document.addEventListener('DOMContentLoaded', updateDocsExamplesBaseUrl);
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

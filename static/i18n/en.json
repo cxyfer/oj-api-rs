@@ -222,5 +222,236 @@
       "skipped": "Skipped",
       "cancelled": "Cancelled"
     }
+  },
+  "home": {
+    "nav": {
+      "overview": "Overview",
+      "api_docs": "API Docs",
+      "mcp_docs": "MCP Docs"
+    },
+    "hero": {
+      "eyebrow": "Public API documentation",
+      "title": "Access coding problem data through one unified API.",
+      "lead": "Query problem records, fetch daily challenges, search similar problems, and connect tool clients through MCP without switching between fragmented data sources."
+    },
+    "stats": {
+      "problems_label": "Indexed problems",
+      "sources_label": "Core sources",
+      "version_label": "Version"
+    },
+    "auth": {
+      "kicker": "Authentication",
+      "title": "Dual-state access rules",
+      "lead": "The docs pages stay public. API, status, and MCP access depend on whether token auth is enabled for this deployment.",
+      "route": "Route",
+      "mode_disabled": "Auth Disabled",
+      "mode_enabled": "Auth Enabled",
+      "public": "Public",
+      "protected": "Protected",
+      "current_label": "Current deployment",
+      "current_enabled": "Token auth enabled",
+      "current_disabled": "Token auth disabled"
+    },
+    "featured": {
+      "view_details": "View details",
+      "card_1_title": "Problem detail",
+      "card_1_summary": "Fetch a normalized problem record by platform source and problem ID.",
+      "card_2_title": "Daily challenge",
+      "card_2_summary": "Fetch the current LeetCode daily challenge with the existing fallback behavior.",
+      "card_3_title": "Similar search",
+      "card_3_summary": "Search related problems by free-text query against the public similarity index."
+    },
+    "example": {
+      "kicker": "Example",
+      "title": "Canonical request",
+      "lead": "Start with a single problem-detail request to confirm auth, response shape, and source-key usage."
+    },
+    "links": {
+      "api_kicker": "HTTP API",
+      "api_title": "HTTP API Reference",
+      "api_body": "Review all nine public HTTP routes with paths, auth rules, inputs, response shapes, and examples.",
+      "mcp_kicker": "MCP",
+      "mcp_title": "MCP Reference",
+      "mcp_body": "See transport guidance, tool summaries, and examples for the five exposed MCP tools."
+    }
+  },
+  "docs_api": {
+    "hero": {
+      "kicker": "Reference",
+      "title": "HTTP API Reference",
+      "lead": "Review every public non-MCP HTTP route with purpose, auth, inputs, response shape, and a copyable request example.",
+      "runtime_enabled": "Protected routes currently require bearer auth.",
+      "runtime_disabled": "Bearer auth is currently disabled for protected routes.",
+      "supported_sources": "Supported public sources:"
+    },
+    "groups": {
+      "kicker": "Route group",
+      "problems": "Problems",
+      "problems_lead": "Read normalized problem records, source listings, and tag metadata.",
+      "discovery": "Discovery",
+      "discovery_lead": "Resolve unknown inputs, fetch the daily challenge, and run similarity search.",
+      "service": "Service",
+      "service_lead": "Check service health and index coverage without touching admin-only surfaces."
+    },
+    "labels": {
+      "auth": "Auth",
+      "inputs": "Inputs",
+      "success": "Success",
+      "example": "Example",
+      "supported_sources_for_route": "Supported {source}:"
+    },
+    "details": {
+      "summary": "Expand route details"
+    },
+    "cards": {
+      "problem_detail": {
+        "title": "Problem detail",
+        "purpose": "Return a single normalized problem document.",
+        "auth_rule": "Bearer auth follows the existing public API middleware setting.",
+        "inputs": "Path params: {source}, {id}.",
+        "success_shape": "JSON object with the requested problem fields."
+      },
+      "problem_list": {
+        "title": "Problem list",
+        "purpose": "List problems for a source with pagination and filtering.",
+        "auth_rule": "Bearer auth follows the existing public API middleware setting.",
+        "inputs": "Path param: {source}. Query params include pagination and optional filters.",
+        "success_shape": "JSON object with data[] and meta pagination fields."
+      },
+      "problem_tags": {
+        "title": "Tags",
+        "purpose": "List tag metadata for a supported source.",
+        "auth_rule": "Bearer auth follows the existing public API middleware setting.",
+        "inputs": "Path param: {source}.",
+        "success_shape": "JSON array of tag strings."
+      },
+      "resolve_problem": {
+        "title": "Resolve",
+        "purpose": "Resolve a URL, slug, or prefixed identifier into a concrete problem.",
+        "auth_rule": "Bearer auth follows the existing public API middleware setting.",
+        "inputs": "Wildcard path param: {query}.",
+        "success_shape": "JSON object with source, id, and problem fields."
+      },
+      "daily_challenge": {
+        "title": "Daily challenge",
+        "purpose": "Fetch the current daily challenge, optionally by date or domain.",
+        "auth_rule": "Bearer auth follows the existing public API middleware setting.",
+        "inputs": "Query params include domain, date, and async flags.",
+        "success_shape": "JSON challenge payload or accepted/fetching response."
+      },
+      "similar_by_id": {
+        "title": "Similar by ID",
+        "purpose": "Find similar problems using an existing problem as the seed.",
+        "auth_rule": "Bearer auth follows the existing public API middleware setting.",
+        "inputs": "Path params: {source}, {id}. Optional query params refine the search.",
+        "success_shape": "JSON object with ranked similar-problem results."
+      },
+      "similar_by_query": {
+        "title": "Similar by query",
+        "purpose": "Find similar problems from a free-text query.",
+        "auth_rule": "Bearer auth follows the existing public API middleware setting.",
+        "inputs": "Query params include query, limit, threshold, and source.",
+        "success_shape": "JSON object with ranked similar-problem results."
+      },
+      "service_status": {
+        "title": "Status",
+        "purpose": "Return service version and per-platform indexing stats.",
+        "auth_rule": "Bearer auth follows the existing public API middleware setting.",
+        "inputs": "No input parameters.",
+        "success_shape": "JSON object with version and platforms[]."
+      },
+      "service_health": {
+        "title": "Health",
+        "purpose": "Run the public health check against the database and sqlite-vec.",
+        "auth_rule": "Public without bearer auth.",
+        "inputs": "No input parameters.",
+        "success_shape": "JSON object with status, db, sqlite_vec, vec_dimension, and version fields."
+      }
+    }
+  },
+  "docs_mcp": {
+    "hero": {
+      "kicker": "Reference",
+      "title": "MCP Reference",
+      "lead": "Use the mounted MCP transport when you want tool-based access to the same public problem, daily, similarity, and status capabilities.",
+      "runtime_enabled": "The mounted MCP transport still uses the existing bearer-auth middleware.",
+      "runtime_disabled": "The mounted MCP transport is currently reachable without bearer auth."
+    },
+    "groups": {
+      "kicker": "Section",
+      "transport": "Transport",
+      "transport_lead": "Document the two HTTP surfaces exposed by the mounted Streamable HTTP MCP service.",
+      "tools": "Tools",
+      "tools_lead": "Each MCP tool maps back to an existing public REST capability while returning plain-language output for tool clients.",
+      "examples": "Examples",
+      "examples_lead": "Start with one connection snippet and one JSON-RPC request to verify auth, transport, and tool naming."
+    },
+    "labels": {
+      "auth": "Auth",
+      "example": "Example",
+      "jump_examples": "Jump to examples",
+      "inputs": "Inputs",
+      "rest_capability": "REST capability",
+      "output_style": "Output style",
+      "usage_note": "Usage note"
+    },
+    "details": {
+      "summary": "Expand details"
+    },
+    "transport_cards": {
+      "mcp_post": {
+        "title": "Streamable HTTP entrypoint",
+        "responsibility": "Primary Streamable HTTP endpoint for initialize and tool-call requests.",
+        "auth_rule": "Bearer auth follows the existing MCP middleware setting."
+      },
+      "mcp_get": {
+        "title": "SSE session stream",
+        "responsibility": "SSE/session-resume transport surface exposed by the mounted MCP service.",
+        "auth_rule": "Bearer auth follows the existing MCP middleware setting."
+      }
+    },
+    "tool_cards": {
+      "resolve_problem": {
+        "title": "Resolve a problem from flexible input",
+        "required_inputs": "query",
+        "rest_capability": "Maps to GET /api/v1/resolve/{*query}.",
+        "output_style": "Text summary of the resolved problem detail.",
+        "usage_note": "Use when the source/ID format is uncertain or when the input is a URL."
+      },
+      "get_problem": {
+        "title": "Fetch one normalized problem",
+        "required_inputs": "source, id",
+        "rest_capability": "Maps to GET /api/v1/problems/{source}/{id}.",
+        "output_style": "Text summary of the requested problem detail.",
+        "usage_note": "Use when the caller already knows the normalized source and problem ID."
+      },
+      "get_daily_challenge": {
+        "title": "Read the current daily challenge",
+        "required_inputs": "domain?, date?",
+        "rest_capability": "Maps to GET /api/v1/daily.",
+        "output_style": "Text summary of the daily challenge or the active fetch state.",
+        "usage_note": "Use when the caller wants the current daily challenge without composing REST query strings."
+      },
+      "find_similar_problems": {
+        "title": "Search similar problems",
+        "required_inputs": "query or source+id, plus limit/threshold/source_filter?",
+        "rest_capability": "Maps to GET /api/v1/similar and GET /api/v1/similar/{source}/{id}.",
+        "output_style": "Text ranking of similar problems with similarity scores.",
+        "usage_note": "Use text query mode for semantic search or source+id mode for seed-problem lookup."
+      },
+      "get_platform_status": {
+        "title": "Check indexed platform status",
+        "required_inputs": "none",
+        "rest_capability": "Maps to GET /status.",
+        "output_style": "Text summary of service version and platform stats.",
+        "usage_note": "Use for a compact operational overview of available indexed platforms."
+      }
+    },
+    "examples": {
+      "connection_title": "Connection example",
+      "connection_lead": "Point your MCP client at the mounted HTTP endpoint and send the same bearer token you use for protected public routes.",
+      "request_title": "Request example",
+      "request_lead": "This request asks the MCP server to run the exact tool name get_problem with the same source and ID you would send to the REST detail endpoint."
+    }
   }
 }
