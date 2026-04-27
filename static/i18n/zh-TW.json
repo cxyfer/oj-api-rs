@@ -222,5 +222,236 @@
       "skipped": "已跳過",
       "cancelled": "已取消"
     }
+  },
+  "home": {
+    "nav": {
+      "overview": "總覽",
+      "api_docs": "API 文件",
+      "mcp_docs": "MCP 文件"
+    },
+    "hero": {
+      "eyebrow": "公開 API 文件",
+      "title": "透過單一整合 API 存取程式競賽題目資料。",
+      "lead": "查詢題目資料、取得每日挑戰、搜尋相似題目，並透過 MCP 連接工具客戶端，不必再在零散的資料來源之間切換。"
+    },
+    "stats": {
+      "problems_label": "已索引題目",
+      "sources_label": "核心來源",
+      "version_label": "版本"
+    },
+    "auth": {
+      "kicker": "驗證方式",
+      "title": "雙狀態存取規則",
+      "lead": "文件頁面始終公開；API、status 與 MCP 是否需要憑證，取決於部署時是否啟用 token auth。",
+      "route": "路徑",
+      "mode_disabled": "驗證關閉",
+      "mode_enabled": "驗證開啟",
+      "public": "公開",
+      "protected": "受保護",
+      "current_label": "目前部署",
+      "current_enabled": "已啟用 token auth",
+      "current_disabled": "已關閉 token auth"
+    },
+    "featured": {
+      "view_details": "查看詳情",
+      "card_1_title": "題目詳情",
+      "card_1_summary": "依平台來源與題目 ID 取得標準化題目資料。",
+      "card_2_title": "每日挑戰",
+      "card_2_summary": "取得目前的 LeetCode 每日挑戰，保留既有 fallback 行為。",
+      "card_3_title": "相似搜尋",
+      "card_3_summary": "使用自由文字查詢公開相似度索引中的相關題目。"
+    },
+    "example": {
+      "kicker": "範例",
+      "title": "標準請求",
+      "lead": "先用單一題目詳情請求確認驗證狀態、回應結構與 source key 用法。"
+    },
+    "links": {
+      "api_kicker": "HTTP API",
+      "api_title": "HTTP API 參考",
+      "api_body": "查看全部九個公開 HTTP 路由的路徑、驗證規則、輸入、回應結構與範例。",
+      "mcp_kicker": "MCP",
+      "mcp_title": "MCP 參考",
+      "mcp_body": "查看 transport 指南、工具摘要，以及五個 MCP 工具的使用範例。"
+    }
+  },
+  "docs_api": {
+    "hero": {
+      "kicker": "參考",
+      "title": "HTTP API 參考",
+      "lead": "查看每個公開且非 MCP 的 HTTP 路由，包含用途、驗證規則、輸入、回應結構與可直接複製的請求範例。",
+      "runtime_enabled": "目前受保護路由需要 bearer auth。",
+      "runtime_disabled": "目前受保護路由未啟用 bearer auth。",
+      "supported_sources": "支援的公開來源："
+    },
+    "groups": {
+      "kicker": "路由分組",
+      "problems": "題目 (Problems)",
+      "problems_lead": "查看標準化題目資料、來源列表與標籤資訊。",
+      "discovery": "探索 (Discovery)",
+      "discovery_lead": "解析未知輸入、取得每日挑戰，並執行相似題搜尋。",
+      "service": "服務 (Service)",
+      "service_lead": "檢查服務健康狀態與索引覆蓋情況，不涉及任何管理端路由。"
+    },
+    "labels": {
+      "auth": "驗證",
+      "inputs": "輸入",
+      "success": "成功回應",
+      "example": "範例",
+      "supported_sources_for_route": "支援的 {source}："
+    },
+    "details": {
+      "summary": "展開路由詳情"
+    },
+    "cards": {
+      "problem_detail": {
+        "title": "題目詳情",
+        "purpose": "回傳單一標準化題目文件。",
+        "auth_rule": "Bearer auth 依現有公開 API middleware 設定決定。",
+        "inputs": "路徑參數：{source}、{id}。",
+        "success_shape": "JSON 物件，包含請求題目的欄位資料。"
+      },
+      "problem_list": {
+        "title": "題目列表",
+        "purpose": "依指定來源列出題目，支援分頁與篩選。",
+        "auth_rule": "Bearer auth 依現有公開 API middleware 設定決定。",
+        "inputs": "路徑參數：{source}。Query 參數可包含分頁與可選篩選條件。",
+        "success_shape": "JSON 物件，包含 data[] 與 meta 分頁欄位。"
+      },
+      "problem_tags": {
+        "title": "標籤",
+        "purpose": "列出指定支援來源的標籤資料。",
+        "auth_rule": "Bearer auth 依現有公開 API middleware 設定決定。",
+        "inputs": "路徑參數：{source}。",
+        "success_shape": "JSON 陣列，內容為標籤字串。"
+      },
+      "resolve_problem": {
+        "title": "解析題目",
+        "purpose": "將 URL、slug 或帶前綴的識別字解析成具體題目。",
+        "auth_rule": "Bearer auth 依現有公開 API middleware 設定決定。",
+        "inputs": "萬用字元路徑參數：{query}。",
+        "success_shape": "JSON 物件，包含 source、id 與 problem 欄位。"
+      },
+      "daily_challenge": {
+        "title": "每日挑戰",
+        "purpose": "取得目前每日挑戰，也可依日期或 domain 查詢。",
+        "auth_rule": "Bearer auth 依現有公開 API middleware 設定決定。",
+        "inputs": "Query 參數可包含 domain、date 與 async flags。",
+        "success_shape": "每日挑戰 JSON 載荷，或 accepted/fetching 狀態回應。"
+      },
+      "similar_by_id": {
+        "title": "依 ID 找相似題",
+        "purpose": "以既有題目作為種子尋找相似題目。",
+        "auth_rule": "Bearer auth 依現有公開 API middleware 設定決定。",
+        "inputs": "路徑參數：{source}、{id}。可用額外 query 參數微調搜尋。",
+        "success_shape": "JSON 物件，包含排序後的相似題結果。"
+      },
+      "similar_by_query": {
+        "title": "依查詢找相似題",
+        "purpose": "透過自由文字查詢尋找相似題目。",
+        "auth_rule": "Bearer auth 依現有公開 API middleware 設定決定。",
+        "inputs": "Query 參數可包含 query、limit、threshold 與 source。",
+        "success_shape": "JSON 物件，包含排序後的相似題結果。"
+      },
+      "service_status": {
+        "title": "狀態",
+        "purpose": "回傳服務版本與各平台索引統計。",
+        "auth_rule": "Bearer auth 依現有公開 API middleware 設定決定。",
+        "inputs": "無輸入參數。",
+        "success_shape": "JSON 物件，包含 version 與 platforms[]。"
+      },
+      "service_health": {
+        "title": "健康檢查",
+        "purpose": "執行公開健康檢查，驗證資料庫與 sqlite-vec。",
+        "auth_rule": "公開，不需要 bearer auth。",
+        "inputs": "無輸入參數。",
+        "success_shape": "JSON 物件，包含 status、db、sqlite_vec、vec_dimension 與 version 欄位。"
+      }
+    }
+  },
+  "docs_mcp": {
+    "hero": {
+      "kicker": "參考",
+      "title": "MCP 參考",
+      "lead": "當你想用工具呼叫方式取得相同的題目、每日挑戰、相似題與狀態能力時，請使用掛載的 MCP transport。",
+      "runtime_enabled": "目前掛載的 MCP transport 仍使用既有 bearer-auth middleware。",
+      "runtime_disabled": "目前掛載的 MCP transport 可在未提供 bearer auth 的情況下存取。"
+    },
+    "groups": {
+      "kicker": "區段",
+      "transport": "Transport",
+      "transport_lead": "說明掛載的 Streamable HTTP MCP 服務對外提供的兩個 HTTP 介面。",
+      "tools": "工具",
+      "tools_lead": "每個 MCP 工具都對應既有公開 REST 能力，同時回傳適合工具客戶端的文字輸出。",
+      "examples": "範例",
+      "examples_lead": "先用一個連線設定範例與一個 JSON-RPC 請求，確認驗證、transport 與 tool name 是否正確。"
+    },
+    "labels": {
+      "auth": "驗證",
+      "example": "範例",
+      "jump_examples": "跳到範例",
+      "inputs": "輸入",
+      "rest_capability": "REST 對應能力",
+      "output_style": "輸出形式",
+      "usage_note": "使用說明"
+    },
+    "details": {
+      "summary": "展開詳情"
+    },
+    "transport_cards": {
+      "mcp_post": {
+        "title": "Streamable HTTP 入口",
+        "responsibility": "主要的 Streamable HTTP 端點，用於 initialize 與 tool-call 請求。",
+        "auth_rule": "Bearer auth 依既有 MCP middleware 設定決定。"
+      },
+      "mcp_get": {
+        "title": "SSE session stream",
+        "responsibility": "由掛載的 MCP 服務提供的 SSE／session resume 介面。",
+        "auth_rule": "Bearer auth 依既有 MCP middleware 設定決定。"
+      }
+    },
+    "tool_cards": {
+      "resolve_problem": {
+        "title": "從彈性輸入解析題目",
+        "required_inputs": "query",
+        "rest_capability": "對應 GET /api/v1/resolve/{*query}。",
+        "output_style": "以文字摘要回傳解析後的題目詳情。",
+        "usage_note": "當 source／ID 格式不確定，或輸入是一個 URL 時使用。"
+      },
+      "get_problem": {
+        "title": "取得單一標準化題目",
+        "required_inputs": "source, id",
+        "rest_capability": "對應 GET /api/v1/problems/{source}/{id}。",
+        "output_style": "以文字摘要回傳指定題目的詳情。",
+        "usage_note": "當呼叫端已經知道標準化 source 與題目 ID 時使用。"
+      },
+      "get_daily_challenge": {
+        "title": "讀取目前每日挑戰",
+        "required_inputs": "domain?, date?",
+        "rest_capability": "對應 GET /api/v1/daily。",
+        "output_style": "以文字摘要回傳每日挑戰，或目前抓取狀態。",
+        "usage_note": "當呼叫端想取得每日挑戰，但不想自行組 REST query string 時使用。"
+      },
+      "find_similar_problems": {
+        "title": "搜尋相似題目",
+        "required_inputs": "query or source+id, plus limit/threshold/source_filter?",
+        "rest_capability": "對應 GET /api/v1/similar 與 GET /api/v1/similar/{source}/{id}。",
+        "output_style": "以文字排名回傳相似題目與相似度分數。",
+        "usage_note": "文字查詢模式適合語意搜尋；source+id 模式適合從既有題目展開。"
+      },
+      "get_platform_status": {
+        "title": "查看索引平台狀態",
+        "required_inputs": "none",
+        "rest_capability": "對應 GET /status。",
+        "output_style": "以文字摘要回傳服務版本與平台統計。",
+        "usage_note": "適合快速查看目前可用索引平台的營運概況。"
+      }
+    },
+    "examples": {
+      "connection_title": "連線範例",
+      "connection_lead": "將 MCP client 指向掛載的 HTTP 端點，並帶上與受保護公開路由相同的 bearer token。",
+      "request_title": "請求範例",
+      "request_lead": "這個請求要求 MCP 伺服器執行精確的 tool name get_problem，並使用與 REST 題目詳情端點相同的 source 與 ID。"
+    }
   }
 }

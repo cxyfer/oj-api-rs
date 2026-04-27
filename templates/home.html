@@ -1,0 +1,118 @@
+{% extends "docs_base.html" %}
+
+{% block nav %}
+<a href="#overview" data-i18n="home.nav.overview">Overview</a>
+<a href="{{ api_docs_path }}" data-i18n="home.nav.api_docs">API Docs</a>
+<a href="{{ mcp_docs_path }}" data-i18n="home.nav.mcp_docs">MCP Docs</a>
+{% endblock %}
+
+{% block content %}
+<section class="bento-grid" id="overview">
+    <section class="bento-item bento-hero panel">
+        <div class="section-kicker" data-i18n="home.hero.eyebrow">Public API documentation</div>
+        <h1 data-i18n="home.hero.title">Access coding problem data through one unified API.</h1>
+        <p class="hero-lead" data-i18n="home.hero.lead">Query problem records, fetch daily challenges, search similar problems, and connect tool clients through MCP without switching between fragmented data sources.</p>
+        <dl class="hero-stats" aria-label="Homepage summary stats">
+            <div class="stat-card">
+                <dt data-i18n="home.stats.problems_label">Indexed problems</dt>
+                <dd>{{ total_problems }}</dd>
+            </div>
+            <div class="stat-card">
+                <dt data-i18n="home.stats.sources_label">Core sources</dt>
+                <dd>{{ docs.supported_sources.len() }}</dd>
+            </div>
+            <div class="stat-card">
+                <dt data-i18n="home.stats.version_label">Version</dt>
+                <dd>v{{ version }}</dd>
+            </div>
+        </dl>
+    </section>
+
+    <section class="bento-item bento-auth panel" aria-labelledby="auth-matrix-title">
+        <div class="section-kicker" data-i18n="home.auth.kicker">Authentication</div>
+        <h2 id="auth-matrix-title" data-i18n="home.auth.title">Dual-state access rules</h2>
+        <p class="section-lead" data-i18n="home.auth.lead">The docs pages stay public. API, status, and MCP access depend on whether token auth is enabled for this deployment.</p>
+        <div class="auth-table-wrapper">
+            <table class="auth-matrix">
+                <thead>
+                    <tr>
+                        <th data-i18n="home.auth.route">Route</th>
+                        <th data-i18n="home.auth.mode_disabled">Auth Disabled</th>
+                        <th data-i18n="home.auth.mode_enabled">Auth Enabled</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/</code></td>
+                        <td class="status-public" data-i18n="home.auth.public">Public</td>
+                        <td class="status-public" data-i18n="home.auth.public">Public</td>
+                    </tr>
+                    <tr>
+                        <td><code>/health</code></td>
+                        <td class="status-public" data-i18n="home.auth.public">Public</td>
+                        <td class="status-public" data-i18n="home.auth.public">Public</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/v1/*</code></td>
+                        <td class="status-public" data-i18n="home.auth.public">Public</td>
+                        <td class="status-protected" data-i18n="home.auth.protected">Protected</td>
+                    </tr>
+                    <tr>
+                        <td><code>/status</code></td>
+                        <td class="status-public" data-i18n="home.auth.public">Public</td>
+                        <td class="status-protected" data-i18n="home.auth.protected">Protected</td>
+                    </tr>
+                    <tr>
+                        <td><code>/mcp</code></td>
+                        <td class="status-public" data-i18n="home.auth.public">Public</td>
+                        <td class="status-protected" data-i18n="home.auth.protected">Protected</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="auth-status-footer">
+            <span data-i18n="home.auth.current_label">Current deployment</span>
+            <span class="status-badge {% if token_auth_enabled %}badge-enabled{% else %}badge-disabled{% endif %}" data-i18n="home.auth.current_{% if token_auth_enabled %}enabled{% else %}disabled{% endif %}">{% if token_auth_enabled %}Token auth enabled{% else %}Token auth disabled{% endif %}</span>
+        </div>
+    </section>
+
+    {% for card in docs.homepage_cards %}
+    <article class="bento-item bento-featured panel">
+        <div class="featured-header">
+            <h2 data-i18n="home.featured.card_{{ loop.index }}_title">{{ card.title }}</h2>
+            <span class="method-tag">{{ card.method }}</span>
+        </div>
+        <div class="featured-path"><code>{{ card.path }}</code></div>
+        <p class="featured-summary" data-i18n="home.featured.card_{{ loop.index }}_summary">{{ card.summary }}</p>
+        <a href="{{ card.docs_href }}" class="featured-link" data-i18n="home.featured.view_details">View details</a>
+    </article>
+    {% endfor %}
+
+    <section class="bento-item bento-example panel">
+        <div class="section-kicker" data-i18n="home.example.kicker">Example</div>
+        <h2 data-i18n="home.example.title">Canonical request</h2>
+        <p class="section-lead" data-i18n="home.example.lead">Start with a single problem-detail request to confirm auth, response shape, and source-key usage.</p>
+        <pre class="code-block"><code>curl \
+  -H "Authorization: Bearer &lt;token&gt;" \
+  "http://127.0.0.1:7856/api/v1/problems/leetcode/1"</code></pre>
+    </section>
+
+    <a href="{{ api_docs_path }}" class="bento-item bento-link panel link-api">
+        <div class="link-content">
+            <div class="section-kicker" data-i18n="home.links.api_kicker">HTTP API</div>
+            <h2 data-i18n="home.links.api_title">HTTP API Reference</h2>
+            <p data-i18n="home.links.api_body">Review all nine public HTTP routes with paths, auth rules, inputs, response shapes, and examples.</p>
+        </div>
+        <div class="link-icon" aria-hidden="true">→</div>
+    </a>
+
+    <a href="{{ mcp_docs_path }}" class="bento-item bento-link panel link-mcp">
+        <div class="link-content">
+            <div class="section-kicker" data-i18n="home.links.mcp_kicker">MCP</div>
+            <h2 data-i18n="home.links.mcp_title">MCP Reference</h2>
+            <p data-i18n="home.links.mcp_body">See transport guidance, tool summaries, and examples for the five exposed MCP tools.</p>
+        </div>
+        <div class="link-icon" aria-hidden="true">→</div>
+    </a>
+</section>
+{% endblock %}

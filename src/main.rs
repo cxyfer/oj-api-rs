@@ -16,6 +16,7 @@ mod config;
 mod db;
 mod detect;
 mod health;
+mod home;
 mod mcp;
 mod models;
 mod utils;
@@ -138,6 +139,8 @@ async fn main() {
 
     let shutdown_state = state.clone();
     let app = Router::new()
+        // Public docs pages — no auth
+        .merge(home::public_router())
         // Health check — no auth
         .route("/health", get(health::health_check))
         .layer(health_cors)
