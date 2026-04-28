@@ -269,7 +269,7 @@
     "links": {
       "api_kicker": "HTTP API",
       "api_title": "HTTP API 参考",
-      "api_body": "查看全部九个公开 HTTP 路由的路径、验证规则、输入、响应结构与示例。",
+      "api_body": "查看全部十个公开 HTTP 路由的路径、验证规则、输入、响应结构与示例。",
       "mcp_kicker": "MCP",
       "mcp_title": "MCP 参考",
       "mcp_body": "查看 transport 指南、工具摘要，以及五个 MCP 工具的使用示例。"
@@ -366,6 +366,13 @@
         "auth_rule": "公开，无需 bearer auth。",
         "inputs": "无输入参数。",
         "success_shape": "JSON 对象，包含 status、db、sqlite_vec、vec_dimension 与 version 字段。"
+      },
+      "problem_batch": {
+        "title": "批量获取",
+        "purpose": "通过 source 与 ID 配对，在单个请求中批量获取多道题目。",
+        "auth_rule": "Bearer auth 取决于现有公开 API middleware 配置。",
+        "inputs": "JSON 请求体：{source, id} 对象数组。可选 query 参数：?detail=true 返回完整内容。",
+        "success_shape": "JSON 对象，包含 results[] 与 not_found[] 数组。"
       }
     }
   },

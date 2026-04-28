@@ -108,7 +108,7 @@ const HOMEPAGE_CARDS: [HomepageCard; 3] = [
     },
 ];
 
-const HTTP_ROUTE_CARDS: [HttpRouteCard; 9] = [
+const HTTP_ROUTE_CARDS: [HttpRouteCard; 10] = [
     HttpRouteCard {
         group: "Problems",
         fragment_id: "problem-detail",
@@ -162,6 +162,24 @@ const HTTP_ROUTE_CARDS: [HttpRouteCard; 9] = [
         success_shape_i18n: "docs_api.cards.problem_tags.success_shape",
         example: "curl -H 'Authorization: Bearer <token>' http://127.0.0.1:7856/api/v1/tags/leetcode",
         has_source_param: true,
+    },
+    HttpRouteCard {
+        group: "Problems",
+        fragment_id: "problem-batch",
+        method: "POST",
+        path: "/api/v1/problems/batch",
+        title: "Batch fetch",
+        title_i18n: "docs_api.cards.problem_batch.title",
+        purpose: "Fetch multiple problems in a single request by source and ID pairs.",
+        purpose_i18n: "docs_api.cards.problem_batch.purpose",
+        auth_rule: "Bearer auth follows the existing public API middleware setting.",
+        auth_rule_i18n: "docs_api.cards.problem_batch.auth_rule",
+        inputs: "JSON body: array of {source, id} objects. Optional query param: ?detail=true for full content.",
+        inputs_i18n: "docs_api.cards.problem_batch.inputs",
+        success_shape: "JSON object with results[] and not_found[] arrays.",
+        success_shape_i18n: "docs_api.cards.problem_batch.success_shape",
+        example: r#"curl -X POST -H 'Authorization: Bearer <token>' -H 'Content-Type: application/json' -d '[{"source":"leetcode","id":"1"}]' http://127.0.0.1:7856/api/v1/problems/batch"#,
+        has_source_param: false,
     },
     HttpRouteCard {
         group: "Discovery",
@@ -652,7 +670,7 @@ mod tests {
         let docs = docs_registry();
 
         assert_eq!(docs.homepage_cards.len(), 3);
-        assert_eq!(docs.http_route_cards.len(), 9);
+        assert_eq!(docs.http_route_cards.len(), 10);
         assert_eq!(docs.mcp_transport_cards.len(), 2);
         assert_eq!(docs.mcp_tool_cards.len(), 5);
 
@@ -724,7 +742,7 @@ mod tests {
         assert!(html.contains("atcoder"));
         assert!(html.contains("luogu"));
         assert!(html.contains("spoj"));
-        assert_eq!(html.matches("class=\"panel reference-card\"").count(), 9);
+        assert_eq!(html.matches("class=\"panel reference-card\"").count(), 10);
         assert!(!html.contains("/admin/"));
     }
 
@@ -844,9 +862,9 @@ mod tests {
         }
         .render()
         .expect("api docs template should render");
-        assert_eq!(api_html.matches("class=\"reference-details\"").count(), 9);
+        assert_eq!(api_html.matches("class=\"reference-details\"").count(), 10);
         assert!(!api_html.contains("<details class=\"reference-details\" open>"));
-        assert_eq!(api_html.matches("<summary>").count(), 9);
+        assert_eq!(api_html.matches("<summary>").count(), 10);
 
         let mcp_html = McpDocsTemplate {
             docs: docs_registry(),

@@ -269,7 +269,7 @@
     "links": {
       "api_kicker": "HTTP API",
       "api_title": "HTTP API Reference",
-      "api_body": "Review all nine public HTTP routes with paths, auth rules, inputs, response shapes, and examples.",
+      "api_body": "Review all ten public HTTP routes with paths, auth rules, inputs, response shapes, and examples.",
       "mcp_kicker": "MCP",
       "mcp_title": "MCP Reference",
       "mcp_body": "See transport guidance, tool summaries, and examples for the five exposed MCP tools."
@@ -366,6 +366,13 @@
         "auth_rule": "Public without bearer auth.",
         "inputs": "No input parameters.",
         "success_shape": "JSON object with status, db, sqlite_vec, vec_dimension, and version fields."
+      },
+      "problem_batch": {
+        "title": "Batch fetch",
+        "purpose": "Fetch multiple problems in a single request by source and ID pairs.",
+        "auth_rule": "Bearer auth follows the existing public API middleware setting.",
+        "inputs": "JSON body: array of {source, id} objects. Optional query param: ?detail=true for full content.",
+        "success_shape": "JSON object with results[] and not_found[] arrays."
       }
     }
   },

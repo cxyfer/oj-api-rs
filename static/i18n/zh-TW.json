@@ -269,7 +269,7 @@
     "links": {
       "api_kicker": "HTTP API",
       "api_title": "HTTP API 參考",
-      "api_body": "查看全部九個公開 HTTP 路由的路徑、驗證規則、輸入、回應結構與範例。",
+      "api_body": "查看全部十個公開 HTTP 路由的路徑、驗證規則、輸入、回應結構與範例。",
       "mcp_kicker": "MCP",
       "mcp_title": "MCP 參考",
       "mcp_body": "查看 transport 指南、工具摘要，以及五個 MCP 工具的使用範例。"
@@ -366,6 +366,13 @@
         "auth_rule": "公開，不需要 bearer auth。",
         "inputs": "無輸入參數。",
         "success_shape": "JSON 物件，包含 status、db、sqlite_vec、vec_dimension 與 version 欄位。"
+      },
+      "problem_batch": {
+        "title": "批次取得",
+        "purpose": "透過 source 與 ID 配對，在單一請求中批次取得多筆題目。",
+        "auth_rule": "Bearer auth 依現有公開 API middleware 設定決定。",
+        "inputs": "JSON 請求體：{source, id} 物件陣列。可選 query 參數：?detail=true 回傳完整內容。",
+        "success_shape": "JSON 物件，包含 results[] 與 not_found[] 陣列。"
       }
     }
   },
