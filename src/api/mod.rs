@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::middleware;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
 
@@ -22,6 +22,7 @@ pub fn public_router() -> Router<Arc<AppState>> {
 
     Router::new()
         .route("/api/v1/problems/{source}/{id}", get(problems::get_problem))
+        .route("/api/v1/problems/batch", post(problems::batch_problems))
         .route("/api/v1/problems/{source}", get(problems::list_problems))
         .route("/api/v1/tags/{source}", get(problems::list_tags))
         .route("/api/v1/resolve/{*query}", get(resolve::resolve))

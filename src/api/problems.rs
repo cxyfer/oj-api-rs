@@ -90,6 +90,31 @@ pub(crate) struct ListResponse<T: Serialize> {
 }
 
 pub(crate) const VALID_SOURCES: &[&str] = &["atcoder", "leetcode", "codeforces", "luogu", "spoj"];
+
+const MAX_BATCH_SIZE: usize = 50;
+
+#[derive(Deserialize)]
+pub struct BatchItem {
+    pub source: String,
+    pub id: String,
+}
+
+#[derive(Deserialize)]
+pub struct BatchQuery {
+    pub detail: Option<bool>,
+}
+
+#[derive(Serialize)]
+pub(crate) struct BatchNotFoundItem {
+    pub source: String,
+    pub id: String,
+}
+
+#[derive(Serialize)]
+pub(crate) struct BatchResponse<T: Serialize> {
+    pub results: Vec<T>,
+    pub not_found: Vec<BatchNotFoundItem>,
+}
 pub(crate) const VALID_SORT_BY: &[&str] = &["id", "difficulty", "rating", "ac_rate"];
 pub(crate) const VALID_SORT_ORDER: &[&str] = &["asc", "desc"];
 pub(crate) const VALID_TAG_MODES: &[&str] = &["any", "all"];
@@ -211,5 +236,86 @@ pub async fn list_tags(
     match result {
         Some(tags) => Json(tags).into_response(),
         None => ProblemDetail::internal("database error").into_response(),
+    }
+}
+
+fn record_to_summary(record: ProblemRecord) -> ProblemSummary {
+    ProblemSummary {
+        id: record.id,
+        source: record.source,
+        slug: record.slug,
+        title: record.title,
+        title_cn: record.title_cn,
+        difficulty: record.difficulty,
+        ac_rate: record.ac_rate,
+        rating: record.rating,
+        contest: record.contest,
+        problem_index: record.problem_index,
+        tags: record.tags,
+        link: record.link,
+    }
+}
+
+pub async fn batch_problems(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<BatchQuery>,
+    Json(items): Json<Vec<BatchItem>>,
+) -> impl IntoResponse {
+    if items.is_empty() {
+        return ProblemDetail::bad_request("request body must not be empty").into_response();
+    }
+    if items.len() > MAX_BATCH_SIZE {
+        return ProblemDetail::bad_request(format!(
+            "batch size {} exceeds maximum of {}",
+            items.len(),
+            MAX_BATCH_SIZE
+        ))
+        .into_response();
+    }
+    for item in &items {
+        if !VALID_SOURCES.contains(&item.source.as_str()) {
+            return ProblemDetail::bad_request(format!("invalid source: {}", item.source))
+                .into_response();
+        }
+    }
+
+    let detail = query.detail.unwrap_or(false);
+    let pool = state.ro_pool.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        if detail {
+            let mut results = Vec::new();
+            let mut not_found = Vec::new();
+            for item in &items {
+                match crate::db::problems::get_problem_record(&pool, &item.source, &item.id) {
+                    Some(record) => results.push(build_problem_detail_response(&pool, record)),
+                    None => not_found.push(BatchNotFoundItem {
+                        source: item.source.clone(),
+                        id: item.id.clone(),
+                    }),
+                }
+            }
+            Ok(Json(BatchResponse { results, not_found }).into_response())
+        } else {
+            let mut results = Vec::new();
+            let mut not_found = Vec::new();
+            for item in &items {
+                match crate::db::problems::get_problem_record(&pool, &item.source, &item.id) {
+                    Some(record) => results.push(record_to_summary(record)),
+                    None => not_found.push(BatchNotFoundItem {
+                        source: item.source.clone(),
+                        id: item.id.clone(),
+                    }),
+                }
+            }
+            Ok(Json(BatchResponse { results, not_found }).into_response())
+        }
+    })
+    .await
+    .unwrap_or(Err(()));
+
+    match result {
+        Ok(resp) => resp,
+        Err(()) => ProblemDetail::internal("database error").into_response(),
     }
 }
