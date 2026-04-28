@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.3] - 2026-04-28
+
+### Features
+
+- **docs**: add a public homepage plus dedicated API and MCP guide pages with locale-aware examples and expandable reference details (#17)
+
+### Bug Fixes
+
+- **mcp**: make MCP tool schemas more Gemini-compatible for clients that validate tool definitions strictly (#18)
+- **docs**: harden public docs rendering to keep homepage and reference content stable across locales (#17)
+
+### Docs
+
+- **api**: expand the built-in API and MCP documentation so users can discover endpoints and setup flows directly from the site (#17)
+
 ## [0.3.2] - 2026-04-18
 
 ### Features
