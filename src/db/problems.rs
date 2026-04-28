@@ -106,13 +106,29 @@ pub fn get_problem_id_by_slug(pool: &DbPool, source: &str, slug: &str) -> Option
 }
 
 pub fn get_problem_record(pool: &DbPool, source: &str, id: &str) -> Option<ProblemRecord> {
-    let conn = pool.get().ok()?;
-    conn.query_row(
+    get_problem_record_result(pool, source, id).ok().flatten()
+}
+
+pub fn get_problem_record_result(
+    pool: &DbPool,
+    source: &str,
+    id: &str,
+) -> rusqlite::Result<Option<ProblemRecord>> {
+    let conn = pool.get().map_err(|e| {
+        rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
+            Some(e.to_string()),
+        )
+    })?;
+    match conn.query_row(
         "SELECT * FROM problems WHERE source = ?1 AND id = ?2",
         params![source, id],
         row_to_problem_record,
-    )
-    .ok()
+    ) {
+        Ok(record) => Ok(Some(record)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e),
+    }
 }
 
 pub fn get_problem(pool: &DbPool, source: &str, id: &str) -> Option<Problem> {

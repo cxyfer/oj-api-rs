@@ -239,23 +239,6 @@ pub async fn list_tags(
     }
 }
 
-fn record_to_summary(record: ProblemRecord) -> ProblemSummary {
-    ProblemSummary {
-        id: record.id,
-        source: record.source,
-        slug: record.slug,
-        title: record.title,
-        title_cn: record.title_cn,
-        difficulty: record.difficulty,
-        ac_rate: record.ac_rate,
-        rating: record.rating,
-        contest: record.contest,
-        problem_index: record.problem_index,
-        tags: record.tags,
-        link: record.link,
-    }
-}
-
 pub async fn batch_problems(
     State(state): State<Arc<AppState>>,
     Query(query): Query<BatchQuery>,
@@ -284,27 +267,29 @@ pub async fn batch_problems(
 
     let result = tokio::task::spawn_blocking(move || {
         if detail {
-            let mut results = Vec::new();
-            let mut not_found = Vec::new();
-            for item in &items {
-                match crate::db::problems::get_problem_record(&pool, &item.source, &item.id) {
+            let mut results = Vec::with_capacity(items.len());
+            let mut not_found = Vec::with_capacity(items.len());
+            for item in items {
+                match crate::db::problems::get_problem_record_result(&pool, &item.source, &item.id)?
+                {
                     Some(record) => results.push(build_problem_detail_response(&pool, record)),
                     None => not_found.push(BatchNotFoundItem {
-                        source: item.source.clone(),
-                        id: item.id.clone(),
+                        source: item.source,
+                        id: item.id,
                     }),
                 }
             }
             Ok(Json(BatchResponse { results, not_found }).into_response())
         } else {
-            let mut results = Vec::new();
-            let mut not_found = Vec::new();
-            for item in &items {
-                match crate::db::problems::get_problem_record(&pool, &item.source, &item.id) {
-                    Some(record) => results.push(record_to_summary(record)),
+            let mut results = Vec::with_capacity(items.len());
+            let mut not_found = Vec::with_capacity(items.len());
+            for item in items {
+                match crate::db::problems::get_problem_record_result(&pool, &item.source, &item.id)?
+                {
+                    Some(record) => results.push(ProblemSummary::from(record)),
                     None => not_found.push(BatchNotFoundItem {
-                        source: item.source.clone(),
-                        id: item.id.clone(),
+                        source: item.source,
+                        id: item.id,
                     }),
                 }
             }
@@ -312,10 +297,13 @@ pub async fn batch_problems(
         }
     })
     .await
-    .unwrap_or(Err(()));
+    .unwrap_or(Err(rusqlite::Error::SqliteFailure(
+        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
+        Some("task panicked".to_string()),
+    )));
 
     match result {
         Ok(resp) => resp,
-        Err(()) => ProblemDetail::internal("database error").into_response(),
+        Err(_) => ProblemDetail::internal("database error").into_response(),
     }
 }
