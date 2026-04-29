@@ -28,9 +28,9 @@ The public API serves competitive programming problems from 5 platforms via `GET
 
 ### 2. Single spawn_blocking with loop (not new DB function)
 
-**Choice**: Loop over `get_problem_record` N times in one `spawn_blocking` closure on one connection.
+**Choice**: Loop over `get_problem_record_result` N times in one `spawn_blocking` closure. Each lookup checks out a connection from the RO pool internally.
 
-**Why**: With max 50 items and SQLite sub-ms primary-key lookups, total latency is < 5ms. Adding a batch SQL query (e.g., `WHERE (source, id) IN (...)`) increases complexity without meaningful performance gain. One connection means no pool exhaustion risk.
+**Why**: With max 50 items and SQLite sub-ms primary-key lookups, total latency is < 5ms. Adding a batch SQL query (e.g., `WHERE (source, id) IN (...)`) increases complexity without meaningful performance gain. Individual pool checkouts are cheap with the default r2d2 pool size. Using `get_problem_record_result` (which returns `Result<Option<...>>`) allows distinguishing DB errors from "not found" — errors propagate as HTTP 500 while genuine misses go to `not_found[]`.
 
 **Alternative considered**: Group by source, use `json_each` IN clause per source — rejected as over-engineering for 50 items.
 
