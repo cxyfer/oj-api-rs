@@ -90,6 +90,31 @@ pub(crate) struct ListResponse<T: Serialize> {
 }
 
 pub(crate) const VALID_SOURCES: &[&str] = &["atcoder", "leetcode", "codeforces", "luogu", "spoj"];
+
+const MAX_BATCH_SIZE: usize = 50;
+
+#[derive(Deserialize)]
+pub struct BatchItem {
+    pub source: String,
+    pub id: String,
+}
+
+#[derive(Deserialize)]
+pub struct BatchQuery {
+    pub detail: Option<bool>,
+}
+
+#[derive(Serialize)]
+pub(crate) struct BatchNotFoundItem {
+    pub source: String,
+    pub id: String,
+}
+
+#[derive(Serialize)]
+pub(crate) struct BatchResponse<T: Serialize> {
+    pub results: Vec<T>,
+    pub not_found: Vec<BatchNotFoundItem>,
+}
 pub(crate) const VALID_SORT_BY: &[&str] = &["id", "difficulty", "rating", "ac_rate"];
 pub(crate) const VALID_SORT_ORDER: &[&str] = &["asc", "desc"];
 pub(crate) const VALID_TAG_MODES: &[&str] = &["any", "all"];
@@ -211,5 +236,317 @@ pub async fn list_tags(
     match result {
         Some(tags) => Json(tags).into_response(),
         None => ProblemDetail::internal("database error").into_response(),
+    }
+}
+
+pub async fn batch_problems(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<BatchQuery>,
+    Json(items): Json<Vec<BatchItem>>,
+) -> impl IntoResponse {
+    if items.is_empty() {
+        return ProblemDetail::bad_request("request body must not be empty").into_response();
+    }
+    if items.len() > MAX_BATCH_SIZE {
+        return ProblemDetail::bad_request(format!(
+            "batch size {} exceeds maximum of {}",
+            items.len(),
+            MAX_BATCH_SIZE
+        ))
+        .into_response();
+    }
+    for item in &items {
+        if !VALID_SOURCES.contains(&item.source.as_str()) {
+            return ProblemDetail::bad_request(format!("invalid source: {}", item.source))
+                .into_response();
+        }
+    }
+
+    let detail = query.detail.unwrap_or(false);
+    let pool = state.ro_pool.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        if detail {
+            let mut results = Vec::with_capacity(items.len());
+            let mut not_found = Vec::with_capacity(items.len());
+            for item in items {
+                match crate::db::problems::get_problem_record_result(&pool, &item.source, &item.id)?
+                {
+                    Some(record) => results.push(build_problem_detail_response(&pool, record)),
+                    None => not_found.push(BatchNotFoundItem {
+                        source: item.source,
+                        id: item.id,
+                    }),
+                }
+            }
+            Ok(Json(BatchResponse { results, not_found }).into_response())
+        } else {
+            let mut results = Vec::with_capacity(items.len());
+            let mut not_found = Vec::with_capacity(items.len());
+            for item in items {
+                match crate::db::problems::get_problem_record_result(&pool, &item.source, &item.id)?
+                {
+                    Some(record) => results.push(ProblemSummary::from(record)),
+                    None => not_found.push(BatchNotFoundItem {
+                        source: item.source,
+                        id: item.id,
+                    }),
+                }
+            }
+            Ok(Json(BatchResponse { results, not_found }).into_response())
+        }
+    })
+    .await
+    .unwrap_or(Err(rusqlite::Error::SqliteFailure(
+        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
+        Some("task panicked".to_string()),
+    )));
+
+    match result {
+        Ok(resp) => resp,
+        Err(_) => ProblemDetail::internal("database error").into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{HashMap, VecDeque};
+    use std::fs;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+
+    use axum::body::to_bytes;
+    use axum::http::StatusCode;
+    use tokio::sync::{RwLock, Semaphore};
+
+    use super::*;
+    use crate::config::Config;
+    use crate::models::Problem;
+
+    fn test_db_path() -> String {
+        std::env::temp_dir()
+            .join(format!(
+                "oj-api-rs-batch-tests-{}.sqlite",
+                uuid::Uuid::new_v4()
+            ))
+            .to_string_lossy()
+            .into_owned()
+    }
+
+    fn cleanup_db_files(path: &str) {
+        let _ = fs::remove_file(path);
+        let _ = fs::remove_file(format!("{path}-wal"));
+        let _ = fs::remove_file(format!("{path}-shm"));
+    }
+
+    fn test_state() -> (Arc<AppState>, String) {
+        crate::db::register_sqlite_vec();
+        let config = Config::default();
+        let path = test_db_path();
+        let rw_pool = crate::db::create_rw_pool(&path, 1, config.database.busy_timeout_ms);
+        crate::db::ensure_data_tables(&rw_pool);
+        let ro_pool = crate::db::create_ro_pool(&path, 1, config.database.busy_timeout_ms);
+
+        let state = Arc::new(AppState {
+            ro_pool,
+            rw_pool,
+            config,
+            crawler_jobs: tokio::sync::Mutex::new(HashMap::new()),
+            manual_crawler_guard: tokio::sync::Mutex::new(None),
+            crawler_history: tokio::sync::Mutex::new(VecDeque::new()),
+            embedding_lock: tokio::sync::Mutex::new(None),
+            embedding_launch_guard: tokio::sync::Mutex::new(None),
+            embedding_history: tokio::sync::Mutex::new(VecDeque::new()),
+            active_crawler_pids: tokio::sync::Mutex::new(HashMap::new()),
+            active_embedding_pid: tokio::sync::Mutex::new(None),
+            daily_fallback: tokio::sync::Mutex::new(HashMap::new()),
+            retained_refresh: tokio::sync::Mutex::new(crate::utils::RetainedRefreshState::default()),
+            embed_semaphore: Semaphore::new(1),
+            token_auth_enabled: Arc::new(AtomicBool::new(true)),
+            admin_sessions: Arc::new(RwLock::new(HashMap::new())),
+            config_path: None,
+        });
+
+        (state, path)
+    }
+
+    fn insert_problem(state: &Arc<AppState>, problem: Problem) {
+        crate::db::problems::insert_problem(&state.rw_pool, &problem).unwrap();
+    }
+
+    fn sample_problem(id: &str, slug: &str, source: &str) -> Problem {
+        Problem {
+            id: id.to_string(),
+            source: source.to_string(),
+            slug: slug.to_string(),
+            title: Some(slug.to_string()),
+            title_cn: None,
+            difficulty: Some("Easy".to_string()),
+            ac_rate: Some(50.0),
+            rating: None,
+            contest: None,
+            problem_index: None,
+            tags: vec!["array".to_string()],
+            link: Some(format!("https://leetcode.com/problems/{slug}/")),
+            category: Some("Algorithms".to_string()),
+            paid_only: Some(0),
+            content: Some("content".to_string()),
+            content_cn: None,
+            similar_questions: vec!["3sum".to_string()],
+        }
+    }
+
+    async fn call_batch(
+        state: &Arc<AppState>,
+        items: Vec<BatchItem>,
+        detail: Option<bool>,
+    ) -> (StatusCode, serde_json::Value) {
+        let query = BatchQuery { detail };
+        let response = super::batch_problems(State(state.clone()), Query(query), Json(items))
+            .await
+            .into_response();
+        let status = response.status();
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        (status, json)
+    }
+
+    #[tokio::test]
+    async fn batch_empty_body_returns_400() {
+        let (state, path) = test_state();
+        let (status, json) = call_batch(&state, vec![], None).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(json["detail"].as_str().unwrap().contains("empty"));
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn batch_oversized_returns_400() {
+        let (state, path) = test_state();
+        let items: Vec<BatchItem> = (0..51)
+            .map(|i| BatchItem {
+                source: "leetcode".to_string(),
+                id: i.to_string(),
+            })
+            .collect();
+        let (status, json) = call_batch(&state, items, None).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(json["detail"].as_str().unwrap().contains("exceeds maximum"));
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn batch_invalid_source_returns_400() {
+        let (state, path) = test_state();
+        let items = vec![BatchItem {
+            source: "invalid_source".to_string(),
+            id: "1".to_string(),
+        }];
+        let (status, json) = call_batch(&state, items, None).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(json["detail"].as_str().unwrap().contains("invalid source"));
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn batch_summary_mode_returns_results_and_not_found() {
+        let (state, path) = test_state();
+        insert_problem(&state, sample_problem("1", "two-sum", "leetcode"));
+        insert_problem(&state, sample_problem("15", "3sum", "leetcode"));
+
+        let items = vec![
+            BatchItem {
+                source: "leetcode".to_string(),
+                id: "1".to_string(),
+            },
+            BatchItem {
+                source: "leetcode".to_string(),
+                id: "999".to_string(),
+            },
+            BatchItem {
+                source: "leetcode".to_string(),
+                id: "15".to_string(),
+            },
+        ];
+        let (status, json) = call_batch(&state, items, Some(false)).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json["results"].as_array().unwrap().len(), 2);
+        assert_eq!(json["not_found"].as_array().unwrap().len(), 1);
+        assert_eq!(json["not_found"][0]["id"], "999");
+        // summary mode should not include content field
+        assert!(json["results"][0]["content"].is_null());
+        assert_eq!(json["results"][0]["slug"], "two-sum");
+
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn batch_detail_mode_returns_full_content() {
+        let (state, path) = test_state();
+        insert_problem(&state, sample_problem("1", "two-sum", "leetcode"));
+        insert_problem(&state, sample_problem("15", "3sum", "leetcode"));
+
+        let items = vec![
+            BatchItem {
+                source: "leetcode".to_string(),
+                id: "1".to_string(),
+            },
+            BatchItem {
+                source: "leetcode".to_string(),
+                id: "15".to_string(),
+            },
+        ];
+        let (status, json) = call_batch(&state, items, Some(true)).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json["results"].as_array().unwrap().len(), 2);
+        assert!(json["not_found"].as_array().unwrap().is_empty());
+        // detail mode should include content and similar_questions
+        assert_eq!(json["results"][0]["content"], "content");
+        assert!(json["results"][0]["similar_questions"].is_array());
+
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn batch_all_not_found_returns_empty_results() {
+        let (state, path) = test_state();
+        let items = vec![
+            BatchItem {
+                source: "leetcode".to_string(),
+                id: "999".to_string(),
+            },
+            BatchItem {
+                source: "codeforces".to_string(),
+                id: "999Z".to_string(),
+            },
+        ];
+        let (status, json) = call_batch(&state, items, None).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(json["results"].as_array().unwrap().is_empty());
+        assert_eq!(json["not_found"].as_array().unwrap().len(), 2);
+
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn batch_default_mode_is_summary() {
+        let (state, path) = test_state();
+        insert_problem(&state, sample_problem("1", "two-sum", "leetcode"));
+
+        let items = vec![BatchItem {
+            source: "leetcode".to_string(),
+            id: "1".to_string(),
+        }];
+        // no detail param → should behave as summary
+        let (status, json) = call_batch(&state, items, None).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json["results"].as_array().unwrap().len(), 1);
+        assert!(json["results"][0]["content"].is_null());
+
+        cleanup_db_files(&path);
     }
 }

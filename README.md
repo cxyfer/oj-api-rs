@@ -110,9 +110,10 @@ All `/api/v1/*` routes require `Authorization: Bearer <token>` when token auth i
 ### Problems
 
 ```
-GET /api/v1/problems/{source}/{id}    # Get a single problem
-GET /api/v1/problems/{source}         # List problems
-GET /api/v1/tags/{source}             # List all tags for a source
+GET  /api/v1/problems/{source}/{id}    # Get a single problem
+POST /api/v1/problems/batch            # Batch fetch multiple problems
+GET  /api/v1/problems/{source}         # List problems
+GET  /api/v1/tags/{source}             # List all tags for a source
 ```
 
 `GET /api/v1/problems/{source}/{id}` returns the full problem record. As of 2026-03-24, the `similar_questions` field is a hydrated object array, not a slug string array:
@@ -142,6 +143,8 @@ GET /api/v1/tags/{source}             # List all tags for a source
 ```
 
 This is a breaking response-schema change for detail consumers that previously treated `similar_questions` as `string[]`.
+
+`POST /api/v1/problems/batch` accepts a JSON array of `{source, id}` objects (max 50) and returns matched problems in `results[]` with unmatched keys in `not_found[]`. Add `?detail=true` to include full content and hydrated `similar_questions`:
 
 <details>
 <summary>GET /api/v1/problems/{source} — Query Parameters</summary>

@@ -176,6 +176,25 @@ pub struct ProblemSummary {
     pub link: Option<String>,
 }
 
+impl From<ProblemRecord> for ProblemSummary {
+    fn from(record: ProblemRecord) -> Self {
+        Self {
+            id: record.id,
+            source: record.source,
+            slug: record.slug,
+            title: record.title,
+            title_cn: record.title_cn,
+            difficulty: record.difficulty,
+            ac_rate: record.ac_rate,
+            rating: record.rating,
+            contest: record.contest,
+            problem_index: record.problem_index,
+            tags: record.tags,
+            link: record.link,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DailyChallenge {
     pub date: String,
