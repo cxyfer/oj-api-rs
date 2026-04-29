@@ -86,3 +86,4 @@ pub fn admin_router() -> Router<Arc<AppState>> {
 
     public.merge(protected)
 }
+

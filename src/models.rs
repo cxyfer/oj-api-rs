@@ -66,7 +66,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Problem {
     pub id: String,
     pub source: String,
@@ -160,7 +160,7 @@ impl From<Problem> for ProblemRecord {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ProblemSummary {
     pub id: String,
     pub source: String,
@@ -195,7 +195,7 @@ impl From<ProblemRecord> for ProblemSummary {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DailyChallenge {
     pub date: String,
     pub domain: String,
@@ -363,7 +363,7 @@ impl Serialize for LeetCodeDomain {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ApiToken {
     pub token: String,
     pub label: Option<String>,
@@ -372,7 +372,7 @@ pub struct ApiToken {
     pub is_active: i32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct CrawlerJob {
     pub job_id: String,
     pub source: String,
@@ -410,7 +410,7 @@ pub struct ActiveCrawlerPid {
     pub pid: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CrawlerStatus {
     Running,
@@ -420,7 +420,7 @@ pub enum CrawlerStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CrawlerTrigger {
     Admin,
@@ -464,7 +464,7 @@ pub const JOB_STDERR_LOG: &str = "stderr.log";
 pub const JOB_PYTHON_LOG: &str = "python.log";
 pub const JOB_PROGRESS_FILE: &str = "progress.json";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum JobType {
     Crawler,
@@ -554,7 +554,7 @@ impl JobArtifactPaths {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct JobArtifactMetadata {
     pub job_id: String,
     pub job_type: JobType,
@@ -1138,7 +1138,7 @@ impl DailyFallbackEntry {
 
 // Embedding job model (parallel to CrawlerJob)
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct EmbeddingJob {
     pub job_id: String,
     pub source: String,
@@ -1152,7 +1152,7 @@ pub struct EmbeddingJob {
     pub stderr: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CrawlerPhase {
     Queued,
@@ -1195,7 +1195,7 @@ impl From<&CrawlerStatus> for CrawlerPhase {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CrawlerProgress {
     pub phase: CrawlerPhase,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1217,7 +1217,7 @@ impl CrawlerProgress {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct EmbeddingProgress {
     pub phase: String,
     #[serde(skip_serializing_if = "Option::is_none")]

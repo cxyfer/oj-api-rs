@@ -9,7 +9,7 @@ use crate::api::error::ProblemDetail;
 use crate::models::{ProblemRecord, ProblemSummary};
 use crate::AppState;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub(crate) struct ProblemDetailResponse {
     pub(crate) id: String,
     pub(crate) source: String,
@@ -61,7 +61,7 @@ pub(crate) fn build_problem_detail_response(
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 pub struct ListQuery {
     pub page: Option<u32>,
     pub per_page: Option<u32>,
@@ -75,7 +75,7 @@ pub struct ListQuery {
     pub rating_max: Option<f64>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub(crate) struct ListMeta {
     pub total: u32,
     pub page: u32,
@@ -83,8 +83,8 @@ pub(crate) struct ListMeta {
     pub total_pages: u32,
 }
 
-#[derive(Serialize, Deserialize)]
-pub(crate) struct ListResponse<T: Serialize> {
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
+pub(crate) struct ListResponse<T: Serialize + utoipa::ToSchema> {
     pub data: Vec<T>,
     pub meta: ListMeta,
 }
@@ -93,25 +93,25 @@ pub(crate) const VALID_SOURCES: &[&str] = &["atcoder", "leetcode", "codeforces",
 
 const MAX_BATCH_SIZE: usize = 50;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct BatchItem {
     pub source: String,
     pub id: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 pub struct BatchQuery {
     pub detail: Option<bool>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub(crate) struct BatchNotFoundItem {
     pub source: String,
     pub id: String,
 }
 
-#[derive(Serialize)]
-pub(crate) struct BatchResponse<T: Serialize> {
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct BatchResponse<T: Serialize + utoipa::ToSchema> {
     pub results: Vec<T>,
     pub not_found: Vec<BatchNotFoundItem>,
 }
@@ -143,6 +143,21 @@ pub(crate) fn validate_list_query(query: &ListQuery) -> Result<(), String> {
     Ok(())
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/problems/{source}/{id}",
+    params(
+        ("source" = String, Path, description = "Problem source (leetcode, atcoder, codeforces, luogu, spoj)"),
+        ("id" = String, Path, description = "Problem ID"),
+    ),
+    responses(
+        (status = 200, description = "Problem detail", body = ProblemDetailResponse),
+        (status = 400, description = "Invalid source", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 404, description = "Problem not found", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Problems"
+)]
 pub async fn get_problem(
     State(state): State<Arc<AppState>>,
     Path((source, id)): Path<(String, String)>,
@@ -165,6 +180,21 @@ pub async fn get_problem(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/problems/{source}",
+    params(
+        ("source" = String, Path, description = "Problem source"),
+        ListQuery,
+    ),
+    responses(
+        (status = 200, description = "Paginated problem list", body = ListResponse<ProblemSummary>),
+        (status = 400, description = "Invalid parameters", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Database error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Problems"
+)]
 pub async fn list_problems(
     State(state): State<Arc<AppState>>,
     Path(source): Path<String>,
@@ -219,6 +249,20 @@ pub async fn list_problems(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/tags/{source}",
+    params(
+        ("source" = String, Path, description = "Problem source"),
+    ),
+    responses(
+        (status = 200, description = "Tag list", body = Vec<String>),
+        (status = 400, description = "Invalid source", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Database error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Tags"
+)]
 pub async fn list_tags(
     State(state): State<Arc<AppState>>,
     Path(source): Path<String>,
@@ -239,6 +283,21 @@ pub async fn list_tags(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/problems/batch",
+    params(
+        BatchQuery,
+    ),
+    request_body = Vec<BatchItem>,
+    responses(
+        (status = 200, description = "Batch results with found and not-found items", body = BatchResponse<ProblemSummary>),
+        (status = 400, description = "Invalid request", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Database error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Problems"
+)]
 pub async fn batch_problems(
     State(state): State<Arc<AppState>>,
     Query(query): Query<BatchQuery>,

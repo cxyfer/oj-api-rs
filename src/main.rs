@@ -3,11 +3,14 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use axum::routing::get;
-use axum::{Extension, Router};
+use axum::{Extension, Json, Router};
 use tokio::signal;
 use tokio::sync::{RwLock, Semaphore};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
+use utoipa::OpenApi;
+use utoipa_scalar::{Scalar, Servable};
+
 
 mod admin;
 mod api;
@@ -131,7 +134,11 @@ async fn main() {
         config_path: config_path_for_children,
     });
 
-    // 12. Assemble routers
+    // 12. Build OpenAPI spec
+    let openapi = api::openapi::ApiDoc::openapi();
+    let openapi_json = serde_json::to_value(&openapi).expect("failed to serialize OpenAPI spec");
+
+    // 13. Assemble routers
     let health_cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -139,6 +146,16 @@ async fn main() {
 
     let shutdown_state = state.clone();
     let app = Router::new()
+        // OpenAPI spec — public, no auth
+        .route(
+            "/openapi.json",
+            get({
+                let spec = openapi_json.clone();
+                move || async move { Json(spec) }
+            }),
+        )
+        // Scalar UI — public, no auth
+        .merge(Scalar::with_url("/docs", openapi_json))
         // Public docs pages — no auth
         .merge(home::public_router())
         // Health check — no auth

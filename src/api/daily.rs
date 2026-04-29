@@ -13,7 +13,7 @@ use crate::models::{
     ActiveCrawlerPid, DailyChallengeRecord, JobType, LeetCodeDomain, ProblemSummary,
 };
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub(crate) struct DailyChallengeResponse {
     pub(crate) date: String,
     pub(crate) domain: String,
@@ -77,11 +77,12 @@ fn crawler_status_is_terminal(status: &crate::models::CrawlerStatus) -> bool {
 }
 use crate::AppState;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 pub struct DailyQuery {
     pub domain: Option<String>,
     pub source: Option<String>,
     pub date: Option<String>,
+    #[param(rename = "async")]
     pub r#async: Option<bool>,
 }
 
@@ -241,6 +242,21 @@ async fn handle_daily_fallback_terminal_failure(
     );
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/daily",
+    params(
+        DailyQuery,
+    ),
+    responses(
+        (status = 200, description = "Daily challenge", body = DailyChallengeResponse),
+        (status = 202, description = "Crawler triggered, no data yet. Retry after the specified seconds.", body = serde_json::Value),
+        (status = 400, description = "Invalid parameters", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Daily"
+)]
 pub async fn get_daily(
     State(state): State<Arc<AppState>>,
     Query(query): Query<DailyQuery>,

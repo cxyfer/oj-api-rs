@@ -29,3 +29,6 @@ fs2 = "0.4"
 rmcp = { version = "1.5.0", features = ["macros", "server", "tower", "transport-streamable-http-server"] }
 htmd = "0.5"
 ammonia = "4"
+utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-axum = "0.2"
+utoipa-scalar = { version = "0.3", features = ["axum"] }

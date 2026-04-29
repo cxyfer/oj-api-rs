@@ -8,13 +8,25 @@ use serde::{Deserialize, Serialize};
 use crate::api::problems::{build_problem_detail_response, ProblemDetailResponse};
 use crate::AppState;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub(crate) struct ResolveResponse {
     pub(crate) source: String,
     pub(crate) id: String,
     pub(crate) problem: Option<ProblemDetailResponse>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/resolve/{query}",
+    params(
+        ("query" = String, Path, description = "Problem identifier or URL to resolve (accepts numeric IDs, slugs, or URLs; captures slashes)"),
+    ),
+    responses(
+        (status = 200, description = "Resolved problem", body = ResolveResponse),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Resolve"
+)]
 pub async fn resolve(
     State(state): State<Arc<AppState>>,
     Path(query): Path<String>,
