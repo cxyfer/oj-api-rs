@@ -1,10 +1,12 @@
 use std::collections::{HashMap, VecDeque};
+use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Once};
 
 use axum::{Extension, Router};
 use tokio::sync::{RwLock, Semaphore};
 use tower_http::cors::{Any, CorsLayer};
+use uuid::Uuid;
 
 use oj_api_rs::{
     admin, api, auth, config, db, health, home, mcp, AppState,
@@ -12,9 +14,22 @@ use oj_api_rs::{
 
 static REGISTER_VEC: Once = Once::new();
 
+/// Guard that cleans up temp DB files (including WAL/SHM) on drop.
+pub struct TestGuard {
+    db_path: PathBuf,
+}
+
+impl Drop for TestGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.db_path);
+        let _ = std::fs::remove_file(format!("{}-wal", self.db_path.display()));
+        let _ = std::fs::remove_file(format!("{}-shm", self.db_path.display()));
+    }
+}
+
 /// Build a test app with a temporary SQLite database file.
-/// Returns a Router that can be used with `tower::ServiceExt::oneshot`.
-pub fn build_test_app() -> Router {
+/// Returns a `(Router, TestGuard)` — hold the guard to ensure cleanup on drop.
+pub fn build_test_app() -> (Router, TestGuard) {
     REGISTER_VEC.call_once(|| {
         db::register_sqlite_vec();
     });
@@ -22,15 +37,8 @@ pub fn build_test_app() -> Router {
     let mut config = config::Config::default();
     config.server.admin_secret = "test-secret".to_string();
 
-    // Use a unique temp file so parallel tests don't conflict
-    let db_path = std::env::temp_dir().join(format!(
-        "oj-api-test-{}-{}.db",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
+    // Use a UUID-based temp file so parallel tests don't conflict
+    let db_path = std::env::temp_dir().join(format!("oj-api-test-{}.db", Uuid::new_v4()));
     let db_path_str = db_path.to_string_lossy().into_owned();
 
     let ro_pool = db::create_ro_pool(&db_path_str, 1, config.database.busy_timeout_ms);
@@ -71,7 +79,7 @@ pub fn build_test_app() -> Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    Router::new()
+    let app = Router::new()
         .merge(home::public_router())
         .route("/health", axum::routing::get(health::health_check))
         .layer(health_cors)
@@ -84,5 +92,9 @@ pub fn build_test_app() -> Router {
         )))
         .layer(Extension(auth::AdminSessions(admin_sessions)))
         .layer(Extension(auth::TokenAuthEnabled(token_auth_flag)))
-        .with_state(state)
+        .with_state(state.clone());
+
+    let guard = TestGuard { db_path };
+
+    (app, guard)
 }

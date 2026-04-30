@@ -6,7 +6,7 @@ use tower::ServiceExt;
 
 #[tokio::test]
 async fn status_endpoint_returns_200_with_version() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     // Status is behind bearer auth, but token_auth is disabled in test config
     let response = app
@@ -27,8 +27,8 @@ async fn status_endpoint_returns_200_with_version() {
 }
 
 #[tokio::test]
-async fn problems_list_returns_empty_for_unknown_source() {
-    let app = common::build_test_app();
+async fn problems_list_returns_empty_for_empty_db() {
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(
@@ -49,7 +49,7 @@ async fn problems_list_returns_empty_for_unknown_source() {
 
 #[tokio::test]
 async fn problem_detail_returns_404_for_missing_problem() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(
@@ -66,7 +66,7 @@ async fn problem_detail_returns_404_for_missing_problem() {
 
 #[tokio::test]
 async fn invalid_source_returns_error() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(
@@ -78,17 +78,17 @@ async fn invalid_source_returns_error() {
         .await
         .unwrap();
 
-    // Should return 400 or 422 for invalid source
-    assert!(
-        response.status().is_client_error(),
-        "expected 4xx, got {}",
+    assert_eq!(
+        response.status(),
+        StatusCode::BAD_REQUEST,
+        "expected 400, got {}",
         response.status()
     );
 }
 
 #[tokio::test]
 async fn tags_list_returns_empty_for_empty_db() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(
@@ -108,7 +108,7 @@ async fn tags_list_returns_empty_for_empty_db() {
 
 #[tokio::test]
 async fn daily_endpoint_responds() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(
@@ -122,10 +122,8 @@ async fn daily_endpoint_responds() {
 
     // May return 200 (cached) or 202 (triggering background fetch)
     assert!(
-        response.status() == StatusCode::OK
-            || response.status() == StatusCode::ACCEPTED
-            || response.status() == StatusCode::SERVICE_UNAVAILABLE,
-        "expected 200, 202, or 503, got {}",
+        response.status() == StatusCode::OK || response.status() == StatusCode::ACCEPTED,
+        "expected 200 or 202, got {}",
         response.status()
     );
 }

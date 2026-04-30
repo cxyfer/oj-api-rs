@@ -6,7 +6,7 @@ use tower::ServiceExt;
 
 #[tokio::test]
 async fn health_returns_200() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(
@@ -18,8 +18,8 @@ async fn health_returns_200() {
         .await
         .unwrap();
 
-    // Health check may return 200 or 503 depending on sqlite-vec status in :memory: db.
-    // The important thing is it responds and returns valid JSON.
+    // Health check returns 503 when vec_embeddings is empty (no dimension data),
+    // which is expected for a fresh temp-file test database.
     assert!(
         response.status() == StatusCode::OK || response.status() == StatusCode::SERVICE_UNAVAILABLE,
         "expected 200 or 503, got {}",
@@ -34,7 +34,7 @@ async fn health_returns_200() {
 
 #[tokio::test]
 async fn root_route_returns_200() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(

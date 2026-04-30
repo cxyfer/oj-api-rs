@@ -27,7 +27,7 @@ fn admin_json_request(method: &str, uri: &str, json: &str) -> Request<Body> {
 
 #[tokio::test]
 async fn list_tokens_returns_empty_array_initially() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(admin_request("GET", "/admin/api/tokens"))
@@ -42,7 +42,7 @@ async fn list_tokens_returns_empty_array_initially() {
 
 #[tokio::test]
 async fn create_token_returns_token_string() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(admin_json_request(
@@ -62,7 +62,7 @@ async fn create_token_returns_token_string() {
 
 #[tokio::test]
 async fn create_then_list_tokens_shows_token() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     // Create a token
     let response = app
@@ -90,7 +90,7 @@ async fn create_then_list_tokens_shows_token() {
 
 #[tokio::test]
 async fn revoke_nonexistent_token_returns_404() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(admin_request("DELETE", "/admin/api/tokens/nonexistent"))
@@ -104,7 +104,7 @@ async fn revoke_nonexistent_token_returns_404() {
 
 #[tokio::test]
 async fn admin_api_without_secret_returns_unauthorized() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(
@@ -121,7 +121,7 @@ async fn admin_api_without_secret_returns_unauthorized() {
 
 #[tokio::test]
 async fn admin_api_with_wrong_secret_returns_unauthorized() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(
@@ -141,7 +141,7 @@ async fn admin_api_with_wrong_secret_returns_unauthorized() {
 
 #[tokio::test]
 async fn get_token_auth_setting_returns_json() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(admin_request(
@@ -159,7 +159,7 @@ async fn get_token_auth_setting_returns_json() {
 
 #[tokio::test]
 async fn set_token_auth_setting_toggles_value() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(admin_json_request(
@@ -180,7 +180,7 @@ async fn set_token_auth_setting_toggles_value() {
 
 #[tokio::test]
 async fn crawler_status_returns_initial_state() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(admin_request(
@@ -201,7 +201,7 @@ async fn crawler_status_returns_initial_state() {
 
 #[tokio::test]
 async fn embedding_status_returns_initial_state() {
-    let app = common::build_test_app();
+    let (app, _guard) = common::build_test_app();
 
     let response = app
         .oneshot(admin_request(
