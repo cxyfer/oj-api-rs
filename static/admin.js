@@ -244,7 +244,7 @@
 
         var CRAWLER_CONFIG = {
             leetcode: [
-                { flag: '--init', i18nKey: 'init', type: 'checkbox' },
+                { flag: '--sync-problemset', i18nKey: 'sync_problemset', type: 'checkbox' },
                 { flag: '--full', i18nKey: 'full', type: 'checkbox' },
                 { flag: '--daily', i18nKey: 'daily', type: 'checkbox' },
                 { flag: '--date', i18nKey: 'date', type: 'date', placeholder: 'YYYY-MM-DD' },
@@ -254,10 +254,9 @@
                 { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' }
             ],
             atcoder: [
-                { flag: '--sync-kenkoooo', i18nKey: 'sync_kenkoooo', type: 'checkbox' },
-                { flag: '--sync-history', i18nKey: 'sync_history', type: 'checkbox' },
-                { flag: '--fetch-all', i18nKey: 'fetch_all', type: 'checkbox' },
-                { flag: '--resume', i18nKey: 'resume', type: 'checkbox' },
+                { flag: '--sync-problemset', i18nKey: 'sync_problemset', type: 'checkbox' },
+                { flag: '--fetch-contest', i18nKey: 'fetch_contest', type: 'checkbox' },
+                { flag: '--no-resume', i18nKey: 'no_resume', type: 'checkbox' },
                 { flag: '--contest', i18nKey: 'contest', type: 'text', placeholder: 'Contest ID' },
                 { flag: '--status', i18nKey: 'status', type: 'checkbox' },
                 { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
@@ -267,8 +266,8 @@
             ],
             codeforces: [
                 { flag: '--sync-problemset', i18nKey: 'sync_problemset', type: 'checkbox' },
-                { flag: '--fetch-all', i18nKey: 'fetch_all', type: 'checkbox' },
-                { flag: '--resume', i18nKey: 'resume', type: 'checkbox' },
+                { flag: '--fetch-contest', i18nKey: 'fetch_contest', type: 'checkbox' },
+                { flag: '--no-resume', i18nKey: 'no_resume', type: 'checkbox' },
                 { flag: '--contest', i18nKey: 'contest', type: 'number', placeholder: 'Contest ID', step: '1' },
                 { flag: '--status', i18nKey: 'status', type: 'checkbox' },
                 { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
@@ -282,7 +281,7 @@
                 { flag: '--test', i18nKey: 'test', type: 'select', options: ['global', 'leetcode', 'atcoder', 'codeforces'] }
             ],
             luogu: [
-                { flag: '--sync', i18nKey: 'sync', type: 'checkbox' },
+                { flag: '--sync-problemset', i18nKey: 'sync_problemset', type: 'checkbox' },
                 { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
                 { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' },
                 { flag: '--status', i18nKey: 'status', type: 'checkbox' },
@@ -293,7 +292,7 @@
                 { flag: '--source', i18nKey: 'source', type: 'select', options: ['luogu', 'spoj'] }
             ],
             spoj: [
-                { flag: '--sync-spoj', i18nKey: 'sync_spoj', type: 'checkbox' },
+                { flag: '--sync-problemset', i18nKey: 'sync_problemset', type: 'checkbox' },
                 { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
                 { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' },
                 { flag: '--overwrite', i18nKey: 'overwrite', type: 'checkbox' },

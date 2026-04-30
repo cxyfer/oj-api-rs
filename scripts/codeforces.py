@@ -633,9 +633,25 @@ async def main() -> None:
         action="store_true",
         help="Sync from Codeforces problemset API",
     )
-    parser.add_argument("--fetch-all", action="store_true", help="Fetch all contests")
     parser.add_argument(
-        "--resume", action="store_true", help="Resume from progress file"
+        "--fetch-contest",
+        action="store_true",
+        help="Fetch contest problems and content (resumes by default)",
+    )
+    parser.add_argument(
+        "--fetch-all",
+        action="store_true",
+        help="Alias for --fetch-contest",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Accepted for compatibility; contest fetching resumes by default",
+    )
+    parser.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="Disable progress-based skipping for contest fetching",
     )
     parser.add_argument("--contest", type=int, help="Fetch a single contest by ID")
     parser.add_argument("--status", action="store_true", help="Show progress status")
@@ -686,6 +702,7 @@ async def main() -> None:
 
     if not (
         args.sync_problemset
+        or args.fetch_contest
         or args.fetch_all
         or args.contest
         or args.status
@@ -703,9 +720,9 @@ async def main() -> None:
     if args.sync_problemset:
         await client.sync_problemset()
 
-    if args.fetch_all:
+    if args.fetch_contest or args.fetch_all:
         await client.fetch_all_problems(
-            resume=args.resume, include_gym=args.include_gym
+            resume=not args.no_resume, include_gym=args.include_gym
         )
 
     if args.contest:

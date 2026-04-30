@@ -632,10 +632,16 @@ pub struct ArgSpec {
 
 pub static LEETCODE_ARGS: &[ArgSpec] = &[
     ArgSpec {
-        flag: "--init",
+        flag: "--sync-problemset",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--init",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
     },
     ArgSpec {
         flag: "--full",
@@ -689,13 +695,25 @@ pub static LEETCODE_ARGS: &[ArgSpec] = &[
 
 pub static ATCODER_ARGS: &[ArgSpec] = &[
     ArgSpec {
-        flag: "--sync-kenkoooo",
+        flag: "--sync-problemset",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
     },
     ArgSpec {
+        flag: "--sync-kenkoooo",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
+    },
+    ArgSpec {
         flag: "--sync-history",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
+    },
+    ArgSpec {
+        flag: "--fetch-contest",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
@@ -704,10 +722,16 @@ pub static ATCODER_ARGS: &[ArgSpec] = &[
         flag: "--fetch-all",
         arity: 0,
         value_type: ValueType::None,
-        ui_exposed: true,
+        ui_exposed: false,
     },
     ArgSpec {
         flag: "--resume",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
+    },
+    ArgSpec {
+        flag: "--no-resume",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
@@ -770,13 +794,25 @@ pub static CODEFORCES_ARGS: &[ArgSpec] = &[
         ui_exposed: true,
     },
     ArgSpec {
-        flag: "--fetch-all",
+        flag: "--fetch-contest",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
     },
     ArgSpec {
+        flag: "--fetch-all",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
+    },
+    ArgSpec {
         flag: "--resume",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
+    },
+    ArgSpec {
+        flag: "--no-resume",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
@@ -845,10 +881,16 @@ pub static CODEFORCES_ARGS: &[ArgSpec] = &[
 
 pub static LUOGU_ARGS: &[ArgSpec] = &[
     ArgSpec {
-        flag: "--sync",
+        flag: "--sync-problemset",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--sync",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
     },
     ArgSpec {
         flag: "--fill-missing-content",
@@ -914,10 +956,16 @@ pub static LUOGU_ARGS: &[ArgSpec] = &[
 
 pub static SPOJ_ARGS: &[ArgSpec] = &[
     ArgSpec {
-        flag: "--sync-spoj",
+        flag: "--sync-problemset",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--sync-spoj",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
     },
     ArgSpec {
         flag: "--fill-missing-content",
@@ -1238,5 +1286,84 @@ impl EmbeddingJob {
     pub fn set_output(&mut self, stdout: Vec<u8>, stderr: Vec<u8>) {
         self.stdout = lossy_tail(&stdout);
         self.stderr = lossy_tail(&stderr);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_args, CrawlerSource};
+
+    fn args(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    #[test]
+    fn validate_args_accepts_canonical_crawler_flags() {
+        assert!(validate_args(&CrawlerSource::LeetCode, &args(&["--sync-problemset"])).is_ok());
+        assert!(validate_args(
+            &CrawlerSource::AtCoder,
+            &args(&["--sync-problemset", "--fetch-contest", "--no-resume"])
+        )
+        .is_ok());
+        assert!(validate_args(
+            &CrawlerSource::Codeforces,
+            &args(&[
+                "--sync-problemset",
+                "--fetch-contest",
+                "--no-resume",
+                "--include-gym",
+            ])
+        )
+        .is_ok());
+        assert!(validate_args(&CrawlerSource::Luogu, &args(&["--sync-problemset"])).is_ok());
+        assert!(validate_args(
+            &CrawlerSource::Spoj,
+            &args(&["--sync-problemset", "--source", "spoj"])
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn validate_args_accepts_legacy_crawler_aliases() {
+        assert!(validate_args(&CrawlerSource::LeetCode, &args(&["--init"])).is_ok());
+        assert!(validate_args(
+            &CrawlerSource::AtCoder,
+            &args(&[
+                "--sync-kenkoooo",
+                "--sync-history",
+                "--fetch-all",
+                "--resume"
+            ])
+        )
+        .is_ok());
+        assert!(validate_args(
+            &CrawlerSource::Codeforces,
+            &args(&["--fetch-all", "--resume"])
+        )
+        .is_ok());
+        assert!(validate_args(&CrawlerSource::Luogu, &args(&["--sync"])).is_ok());
+        assert!(validate_args(&CrawlerSource::Spoj, &args(&["--sync-spoj"])).is_ok());
+    }
+
+    #[test]
+    fn validate_args_rejects_unsupported_canonical_flags() {
+        for source in [
+            CrawlerSource::LeetCode,
+            CrawlerSource::Luogu,
+            CrawlerSource::Spoj,
+        ] {
+            let err = validate_args(&source, &args(&["--fetch-contest"])).unwrap_err();
+            assert_eq!(err, "unknown argument: --fetch-contest");
+        }
+    }
+
+    #[test]
+    fn validate_args_rejects_invalid_crawler_values() {
+        let err = validate_args(&CrawlerSource::LeetCode, &args(&["--domain", "tw"])).unwrap_err();
+        assert!(err.contains("invalid domain"));
+
+        let err =
+            validate_args(&CrawlerSource::Codeforces, &args(&["--contest", "abc"])).unwrap_err();
+        assert!(err.contains("invalid integer"));
     }
 }

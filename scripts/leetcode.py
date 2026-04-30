@@ -387,7 +387,11 @@ class LeetCodeClient(BaseCrawler):
                         for item in json.loads(q.get("similarQuestions", "[]")):
                             if not isinstance(item, dict):
                                 continue
-                            similar_slug = item.get("titleSlug") or item.get("title_slug") or item.get("slug")
+                            similar_slug = (
+                                item.get("titleSlug")
+                                or item.get("title_slug")
+                                or item.get("slug")
+                            )
                             if similar_slug:
                                 similar_questions.append(similar_slug)
 
@@ -1538,6 +1542,11 @@ async def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--init", action="store_true", help="Initialize database")
+    parser.add_argument(
+        "--sync-problemset",
+        action="store_true",
+        help="Sync problem metadata (alias for --init)",
+    )
     parser.add_argument("--full", action="store_true", help="Fetch all problems")
     parser.add_argument(
         "--fill-missing-content",
@@ -1590,7 +1599,7 @@ async def main():
 
     client = LeetCodeClient(domain=args.domain, data_dir=data_dir, db_path=db_path)
 
-    if args.init:
+    if args.init or args.sync_problemset:
         logger.info("Initializing database...")
         await client.init_all_problems()
 
