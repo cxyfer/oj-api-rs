@@ -6,6 +6,8 @@ use serde::Deserialize;
 
 use crate::auth::{AdminSecret, AdminSessions};
 
+const SESSION_DURATION_SECS: i64 = 28800;
+
 // Login / Logout
 
 #[derive(Deserialize)]
@@ -27,13 +29,13 @@ pub async fn login_submit(
         let bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
         bytes.iter().map(|b| format!("{:02x}", b)).collect()
     };
-    let expires_at = chrono::Utc::now().timestamp() + 28800;
+    let expires_at = chrono::Utc::now().timestamp() + SESSION_DURATION_SECS;
 
     sessions.0.write().await.insert(token.clone(), expires_at);
 
     let cookie = format!(
-        "oj_admin_session={}; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=28800",
-        token
+        "oj_admin_session={}; Path=/admin; HttpOnly; SameSite=Lax; Max-Age={}",
+        token, SESSION_DURATION_SECS
     );
 
     (

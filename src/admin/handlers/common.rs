@@ -7,6 +7,31 @@ use crate::models::{
     JobArtifactPaths, JobType,
 };
 
+pub(super) async fn read_job_progress_json(
+    job_type: JobType,
+    job_id: &str,
+) -> Option<serde_json::Value> {
+    let paths = match crate::utils::canonical_job_artifact_paths(job_type, job_id) {
+        Ok(paths) => paths,
+        Err(_) => return None,
+    };
+    match tokio::fs::read_to_string(&paths.progress).await {
+        Ok(content) => Some(
+            serde_json::from_str(&content)
+                .unwrap_or_else(|_| serde_json::json!({ "phase": "unknown" })),
+        ),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            match tokio::fs::metadata(&paths.job_dir).await {
+                Ok(metadata) if metadata.is_dir() => Some(serde_json::json!({ "phase": "queued" })),
+                Ok(_) => None,
+                Err(meta_err) if meta_err.kind() == std::io::ErrorKind::NotFound => None,
+                Err(_) => Some(serde_json::json!({ "phase": "unknown" })),
+            }
+        }
+        Err(_) => Some(serde_json::json!({ "phase": "unknown" })),
+    }
+}
+
 #[derive(Serialize, utoipa::ToSchema)]
 pub(crate) struct CrawlerStatusResponse {
     pub(crate) running: bool,

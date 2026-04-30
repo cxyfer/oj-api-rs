@@ -8,15 +8,16 @@ use serde::Deserialize;
 
 use crate::api::error::ProblemDetail;
 use crate::models::{
-    ActiveCrawlerPid, CrawlerJob, CrawlerSource, CrawlerStatus, CrawlerTrigger, JobType,
+    ActiveCrawlerPid, CrawlerJob, CrawlerProgress, CrawlerSource, CrawlerStatus, CrawlerTrigger,
+    JobType,
 };
 use crate::AppState;
 
 use super::common::{
     clear_manual_guard_if_matches, finalize_owned_manual_crawler_job, inject_job_environment,
     manual_crawler_launch_allowed, manual_trigger_conflicts, persist_crawler_running_progress,
-    persist_crawler_terminal_progress, push_or_replace_crawler_history, take_owned_manual_crawler_pid,
-    with_owned_manual_crawler_job, CrawlerStatusResponse,
+    persist_crawler_terminal_progress, push_or_replace_crawler_history, read_job_progress_json,
+    take_owned_manual_crawler_pid, with_owned_manual_crawler_job, CrawlerStatusResponse,
 };
 
 // Crawler
@@ -456,4 +457,42 @@ pub async fn crawler_output(
         "python_log": output.python_log.unwrap_or_default(),
     }))
     .into_response()
+}
+
+#[utoipa::path(
+    get,
+    path = "/admin/api/crawlers/{job_id}/progress",
+    params(
+        ("job_id" = String, Path, description = "Crawler job ID"),
+    ),
+    responses(
+        (status = 200, description = "Crawler progress", body = CrawlerProgress),
+        (status = 400, description = "Invalid job ID", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 404, description = "Crawler progress not found", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
+pub async fn crawler_progress(
+    State(state): State<Arc<AppState>>,
+    Path(job_id): Path<String>,
+) -> impl IntoResponse {
+    if uuid::Uuid::parse_str(&job_id).is_err() {
+        return ProblemDetail::bad_request("invalid job_id").into_response();
+    }
+
+    if let Some(progress) = read_job_progress_json(JobType::Crawler, &job_id).await {
+        return Json(progress).into_response();
+    }
+
+    let is_running = {
+        let jobs = state.crawler_jobs.lock().await;
+        jobs.values()
+            .any(|job| job.job_id == job_id && job.status == CrawlerStatus::Running)
+    };
+    if is_running {
+        return Json(serde_json::json!({ "phase": "queued" })).into_response();
+    }
+
+    ProblemDetail::not_found("crawler progress not found").into_response()
 }

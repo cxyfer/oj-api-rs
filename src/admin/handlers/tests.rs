@@ -1,4 +1,4 @@
-#[allow(clippy::await_holding_lock)]
+#![allow(clippy::await_holding_lock)]
 
 use std::collections::{HashMap, HashSet, VecDeque};
 #[cfg(unix)]
@@ -1581,7 +1581,7 @@ async fn crawler_progress_returns_queued_for_running_job_without_progress_file()
         },
     );
 
-    let response = super::embedding::crawler_progress(State(state), Path(job_id))
+    let response = super::crawler::crawler_progress(State(state), Path(job_id))
         .await
         .into_response();
     assert_eq!(response.status(), StatusCode::OK);

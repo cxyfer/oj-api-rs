@@ -7,13 +7,13 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::api::error::ProblemDetail;
-use crate::models::{CrawlerProgress, CrawlerStatus, EmbeddingJob, JobType};
+use crate::models::{CrawlerStatus, EmbeddingJob, JobType};
 use crate::AppState;
 
 use super::common::{
     clear_embedding_launch_guard_if_matches, embedding_launch_allowed, embedding_trigger_conflicts,
     finalize_owned_embedding_job, inject_job_environment, persist_embedding_terminal_progress,
-    push_or_replace_embedding_history, EmbeddingStatusResponse,
+    push_or_replace_embedding_history, read_job_progress_json, EmbeddingStatusResponse,
 };
 
 // Embeddings
@@ -414,7 +414,7 @@ pub async fn embedding_status(State(state): State<Arc<AppState>>) -> impl IntoRe
         Some(mut job) if job.status == CrawlerStatus::Running => {
             job.stdout = None;
             job.stderr = None;
-            let progress = read_embedding_progress_json(&job.job_id)
+            let progress = read_job_progress_json(JobType::Embedding, &job.job_id)
                 .await
                 .unwrap_or_else(|| serde_json::json!({ "phase": "queued" }));
             Json(EmbeddingStatusResponse {
@@ -429,7 +429,7 @@ pub async fn embedding_status(State(state): State<Arc<AppState>>) -> impl IntoRe
         Some(mut job) => {
             job.stdout = None;
             job.stderr = None;
-            let progress = read_embedding_progress_json(&job.job_id)
+            let progress = read_job_progress_json(JobType::Embedding, &job.job_id)
                 .await
                 .unwrap_or_else(|| serde_json::json!({ "phase": "unknown" }));
             Json(EmbeddingStatusResponse {
@@ -452,49 +452,6 @@ pub async fn embedding_status(State(state): State<Arc<AppState>>) -> impl IntoRe
     }
 }
 
-pub(super) async fn read_embedding_progress_json(job_id: &str) -> Option<serde_json::Value> {
-    let paths = match crate::utils::canonical_job_artifact_paths(JobType::Embedding, job_id) {
-        Ok(paths) => paths,
-        Err(_) => return None,
-    };
-    match tokio::fs::read_to_string(&paths.progress).await {
-        Ok(content) => Some(
-            serde_json::from_str(&content)
-                .unwrap_or_else(|_| serde_json::json!({ "phase": "unknown" })),
-        ),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            match tokio::fs::metadata(&paths.job_dir).await {
-                Ok(metadata) if metadata.is_dir() => Some(serde_json::json!({ "phase": "queued" })),
-                Ok(_) => None,
-                Err(meta_err) if meta_err.kind() == std::io::ErrorKind::NotFound => None,
-                Err(_) => Some(serde_json::json!({ "phase": "unknown" })),
-            }
-        }
-        Err(_) => Some(serde_json::json!({ "phase": "unknown" })),
-    }
-}
-
-pub(super) async fn read_crawler_progress_json(job_id: &str) -> Option<serde_json::Value> {
-    let paths = match crate::utils::canonical_job_artifact_paths(JobType::Crawler, job_id) {
-        Ok(paths) => paths,
-        Err(_) => return None,
-    };
-    match tokio::fs::read_to_string(&paths.progress).await {
-        Ok(content) => Some(
-            serde_json::from_str(&content)
-                .unwrap_or_else(|_| serde_json::json!({ "phase": "unknown" })),
-        ),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            match tokio::fs::metadata(&paths.job_dir).await {
-                Ok(metadata) if metadata.is_dir() => Some(serde_json::json!({ "phase": "queued" })),
-                Ok(_) => None,
-                Err(meta_err) if meta_err.kind() == std::io::ErrorKind::NotFound => None,
-                Err(_) => Some(serde_json::json!({ "phase": "unknown" })),
-            }
-        }
-        Err(_) => Some(serde_json::json!({ "phase": "unknown" })),
-    }
-}
 
 #[utoipa::path(
     get,
@@ -542,44 +499,6 @@ pub async fn embedding_output(
 
 #[utoipa::path(
     get,
-    path = "/admin/api/crawlers/{job_id}/progress",
-    params(
-        ("job_id" = String, Path, description = "Crawler job ID"),
-    ),
-    responses(
-        (status = 200, description = "Crawler progress", body = CrawlerProgress),
-        (status = 400, description = "Invalid job ID", body = ProblemDetail, content_type = "application/problem+json"),
-        (status = 404, description = "Crawler progress not found", body = ProblemDetail, content_type = "application/problem+json"),
-    ),
-    security(("admin_secret" = []), ("admin_session" = [])),
-    tag = "Admin"
-)]
-pub async fn crawler_progress(
-    State(state): State<Arc<AppState>>,
-    Path(job_id): Path<String>,
-) -> impl IntoResponse {
-    if uuid::Uuid::parse_str(&job_id).is_err() {
-        return ProblemDetail::bad_request("invalid job_id").into_response();
-    }
-
-    if let Some(progress) = read_crawler_progress_json(&job_id).await {
-        return Json(progress).into_response();
-    }
-
-    let is_running = {
-        let jobs = state.crawler_jobs.lock().await;
-        jobs.values()
-            .any(|job| job.job_id == job_id && job.status == CrawlerStatus::Running)
-    };
-    if is_running {
-        return Json(serde_json::json!({ "phase": "queued" })).into_response();
-    }
-
-    ProblemDetail::not_found("crawler progress not found").into_response()
-}
-
-#[utoipa::path(
-    get,
     path = "/admin/api/embeddings/{job_id}/progress",
     params(
         ("job_id" = String, Path, description = "Embedding job ID"),
@@ -597,7 +516,7 @@ pub async fn embedding_progress(Path(job_id): Path<String>) -> impl IntoResponse
         return ProblemDetail::bad_request("invalid job_id").into_response();
     }
 
-    match read_embedding_progress_json(&job_id).await {
+    match read_job_progress_json(JobType::Embedding, &job_id).await {
         Some(progress) => Json(progress).into_response(),
         None => ProblemDetail::not_found("embedding progress not found").into_response(),
     }
