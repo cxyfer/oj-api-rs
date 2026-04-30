@@ -7,7 +7,7 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::api::error::ProblemDetail;
-use crate::models::{CrawlerStatus, EmbeddingJob, JobType};
+use crate::models::{CrawlerProgress, CrawlerStatus, EmbeddingJob, JobType};
 use crate::AppState;
 
 use super::common::{

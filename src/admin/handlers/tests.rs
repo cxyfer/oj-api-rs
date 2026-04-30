@@ -16,9 +16,9 @@ use tokio::sync::{Notify, RwLock, Semaphore};
 
 use super::common::{
     apply_terminal_update, embedding_launch_allowed, embedding_trigger_conflicts,
-    finalize_owned_embedding_job, finalize_owned_manual_crawler_job,
-    manual_crawler_launch_allowed, manual_trigger_conflicts, persist_crawler_terminal_progress,
-    take_manual_crawler_pid, take_owned_manual_crawler_pid, with_owned_manual_crawler_job,
+    finalize_owned_manual_crawler_job, manual_crawler_launch_allowed, manual_trigger_conflicts,
+    persist_crawler_terminal_progress, take_manual_crawler_pid, take_owned_manual_crawler_pid,
+    with_owned_manual_crawler_job,
 };
 use super::crawler::TriggerCrawlerRequest;
 use super::embedding::TriggerEmbeddingRequest;
