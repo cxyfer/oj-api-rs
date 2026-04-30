@@ -31,3 +31,6 @@ htmd = "0.5"
 ammonia = "4"
 utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-scalar = { version = "0.3", features = ["axum"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }

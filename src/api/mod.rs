@@ -37,5 +37,3 @@ pub fn public_router() -> Router<Arc<AppState>> {
         .route_layer(middleware::from_fn(crate::auth::bearer_auth))
         .layer(cors)
 }
-
-
