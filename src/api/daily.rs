@@ -5,7 +5,7 @@ use std::time::Duration;
 use axum::extract::{Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::Notify;
 
 use crate::api::error::ProblemDetail;
@@ -33,6 +33,14 @@ pub(crate) struct DailyChallengeResponse {
     pub(crate) content: Option<String>,
     pub(crate) content_cn: Option<String>,
     pub(crate) similar_questions: Vec<ProblemSummary>,
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct DailyFetchingResponse {
+    /// Always `"fetching"`.
+    pub(crate) status: String,
+    /// Seconds to wait before retrying.
+    pub(crate) retry_after: u64,
 }
 
 fn build_daily_response(
@@ -250,7 +258,7 @@ async fn handle_daily_fallback_terminal_failure(
     ),
     responses(
         (status = 200, description = "Daily challenge", body = DailyChallengeResponse),
-        (status = 202, description = "Crawler triggered, no data yet. Retry after the specified seconds.", body = serde_json::Value),
+        (status = 202, description = "Crawler triggered, no data yet. Retry after the specified seconds.", body = DailyFetchingResponse),
         (status = 400, description = "Invalid parameters", body = ProblemDetail, content_type = "application/problem+json"),
         (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
     ),

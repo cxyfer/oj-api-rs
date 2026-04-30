@@ -155,7 +155,7 @@ async fn main() {
             }),
         )
         // Scalar UI — public, no auth
-        .merge(Scalar::with_url("/docs", openapi_json))
+        .merge(Scalar::with_url("/docs", openapi.clone()))
         // Public docs pages — no auth
         .merge(home::public_router())
         // Health check — no auth

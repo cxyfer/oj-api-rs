@@ -15,6 +15,7 @@ use crate::AppState;
         (status = 200, description = "Service healthy", body = serde_json::Value),
         (status = 503, description = "Service unhealthy", body = serde_json::Value),
     ),
+    security(()),
     tag = "Health"
 )]
 pub async fn health_check(State(state): State<Arc<AppState>>) -> impl IntoResponse {

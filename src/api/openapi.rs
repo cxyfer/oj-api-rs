@@ -1,3 +1,4 @@
+use utoipa::openapi::schema::{Ref, Schema};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, Http, HttpAuthScheme, SecurityScheme};
 use utoipa::OpenApi;
 
@@ -7,9 +8,6 @@ use utoipa::OpenApi;
         title = "OJ API",
         version = "0.3.3",
         description = "REST API for querying competitive programming problems across multiple online judges (LeetCode, AtCoder, Codeforces, Luogu, SPOJ)."
-    ),
-    security(
-        ("bearer_auth" = [])
     ),
     tags(
         (name = "Problems", description = "Problem CRUD operations"),
@@ -84,8 +82,10 @@ use utoipa::OpenApi;
         crate::api::problems::ListResponse<crate::models::ProblemSummary>,
         crate::api::problems::BatchNotFoundItem,
         crate::api::problems::BatchResponse<crate::models::ProblemSummary>,
+        crate::api::problems::BatchResponse<crate::api::problems::ProblemDetailResponse>,
         crate::api::resolve::ResolveResponse,
         crate::api::daily::DailyChallengeResponse,
+        crate::api::daily::DailyFetchingResponse,
         crate::api::similar::SimilarResponse,
         crate::api::similar::SimilarResult,
         crate::api::status::StatusResponse,
@@ -96,10 +96,77 @@ use utoipa::OpenApi;
         crate::admin::handlers::TriggerCrawlerRequest,
         crate::admin::handlers::TriggerEmbeddingRequest,
         crate::admin::handlers::TokenAuthSettingRequest,
+        crate::admin::handlers::CrawlerStatusResponse,
+        crate::admin::handlers::EmbeddingStatusResponse,
     )),
-    modifiers(&SecurityAddon)
+    modifiers(&SecurityAddon, &BatchResponseAddon)
 )]
 pub struct ApiDoc;
+
+/// Patches `batch_problems` 200 response to
+/// `oneOf[BatchResponse<ProblemSummary>, BatchResponse<ProblemDetailResponse>]`
+/// so the spec accurately reflects the `detail` query parameter.
+struct BatchResponseAddon;
+
+impl utoipa::Modify for BatchResponseAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        use utoipa::openapi::schema::{Array, ObjectBuilder, OneOfBuilder};
+
+        let components = match openapi.components.as_ref() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let has_summary = components
+            .schemas
+            .contains_key("BatchResponse_ProblemSummary");
+        let has_detail = components
+            .schemas
+            .contains_key("BatchResponse_ProblemDetailResponse");
+        if !has_summary || !has_detail {
+            return;
+        }
+
+        fn make_batch_response(result_ref: Ref) -> Schema {
+            Schema::Object(
+                ObjectBuilder::new()
+                    .property("results", Array::new(result_ref))
+                    .required("results")
+                    .property(
+                        "not_found",
+                        Array::new(Ref::from_schema_name("BatchNotFoundItem")),
+                    )
+                    .required("not_found")
+                    .build(),
+            )
+        }
+
+        let one_of = OneOfBuilder::new()
+            .item(make_batch_response(Ref::from_schema_name("ProblemSummary")))
+            .item(make_batch_response(Ref::from_schema_name(
+                "ProblemDetailResponse",
+            )))
+            .description(Some(
+                "Batch results. Schema varies by `detail` query parameter: \
+                 ProblemSummary when false (default), ProblemDetailResponse when true."
+                    .to_string(),
+            ))
+            .build();
+
+        if let Some(path_item) = openapi.paths.paths.get_mut("/api/v1/problems/batch") {
+            if let Some(post) = path_item.post.as_mut() {
+                if let Some(utoipa::openapi::RefOr::T(response)) =
+                    post.responses.responses.get_mut("200")
+                {
+                    for content in response.content.values_mut() {
+                        content.schema =
+                            Some(utoipa::openapi::RefOr::T(Schema::OneOf(one_of.clone())));
+                    }
+                }
+            }
+        }
+    }
+}
 
 struct SecurityAddon;
 

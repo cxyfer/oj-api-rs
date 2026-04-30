@@ -7,7 +7,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{Extension, Form, Json};
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::api::error::ProblemDetail;
 use crate::api::problems::{validate_list_query, ListMeta, ListQuery, ListResponse, ProblemDetailResponse, VALID_SOURCES};
@@ -18,6 +18,25 @@ use crate::models::{
     JobType, Problem, ProblemSummary,
 };
 use crate::AppState;
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct CrawlerStatusResponse {
+    pub(crate) running: bool,
+    pub(crate) running_jobs: Vec<CrawlerJob>,
+    pub(crate) history: Vec<CrawlerJob>,
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct EmbeddingStatusResponse {
+    pub(crate) running: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) current_job: Option<EmbeddingJob>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) last_job: Option<EmbeddingJob>,
+    /// Embedding progress details (phase, counts, etc.).
+    pub(crate) progress: Option<serde_json::Value>,
+    pub(crate) history: Vec<EmbeddingJob>,
+}
 
 trait TerminalJob {
     fn status(&self) -> &CrawlerStatus;
@@ -1011,7 +1030,7 @@ pub async fn cancel_crawler(State(state): State<Arc<AppState>>) -> impl IntoResp
     get,
     path = "/admin/api/crawlers/status",
     responses(
-        (status = 200, description = "Crawler status", body = serde_json::Value),
+        (status = 200, description = "Crawler status", body = CrawlerStatusResponse),
         (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
     ),
     security(("admin_secret" = []), ("admin_session" = [])),
@@ -1059,11 +1078,11 @@ pub async fn crawler_status(State(state): State<Arc<AppState>>) -> impl IntoResp
         })
         .collect();
 
-    Json(serde_json::json!({
-        "running": !running_jobs.is_empty(),
-        "running_jobs": running_jobs,
-        "history": history_vec,
-    }))
+    Json(CrawlerStatusResponse {
+        running: !running_jobs.is_empty(),
+        running_jobs,
+        history: history_vec,
+    })
     .into_response()
 }
 
@@ -1584,7 +1603,7 @@ pub async fn cancel_embedding(State(state): State<Arc<AppState>>) -> impl IntoRe
     get,
     path = "/admin/api/embeddings/status",
     responses(
-        (status = 200, description = "Embedding status", body = serde_json::Value),
+        (status = 200, description = "Embedding status", body = EmbeddingStatusResponse),
         (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
     ),
     security(("admin_secret" = []), ("admin_session" = [])),
@@ -1620,12 +1639,13 @@ pub async fn embedding_status(State(state): State<Arc<AppState>>) -> impl IntoRe
             let progress = read_embedding_progress_json(&job.job_id)
                 .await
                 .unwrap_or_else(|| serde_json::json!({ "phase": "queued" }));
-            Json(serde_json::json!({
-                "running": true,
-                "current_job": job,
-                "progress": progress,
-                "history": history_vec,
-            }))
+            Json(EmbeddingStatusResponse {
+                running: true,
+                current_job: Some(job),
+                last_job: None,
+                progress: Some(progress),
+                history: history_vec,
+            })
             .into_response()
         }
         Some(mut job) => {
@@ -1634,19 +1654,22 @@ pub async fn embedding_status(State(state): State<Arc<AppState>>) -> impl IntoRe
             let progress = read_embedding_progress_json(&job.job_id)
                 .await
                 .unwrap_or_else(|| serde_json::json!({ "phase": "unknown" }));
-            Json(serde_json::json!({
-                "running": false,
-                "last_job": job,
-                "progress": progress,
-                "history": history_vec,
-            }))
+            Json(EmbeddingStatusResponse {
+                running: false,
+                current_job: None,
+                last_job: Some(job),
+                progress: Some(progress),
+                history: history_vec,
+            })
             .into_response()
         }
-        None => Json(serde_json::json!({
-            "running": false,
-            "last_job": null,
-            "history": history_vec,
-        }))
+        None => Json(EmbeddingStatusResponse {
+            running: false,
+            current_job: None,
+            last_job: None,
+            progress: None,
+            history: history_vec,
+        })
         .into_response(),
     }
 }
