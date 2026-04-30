@@ -1,0 +1,15 @@
+# Development override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# Changes from production:
+#   - RUST_LOG=debug for verbose logging
+#   - config.toml mounted read-write for live edits
+
+services:
+  oj-api:
+    container_name: oj-api-dev
+    volumes: !override
+      - ./config.toml:/app/config.toml
+      - oj-data:/app/data
+    environment:
+      - RUST_LOG=debug

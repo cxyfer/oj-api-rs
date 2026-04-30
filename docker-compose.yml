@@ -1,0 +1,32 @@
+# OJ API - Local development & deployment
+# Usage:
+#   docker compose up -d          # start
+#   docker compose logs -f        # follow logs
+#   docker compose down           # stop
+#   docker compose down -v        # stop + delete data volume
+
+services:
+  oj-api:
+    build: .
+    init: true
+    container_name: oj-api
+    ports:
+      - "7856:7856"
+    volumes:
+      # Config file (read-only)
+      - ./config.toml:/app/config.toml:ro
+      # Persistent SQLite data
+      - oj-data:/app/data
+    environment:
+      - RUST_LOG=info
+    restart: unless-stopped
+    healthcheck:
+      # Use Python since curl/wget are not in the slim image
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7856/health', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  oj-data:
