@@ -37,12 +37,7 @@ async fn root_route_returns_200() {
     let (app, _guard) = common::build_test_app();
 
     let response = app
-        .oneshot(
-            Request::builder()
-                .uri("/")
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
         .await
         .unwrap();
 

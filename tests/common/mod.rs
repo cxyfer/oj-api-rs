@@ -8,9 +8,7 @@ use tokio::sync::{RwLock, Semaphore};
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
-use oj_api_rs::{
-    admin, api, auth, config, db, health, home, mcp, AppState,
-};
+use oj_api_rs::{admin, api, auth, config, db, health, home, mcp, AppState};
 
 static REGISTER_VEC: Once = Once::new();
 
@@ -65,9 +63,7 @@ pub fn build_test_app() -> (Router, TestGuard) {
         active_crawler_pids: tokio::sync::Mutex::new(HashMap::new()),
         active_embedding_pid: tokio::sync::Mutex::new(None),
         daily_fallback: tokio::sync::Mutex::new(HashMap::new()),
-        retained_refresh: tokio::sync::Mutex::new(
-            oj_api_rs::utils::RetainedRefreshState::default(),
-        ),
+        retained_refresh: tokio::sync::Mutex::new(oj_api_rs::utils::RetainedRefreshState::default()),
         embed_semaphore: Semaphore::new(1),
         token_auth_enabled: token_auth_flag.clone(),
         admin_sessions: admin_sessions.clone(),

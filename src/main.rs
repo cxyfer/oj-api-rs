@@ -11,9 +11,7 @@ use tower_http::services::ServeDir;
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
 
-use oj_api_rs::{
-    admin, api, auth, config, db, health, home, mcp, models, utils, AppState,
-};
+use oj_api_rs::{admin, api, auth, config, db, health, home, mcp, models, utils, AppState};
 
 #[tokio::main]
 async fn main() {

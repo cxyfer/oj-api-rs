@@ -57,7 +57,7 @@ async fn create_token_returns_token_string() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let token: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert!(token.get("token").is_some());
-    assert!(token["token"].as_str().unwrap().len() > 0);
+    assert!(!token["token"].as_str().unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -144,10 +144,7 @@ async fn get_token_auth_setting_returns_json() {
     let (app, _guard) = common::build_test_app();
 
     let response = app
-        .oneshot(admin_request(
-            "GET",
-            "/admin/api/settings/token-auth",
-        ))
+        .oneshot(admin_request("GET", "/admin/api/settings/token-auth"))
         .await
         .unwrap();
 
@@ -183,10 +180,7 @@ async fn crawler_status_returns_initial_state() {
     let (app, _guard) = common::build_test_app();
 
     let response = app
-        .oneshot(admin_request(
-            "GET",
-            "/admin/api/crawlers/status",
-        ))
+        .oneshot(admin_request("GET", "/admin/api/crawlers/status"))
         .await
         .unwrap();
 
@@ -204,10 +198,7 @@ async fn embedding_status_returns_initial_state() {
     let (app, _guard) = common::build_test_app();
 
     let response = app
-        .oneshot(admin_request(
-            "GET",
-            "/admin/api/embeddings/status",
-        ))
+        .oneshot(admin_request("GET", "/admin/api/embeddings/status"))
         .await
         .unwrap();
 
