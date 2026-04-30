@@ -19,7 +19,7 @@ cargo run --release
 cargo clippy
 cargo fmt
 
-# Tests (none currently exist)
+# Tests (inline unit tests across source files, ~100+ tests)
 cargo test
 
 # Python crawler environment
