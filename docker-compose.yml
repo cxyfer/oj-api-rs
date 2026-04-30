@@ -8,6 +8,7 @@
 services:
   oj-api:
     build: .
+    init: true
     container_name: oj-api
     ports:
       - "7856:7856"
@@ -21,7 +22,7 @@ services:
     restart: unless-stopped
     healthcheck:
       # Use Python since curl/wget are not in the slim image
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7856/health')"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7856/health', timeout=5)"]
       interval: 30s
       timeout: 5s
       retries: 3

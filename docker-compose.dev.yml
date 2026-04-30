@@ -8,7 +8,7 @@
 services:
   oj-api:
     container_name: oj-api-dev
-    volumes:
+    volumes: !override
       - ./config.toml:/app/config.toml
       - oj-data:/app/data
     environment:
