@@ -100,6 +100,7 @@
     "control": {
       "source": "来源",
       "args": "参数",
+      "operations": "操作",
       "trigger": "执行",
       "cancel": "取消执行"
     },
@@ -117,6 +118,10 @@
     },
     "modal": {
       "title": "任务输出"
+    },
+    "groups": {
+      "operations": "主要操作",
+      "options": "附加选项"
     },
     "flags": {
       "init": "初始化",

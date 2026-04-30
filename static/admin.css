@@ -353,6 +353,15 @@ input:focus { border-color: var(--color-primary); }
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 0.5rem;
 }
+.flag-group-title {
+    grid-column: 1 / -1;
+    margin-top: 0.25rem;
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
 .flag-item {
     display: flex;
     align-items: center;
