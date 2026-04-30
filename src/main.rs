@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
@@ -11,38 +11,9 @@ use tower_http::services::ServeDir;
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
 
-
-mod admin;
-mod api;
-mod auth;
-mod config;
-mod db;
-mod detect;
-mod health;
-mod home;
-mod mcp;
-mod models;
-mod utils;
-
-pub struct AppState {
-    pub ro_pool: db::DbPool,
-    pub rw_pool: db::DbPool,
-    pub config: config::Config,
-    pub crawler_jobs: tokio::sync::Mutex<HashMap<String, models::CrawlerJob>>,
-    pub manual_crawler_guard: tokio::sync::Mutex<Option<String>>,
-    pub crawler_history: tokio::sync::Mutex<VecDeque<models::CrawlerJob>>,
-    pub embedding_lock: tokio::sync::Mutex<Option<models::EmbeddingJob>>,
-    pub embedding_launch_guard: tokio::sync::Mutex<Option<String>>,
-    pub embedding_history: tokio::sync::Mutex<VecDeque<models::EmbeddingJob>>,
-    pub active_crawler_pids: tokio::sync::Mutex<HashMap<String, models::ActiveCrawlerPid>>,
-    pub active_embedding_pid: tokio::sync::Mutex<Option<u32>>,
-    pub daily_fallback: tokio::sync::Mutex<HashMap<String, models::DailyFallbackEntry>>,
-    pub retained_refresh: tokio::sync::Mutex<utils::RetainedRefreshState>,
-    pub embed_semaphore: Semaphore,
-    pub token_auth_enabled: Arc<AtomicBool>,
-    pub admin_sessions: Arc<RwLock<HashMap<String, i64>>>,
-    pub config_path: Option<String>,
-}
+use oj_api_rs::{
+    admin, api, auth, config, db, health, home, mcp, models, utils, AppState,
+};
 
 #[tokio::main]
 async fn main() {
@@ -93,10 +64,10 @@ async fn main() {
     // 10. Build shared auth state
     let admin_sessions = Arc::new(RwLock::new(HashMap::<String, i64>::new()));
     let token_auth_flag = Arc::new(AtomicBool::new(auth_enabled));
-    let mut retained_jobs = crate::utils::RetainedJobState::default();
-    if let Err(err) = crate::utils::reconcile_retained_job_state(
-        crate::models::JOB_ARTIFACTS_ROOT,
-        &std::collections::HashSet::new(),
+    let mut retained_jobs = utils::RetainedJobState::default();
+    if let Err(err) = utils::reconcile_retained_job_state(
+        models::JOB_ARTIFACTS_ROOT,
+        &HashSet::new(),
         &mut retained_jobs.crawler_history,
         &mut retained_jobs.embedding_history,
     )
@@ -107,7 +78,7 @@ async fn main() {
             err
         );
     }
-    let retained_refresh = tokio::sync::Mutex::new(crate::utils::RetainedRefreshState {
+    let retained_refresh = tokio::sync::Mutex::new(utils::RetainedRefreshState {
         last_summary_sync: Some(tokio::time::Instant::now()),
         last_cleanup: Some(tokio::time::Instant::now()),
     });
@@ -253,7 +224,7 @@ async fn cleanup_active_crawler_jobs(
     }
 
     for (runtime_key, active_pid) in pids {
-        let killed = crate::utils::kill_pgid(active_pid.pid);
+        let killed = utils::kill_pgid(active_pid.pid);
         if killed {
             tracing::info!(
                 "shutdown cleanup killed active crawler process group for {} (job {}, pid {})",
@@ -280,7 +251,7 @@ async fn cleanup_active_job(pid_lock: &tokio::sync::Mutex<Option<u32>>, job_type
 
     match pid {
         Some(pid) => {
-            let killed = crate::utils::kill_pgid(pid);
+            let killed = utils::kill_pgid(pid);
             if killed {
                 tracing::info!(
                     "shutdown cleanup killed active {} process group (pid {})",
