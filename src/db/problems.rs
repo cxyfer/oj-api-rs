@@ -8,7 +8,7 @@ use crate::models::{
     parse_similar_question_slugs, parse_string_array, Problem, ProblemRecord, ProblemSummary,
 };
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PlatformStats {
     pub source: String,
     pub total: u32,

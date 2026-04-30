@@ -9,6 +9,7 @@ use crate::AppState;
 
 pub mod daily;
 pub mod error;
+pub mod openapi;
 pub mod problems;
 pub mod resolve;
 pub mod similar;
@@ -36,3 +37,5 @@ pub fn public_router() -> Router<Arc<AppState>> {
         .route_layer(middleware::from_fn(crate::auth::bearer_auth))
         .layer(cors)
 }
+
+

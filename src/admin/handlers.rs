@@ -7,16 +7,36 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{Extension, Form, Json};
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::api::error::ProblemDetail;
-use crate::api::problems::{validate_list_query, ListMeta, ListQuery, ListResponse, VALID_SOURCES};
+use crate::api::problems::{validate_list_query, ListMeta, ListQuery, ListResponse, ProblemDetailResponse, VALID_SOURCES};
 use crate::auth::{AdminSecret, AdminSessions};
 use crate::models::{
-    ActiveCrawlerPid, CrawlerJob, CrawlerSource, CrawlerStatus, CrawlerTrigger, EmbeddingJob,
-    JobArtifactMetadata, JobArtifactPaths, JobType, Problem,
+    ActiveCrawlerPid, ApiToken, CrawlerJob, CrawlerProgress, CrawlerSource, CrawlerStatus,
+    CrawlerTrigger, EmbeddingJob, EmbeddingProgress, JobArtifactMetadata, JobArtifactPaths,
+    JobType, Problem, ProblemSummary,
 };
 use crate::AppState;
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct CrawlerStatusResponse {
+    pub(crate) running: bool,
+    pub(crate) running_jobs: Vec<CrawlerJob>,
+    pub(crate) history: Vec<CrawlerJob>,
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct EmbeddingStatusResponse {
+    pub(crate) running: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) current_job: Option<EmbeddingJob>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) last_job: Option<EmbeddingJob>,
+    /// Embedding progress details (phase, counts, etc.).
+    pub(crate) progress: Option<serde_json::Value>,
+    pub(crate) history: Vec<EmbeddingJob>,
+}
 
 trait TerminalJob {
     fn status(&self) -> &CrawlerStatus;
@@ -293,7 +313,7 @@ fn collect_running_job_keys<'a>(
 
 // Problem CRUD
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct CreateProblemRequest {
     pub id: String,
     pub source: String,
@@ -340,6 +360,17 @@ impl From<CreateProblemRequest> for Problem {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/admin/api/problems",
+    request_body = CreateProblemRequest,
+    responses(
+        (status = 201, description = "Problem created"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn create_problem(
     State(state): State<Arc<AppState>>,
     Json(body): Json<CreateProblemRequest>,
@@ -358,6 +389,22 @@ pub async fn create_problem(
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/admin/api/problems/{source}/{id}",
+    params(
+        ("source" = String, Path, description = "Problem source"),
+        ("id" = String, Path, description = "Problem ID"),
+    ),
+    request_body = CreateProblemRequest,
+    responses(
+        (status = 200, description = "Problem updated"),
+        (status = 404, description = "Problem not found", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn update_problem(
     State(state): State<Arc<AppState>>,
     Path((source, id)): Path<(String, String)>,
@@ -379,6 +426,21 @@ pub async fn update_problem(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/admin/api/problems/{source}/{id}",
+    params(
+        ("source" = String, Path, description = "Problem source"),
+        ("id" = String, Path, description = "Problem ID"),
+    ),
+    responses(
+        (status = 204, description = "Problem deleted"),
+        (status = 404, description = "Problem not found", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn delete_problem(
     State(state): State<Arc<AppState>>,
     Path((source, id)): Path<(String, String)>,
@@ -398,6 +460,21 @@ pub async fn delete_problem(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/admin/api/problems/{source}",
+    params(
+        ("source" = String, Path, description = "Problem source"),
+        ListQuery,
+    ),
+    responses(
+        (status = 200, description = "Paginated problem list", body = ListResponse<ProblemSummary>),
+        (status = 400, description = "Invalid parameters", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn get_problems_list(
     State(state): State<Arc<AppState>>,
     Path(source): Path<String>,
@@ -451,6 +528,20 @@ pub async fn get_problems_list(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/admin/api/tags/{source}",
+    params(
+        ("source" = String, Path, description = "Problem source"),
+    ),
+    responses(
+        (status = 200, description = "Tag list", body = Vec<String>),
+        (status = 400, description = "Invalid source", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn get_tags_list(
     State(state): State<Arc<AppState>>,
     Path(source): Path<String>,
@@ -471,6 +562,22 @@ pub async fn get_tags_list(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/admin/api/problems/{source}/{id}",
+    params(
+        ("source" = String, Path, description = "Problem source"),
+        ("id" = String, Path, description = "Problem ID"),
+    ),
+    responses(
+        (status = 200, description = "Problem detail", body = ProblemDetailResponse),
+        (status = 400, description = "Invalid source", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 404, description = "Problem not found", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn get_problem_detail(
     State(state): State<Arc<AppState>>,
     Path((source, id)): Path<(String, String)>,
@@ -497,11 +604,21 @@ pub async fn get_problem_detail(
 
 // Token management
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct CreateTokenRequest {
     pub label: Option<String>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/admin/api/tokens",
+    responses(
+        (status = 200, description = "Token list", body = Vec<ApiToken>),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn list_tokens(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool = state.rw_pool.clone();
     let tokens = tokio::task::spawn_blocking(move || crate::db::tokens::list_tokens(&pool))
@@ -511,6 +628,17 @@ pub async fn list_tokens(State(state): State<Arc<AppState>>) -> impl IntoRespons
     Json(tokens).into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/admin/api/tokens",
+    request_body = CreateTokenRequest,
+    responses(
+        (status = 201, description = "Token created", body = ApiToken),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn create_token(
     State(state): State<Arc<AppState>>,
     Json(body): Json<CreateTokenRequest>,
@@ -530,6 +658,20 @@ pub async fn create_token(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/admin/api/tokens/{token}",
+    params(
+        ("token" = String, Path, description = "API token to revoke"),
+    ),
+    responses(
+        (status = 204, description = "Token revoked"),
+        (status = 404, description = "Token not found", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn revoke_token(
     State(state): State<Arc<AppState>>,
     Path(token): Path<String>,
@@ -550,13 +692,26 @@ pub async fn revoke_token(
 
 // Crawler
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct TriggerCrawlerRequest {
     pub source: String,
     #[serde(default)]
     pub args: Vec<String>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/admin/api/crawlers/trigger",
+    request_body = TriggerCrawlerRequest,
+    responses(
+        (status = 202, description = "Crawler triggered", body = serde_json::Value),
+        (status = 400, description = "Invalid parameters", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 409, description = "Crawler already running", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn trigger_crawler(
     State(state): State<Arc<AppState>>,
     Json(body): Json<TriggerCrawlerRequest>,
@@ -830,6 +985,16 @@ pub async fn trigger_crawler(
         .into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/admin/api/crawlers/cancel",
+    responses(
+        (status = 200, description = "Crawler cancelled"),
+        (status = 409, description = "No running crawler", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn cancel_crawler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let runtime_key = crate::models::manual_crawler_runtime_key().to_string();
     let mut manual_guard = state.manual_crawler_guard.lock().await;
@@ -861,6 +1026,16 @@ pub async fn cancel_crawler(State(state): State<Arc<AppState>>) -> impl IntoResp
     ProblemDetail::conflict("no running crawler to cancel").into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/admin/api/crawlers/status",
+    responses(
+        (status = 200, description = "Crawler status", body = CrawlerStatusResponse),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn crawler_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     if let Err(err) = crate::utils::maybe_refresh_retained_job_state(state.as_ref()).await {
         tracing::warn!(
@@ -903,14 +1078,29 @@ pub async fn crawler_status(State(state): State<Arc<AppState>>) -> impl IntoResp
         })
         .collect();
 
-    Json(serde_json::json!({
-        "running": !running_jobs.is_empty(),
-        "running_jobs": running_jobs,
-        "history": history_vec,
-    }))
+    Json(CrawlerStatusResponse {
+        running: !running_jobs.is_empty(),
+        running_jobs,
+        history: history_vec,
+    })
     .into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/admin/api/crawlers/{job_id}/output",
+    params(
+        ("job_id" = String, Path, description = "Crawler job ID"),
+    ),
+    responses(
+        (status = 200, description = "Crawler output", body = serde_json::Value),
+        (status = 400, description = "Invalid job ID", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 404, description = "Job output not found", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn crawler_output(
     State(_state): State<Arc<AppState>>,
     Path(job_id): Path<String>,
@@ -995,16 +1185,36 @@ pub async fn logout(
 
 // Settings toggle
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct TokenAuthSettingRequest {
     pub enabled: bool,
 }
 
+#[utoipa::path(
+    get,
+    path = "/admin/api/settings/token-auth",
+    responses(
+        (status = 200, description = "Token auth setting", body = serde_json::Value),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn get_token_auth_setting(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let enabled = state.token_auth_enabled.load(Ordering::Acquire);
     Json(serde_json::json!({ "enabled": enabled }))
 }
 
+#[utoipa::path(
+    put,
+    path = "/admin/api/settings/token-auth",
+    request_body = TokenAuthSettingRequest,
+    responses(
+        (status = 200, description = "Setting updated", body = serde_json::Value),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn set_token_auth_setting(
     State(state): State<Arc<AppState>>,
     Json(body): Json<TokenAuthSettingRequest>,
@@ -1030,7 +1240,7 @@ pub async fn set_token_auth_setting(
 
 // Embeddings
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct TriggerEmbeddingRequest {
     pub source: String,
     #[serde(default)]
@@ -1041,6 +1251,15 @@ pub struct TriggerEmbeddingRequest {
     pub filter: Option<String>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/admin/api/embeddings/stats",
+    responses(
+        (status = 200, description = "Embedding statistics", body = serde_json::Value),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn embedding_stats(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool = state.ro_pool.clone();
     let stats =
@@ -1051,6 +1270,19 @@ pub async fn embedding_stats(State(state): State<Arc<AppState>>) -> impl IntoRes
     Json(stats).into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/admin/api/embeddings/trigger",
+    request_body = TriggerEmbeddingRequest,
+    responses(
+        (status = 202, description = "Embedding triggered", body = serde_json::Value),
+        (status = 400, description = "Invalid parameters", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 409, description = "Embedding already running", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn trigger_embedding(
     State(state): State<Arc<AppState>>,
     Json(body): Json<TriggerEmbeddingRequest>,
@@ -1323,6 +1555,16 @@ pub async fn trigger_embedding(
         .into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/admin/api/embeddings/cancel",
+    responses(
+        (status = 200, description = "Embedding cancelled"),
+        (status = 409, description = "No running embedding job", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn cancel_embedding(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let _launch_guard = state.embedding_launch_guard.lock().await;
     let cancelled_job = {
@@ -1357,6 +1599,16 @@ pub async fn cancel_embedding(State(state): State<Arc<AppState>>) -> impl IntoRe
     ProblemDetail::conflict("no running embedding job to cancel").into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/admin/api/embeddings/status",
+    responses(
+        (status = 200, description = "Embedding status", body = EmbeddingStatusResponse),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn embedding_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     if let Err(err) = crate::utils::maybe_refresh_retained_job_state(state.as_ref()).await {
         tracing::warn!(
@@ -1387,12 +1639,13 @@ pub async fn embedding_status(State(state): State<Arc<AppState>>) -> impl IntoRe
             let progress = read_embedding_progress_json(&job.job_id)
                 .await
                 .unwrap_or_else(|| serde_json::json!({ "phase": "queued" }));
-            Json(serde_json::json!({
-                "running": true,
-                "current_job": job,
-                "progress": progress,
-                "history": history_vec,
-            }))
+            Json(EmbeddingStatusResponse {
+                running: true,
+                current_job: Some(job),
+                last_job: None,
+                progress: Some(progress),
+                history: history_vec,
+            })
             .into_response()
         }
         Some(mut job) => {
@@ -1401,19 +1654,22 @@ pub async fn embedding_status(State(state): State<Arc<AppState>>) -> impl IntoRe
             let progress = read_embedding_progress_json(&job.job_id)
                 .await
                 .unwrap_or_else(|| serde_json::json!({ "phase": "unknown" }));
-            Json(serde_json::json!({
-                "running": false,
-                "last_job": job,
-                "progress": progress,
-                "history": history_vec,
-            }))
+            Json(EmbeddingStatusResponse {
+                running: false,
+                current_job: None,
+                last_job: Some(job),
+                progress: Some(progress),
+                history: history_vec,
+            })
             .into_response()
         }
-        None => Json(serde_json::json!({
-            "running": false,
-            "last_job": null,
-            "history": history_vec,
-        }))
+        None => Json(EmbeddingStatusResponse {
+            running: false,
+            current_job: None,
+            last_job: None,
+            progress: None,
+            history: history_vec,
+        })
         .into_response(),
     }
 }
@@ -1462,6 +1718,21 @@ async fn read_crawler_progress_json(job_id: &str) -> Option<serde_json::Value> {
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/admin/api/embeddings/{job_id}/output",
+    params(
+        ("job_id" = String, Path, description = "Embedding job ID"),
+    ),
+    responses(
+        (status = 200, description = "Embedding output", body = serde_json::Value),
+        (status = 400, description = "Invalid job ID", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 404, description = "Job output not found", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn embedding_output(
     State(_state): State<Arc<AppState>>,
     Path(job_id): Path<String>,
@@ -1491,6 +1762,20 @@ pub async fn embedding_output(
     .into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/admin/api/crawlers/{job_id}/progress",
+    params(
+        ("job_id" = String, Path, description = "Crawler job ID"),
+    ),
+    responses(
+        (status = 200, description = "Crawler progress", body = CrawlerProgress),
+        (status = 400, description = "Invalid job ID", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 404, description = "Crawler progress not found", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn crawler_progress(
     State(state): State<Arc<AppState>>,
     Path(job_id): Path<String>,
@@ -1515,6 +1800,20 @@ pub async fn crawler_progress(
     ProblemDetail::not_found("crawler progress not found").into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/admin/api/embeddings/{job_id}/progress",
+    params(
+        ("job_id" = String, Path, description = "Embedding job ID"),
+    ),
+    responses(
+        (status = 200, description = "Embedding progress", body = EmbeddingProgress),
+        (status = 400, description = "Invalid job ID", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 404, description = "Embedding progress not found", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("admin_secret" = []), ("admin_session" = [])),
+    tag = "Admin"
+)]
 pub async fn embedding_progress(Path(job_id): Path<String>) -> impl IntoResponse {
     if uuid::Uuid::parse_str(&job_id).is_err() {
         return ProblemDetail::bad_request("invalid job_id").into_response();

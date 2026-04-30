@@ -7,12 +7,21 @@ use serde::{Deserialize, Serialize};
 
 use crate::AppState;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub(crate) struct StatusResponse {
     pub(crate) version: String,
     pub(crate) platforms: Vec<crate::db::problems::PlatformStats>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/status",
+    responses(
+        (status = 200, description = "Platform status", body = StatusResponse),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Status"
+)]
 pub async fn get_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool = state.ro_pool.clone();
     let platforms = tokio::task::spawn_blocking(move || crate::db::problems::platform_stats(&pool))

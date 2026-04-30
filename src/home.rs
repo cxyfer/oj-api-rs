@@ -17,6 +17,7 @@ pub(crate) const MCP_DOCS_PATH: &str = "/docs/mcp";
 pub(crate) struct DocsRegistry {
     pub(crate) supported_sources: &'static [&'static str],
     pub(crate) homepage_cards: &'static [HomepageCard],
+    #[allow(dead_code)]
     pub(crate) http_route_cards: &'static [HttpRouteCard],
     pub(crate) mcp_transport_cards: &'static [McpTransportCard],
     pub(crate) mcp_tool_cards: &'static [McpToolCard],
@@ -32,6 +33,7 @@ pub(crate) struct HomepageCard {
     pub(crate) docs_href: &'static str,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub(crate) struct HttpRouteCard {
     pub(crate) group: &'static str,
@@ -419,6 +421,7 @@ struct HomeTemplate {
     mcp_docs_path: &'static str,
 }
 
+#[allow(dead_code)]
 #[derive(Template)]
 #[template(path = "docs_api.html")]
 struct ApiDocsTemplate {
@@ -468,20 +471,8 @@ pub async fn index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     .into_response()
 }
 
-pub async fn api_docs(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let token_auth_enabled = state.token_auth_enabled.load(Ordering::Acquire);
-
-    ApiDocsTemplate {
-        docs: docs_registry(),
-        version: env!("CARGO_PKG_VERSION"),
-        home_path: "/",
-        mcp_docs_path: MCP_DOCS_PATH,
-        token_auth_enabled,
-    }
-    .render()
-    .map(Html)
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
-    .into_response()
+pub async fn api_docs() -> impl IntoResponse {
+    axum::response::Redirect::permanent("/docs")
 }
 
 pub async fn mcp_docs(State(state): State<Arc<AppState>>) -> impl IntoResponse {
@@ -904,7 +895,7 @@ mod tests {
             )
             .await
             .expect("router should respond");
-        assert_eq!(api_docs_response.status(), StatusCode::OK);
+        assert_eq!(api_docs_response.status(), StatusCode::PERMANENT_REDIRECT);
 
         let mcp_docs_response = app
             .clone()

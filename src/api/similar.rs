@@ -8,14 +8,14 @@ use serde::{Deserialize, Serialize};
 use crate::api::error::ProblemDetail;
 use crate::AppState;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 pub struct SimilarByProblemQuery {
     pub limit: Option<u32>,
     pub threshold: Option<f32>,
     pub source: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 pub struct SimilarByTextQuery {
     #[serde(alias = "q")]
     pub query: Option<String>,
@@ -24,13 +24,13 @@ pub struct SimilarByTextQuery {
     pub source: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub(crate) struct SimilarResponse {
     pub(crate) rewritten_query: Option<String>,
     pub(crate) results: Vec<SimilarResult>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub(crate) struct SimilarResult {
     pub(crate) source: String,
     pub(crate) id: String,
@@ -46,6 +46,22 @@ struct EmbedTextOutput {
     rewritten: Option<String>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/similar/{source}/{id}",
+    params(
+        ("source" = String, Path, description = "Problem source"),
+        ("id" = String, Path, description = "Problem ID"),
+        SimilarByProblemQuery,
+    ),
+    responses(
+        (status = 200, description = "Similar problems by embedding", body = SimilarResponse),
+        (status = 404, description = "No embedding found", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Similar"
+)]
 pub async fn similar_by_problem(
     State(state): State<Arc<AppState>>,
     Path((source, id)): Path<(String, String)>,
@@ -126,6 +142,21 @@ pub async fn similar_by_problem(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/similar",
+    params(
+        SimilarByTextQuery,
+    ),
+    responses(
+        (status = 200, description = "Similar problems by text query", body = SimilarResponse),
+        (status = 400, description = "Invalid query", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 502, description = "Embedding service error", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 504, description = "Embedding service timeout", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Similar"
+)]
 pub async fn similar_by_text(
     State(state): State<Arc<AppState>>,
     Query(query): Query<SimilarByTextQuery>,
