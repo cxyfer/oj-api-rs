@@ -50,14 +50,20 @@
             for (var i = 0; i < elements.length; i++) {
                 var el = elements[i];
                 var key = el.getAttribute('data-i18n');
-                el.textContent = this.t(key);
+                var translated = this.t(key);
+                if (translated !== key) {
+                    el.textContent = translated;
+                }
             }
 
             var placeholders = document.querySelectorAll('[data-i18n-placeholder]');
             for (var j = 0; j < placeholders.length; j++) {
                 var p = placeholders[j];
                 var pKey = p.getAttribute('data-i18n-placeholder');
-                p.setAttribute('placeholder', this.t(pKey));
+                var translatedPlaceholder = this.t(pKey);
+                if (translatedPlaceholder !== pKey) {
+                    p.setAttribute('placeholder', translatedPlaceholder);
+                }
             }
 
             // 更新 HTML lang 屬性

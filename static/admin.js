@@ -302,6 +302,16 @@
             ]
         };
 
+        var GROUP_LABEL_FALLBACKS = {
+            operations: 'Primary Operations',
+            options: 'Options'
+        };
+
+        function translateOrFallback(key, fallback) {
+            var translated = i18n.t(key);
+            return translated === key ? fallback : translated;
+        }
+
         function renderArgs(source) {
             var container = document.getElementById('crawler-args-options');
             if (!container) return;
@@ -313,7 +323,10 @@
                 if (group !== currentGroup) {
                     var title = document.createElement('div');
                     title.className = 'flag-group-title';
-                    title.textContent = i18n.t('crawlers.groups.' + group);
+                    title.textContent = translateOrFallback(
+                        'crawlers.groups.' + group,
+                        GROUP_LABEL_FALLBACKS[group] || group
+                    );
                     container.appendChild(title);
                     currentGroup = group;
                 }
@@ -328,7 +341,7 @@
 
                 var lbl = document.createElement('label');
                 lbl.htmlFor = cb.id;
-                lbl.textContent = i18n.t('crawlers.flags.' + f.i18nKey);
+                lbl.textContent = translateOrFallback('crawlers.flags.' + f.i18nKey, f.flag);
 
                 item.appendChild(cb);
                 item.appendChild(lbl);
