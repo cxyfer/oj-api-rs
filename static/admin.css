@@ -75,7 +75,9 @@ table { width: 100%; border-collapse: collapse; }
 th, td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid var(--color-border); font-size: 0.875rem; }
 th { color: var(--color-muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
 tr:hover { background: var(--bg-hover); }
-.table-scroll-card,
+.table-scroll-card {
+    overflow-x: auto;
+}
 .card:has(> #crawler-history-table) {
     overflow-x: auto;
 }
