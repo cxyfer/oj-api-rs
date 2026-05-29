@@ -290,7 +290,7 @@ impl OjMcpServer {
 
             similar::similar_by_text(
                 axum::extract::State(self.state.clone()),
-                axum::extract::Query(similar::SimilarByTextQuery {
+                axum::extract::Json(similar::SimilarByTextQuery {
                     query: Some(query.to_string()),
                     limit: Some(limit),
                     threshold: Some(threshold),

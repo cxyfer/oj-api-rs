@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use axum::extract::{Path, Query, State};
+use axum::extract::{Json, Path, Query, State};
 use axum::response::IntoResponse;
-use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::api::error::ProblemDetail;
@@ -15,7 +14,7 @@ pub struct SimilarByProblemQuery {
     pub source: Option<String>,
 }
 
-#[derive(Deserialize, utoipa::IntoParams)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct SimilarByTextQuery {
     #[serde(alias = "q")]
     pub query: Option<String>,
@@ -143,11 +142,9 @@ pub async fn similar_by_problem(
 }
 
 #[utoipa::path(
-    get,
+    post,
     path = "/api/v1/similar",
-    params(
-        SimilarByTextQuery,
-    ),
+    request_body = SimilarByTextQuery,
     responses(
         (status = 200, description = "Similar problems by text query", body = SimilarResponse),
         (status = 400, description = "Invalid query", body = ProblemDetail, content_type = "application/problem+json"),
@@ -159,7 +156,7 @@ pub async fn similar_by_problem(
 )]
 pub async fn similar_by_text(
     State(state): State<Arc<AppState>>,
-    Query(query): Query<SimilarByTextQuery>,
+    Json(query): Json<SimilarByTextQuery>,
 ) -> impl IntoResponse {
     let processed = query.query.as_deref().map(|q| {
         let trimmed = q.trim();

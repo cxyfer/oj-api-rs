@@ -449,7 +449,7 @@
       "find_similar_problems": {
         "title": "搜尋相似題目",
         "required_inputs": "query or source+id, plus limit/threshold/source_filter?",
-        "rest_capability": "對應 GET /api/v1/similar 與 GET /api/v1/similar/{source}/{id}。",
+        "rest_capability": "對應 POST /api/v1/similar 與 GET /api/v1/similar/{source}/{id}。",
         "output_style": "以文字排名回傳相似題目與相似度分數。",
         "usage_note": "文字查詢模式適合語意搜尋；source+id 模式適合從既有題目展開。"
       },
