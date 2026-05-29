@@ -828,6 +828,11 @@ class LuoguClient(BaseCrawler):
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Luogu crawler")
+    parser.add_argument(
+        "--sync-problemset",
+        action="store_true",
+        help="Sync problem metadata for the source selected by --source (luogu or spoj)",
+    )
     parser.add_argument("--sync", action="store_true", help="Sync problem list")
     parser.add_argument(
         "--fill-missing-content",
@@ -875,14 +880,16 @@ async def main() -> None:
         type=str,
         default=None,
         choices=["luogu", "spoj"],
-        help="Target source for --fill-missing-content/--missing-content-stats",
+        help="Target source for --sync-problemset/--fill-missing-content/--missing-content-stats",
     )
 
     args = parser.parse_args()
     do_sync_content = args.fill_missing_content
+    source = args.source or "luogu"
 
     if not (
-        args.sync
+        args.sync_problemset
+        or args.sync
         or do_sync_content
         or args.missing_content_stats
         or args.status
@@ -905,14 +912,13 @@ async def main() -> None:
 
     if args.status:
         client.show_status()
-    if args.sync:
+    if (args.sync_problemset and source == "luogu") or args.sync:
         await client.sync(overwrite=args.overwrite)
     if args.training_list:
         await client.sync_training_list(args.training_list, overwrite=args.overwrite)
-    if args.sync_spoj:
+    if (args.sync_problemset and source == "spoj") or args.sync_spoj:
         await client.sync_spoj(overwrite=args.overwrite)
 
-    source = args.source or "luogu"
     if do_sync_content:
         await client.sync_content(source=source)
     if args.missing_content_stats:

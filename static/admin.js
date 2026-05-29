@@ -244,34 +244,33 @@
 
         var CRAWLER_CONFIG = {
             leetcode: [
-                { flag: '--init', i18nKey: 'init', type: 'checkbox' },
+                { flag: '--sync-problemset', i18nKey: 'sync_problemset', type: 'checkbox', group: 'operations' },
+                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox', group: 'operations' },
                 { flag: '--full', i18nKey: 'full', type: 'checkbox' },
                 { flag: '--daily', i18nKey: 'daily', type: 'checkbox' },
                 { flag: '--date', i18nKey: 'date', type: 'date', placeholder: 'YYYY-MM-DD' },
                 { flag: '--monthly', i18nKey: 'monthly', type: 'month-year' },
-                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
                 { flag: '--fill-missing-content-workers', i18nKey: 'fill_missing_content_workers', type: 'number', placeholder: 'N', step: '1' },
                 { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' }
             ],
             atcoder: [
-                { flag: '--sync-kenkoooo', i18nKey: 'sync_kenkoooo', type: 'checkbox' },
-                { flag: '--sync-history', i18nKey: 'sync_history', type: 'checkbox' },
-                { flag: '--fetch-all', i18nKey: 'fetch_all', type: 'checkbox' },
-                { flag: '--resume', i18nKey: 'resume', type: 'checkbox' },
+                { flag: '--sync-problemset', i18nKey: 'sync_problemset', type: 'checkbox', group: 'operations' },
+                { flag: '--fetch-contest', i18nKey: 'fetch_contest', type: 'checkbox', group: 'operations' },
+                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox', group: 'operations' },
+                { flag: '--no-resume', i18nKey: 'no_resume', type: 'checkbox' },
                 { flag: '--contest', i18nKey: 'contest', type: 'text', placeholder: 'Contest ID' },
                 { flag: '--status', i18nKey: 'status', type: 'checkbox' },
-                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
                 { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' },
                 { flag: '--reprocess-content', i18nKey: 'reprocess_content', type: 'checkbox' },
                 { flag: '--rate-limit', i18nKey: 'rate_limit', type: 'number', placeholder: 'seconds', step: '0.1' }
             ],
             codeforces: [
-                { flag: '--sync-problemset', i18nKey: 'sync_problemset', type: 'checkbox' },
-                { flag: '--fetch-all', i18nKey: 'fetch_all', type: 'checkbox' },
-                { flag: '--resume', i18nKey: 'resume', type: 'checkbox' },
+                { flag: '--sync-problemset', i18nKey: 'sync_problemset', type: 'checkbox', group: 'operations' },
+                { flag: '--fetch-contest', i18nKey: 'fetch_contest', type: 'checkbox', group: 'operations' },
+                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox', group: 'operations' },
+                { flag: '--no-resume', i18nKey: 'no_resume', type: 'checkbox' },
                 { flag: '--contest', i18nKey: 'contest', type: 'number', placeholder: 'Contest ID', step: '1' },
                 { flag: '--status', i18nKey: 'status', type: 'checkbox' },
-                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
                 { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' },
                 { flag: '--missing-problems', i18nKey: 'missing_problems', type: 'checkbox' },
                 { flag: '--reprocess-content', i18nKey: 'reprocess_content', type: 'checkbox' },
@@ -282,8 +281,8 @@
                 { flag: '--test', i18nKey: 'test', type: 'select', options: ['global', 'leetcode', 'atcoder', 'codeforces'] }
             ],
             luogu: [
-                { flag: '--sync', i18nKey: 'sync', type: 'checkbox' },
-                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
+                { flag: '--sync-problemset', i18nKey: 'sync_problemset', type: 'checkbox', group: 'operations' },
+                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox', group: 'operations' },
                 { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' },
                 { flag: '--status', i18nKey: 'status', type: 'checkbox' },
                 { flag: '--overwrite', i18nKey: 'overwrite', type: 'checkbox' },
@@ -293,8 +292,8 @@
                 { flag: '--source', i18nKey: 'source', type: 'select', options: ['luogu', 'spoj'] }
             ],
             spoj: [
-                { flag: '--sync-spoj', i18nKey: 'sync_spoj', type: 'checkbox' },
-                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox' },
+                { flag: '--sync-problemset', i18nKey: 'sync_problemset', type: 'checkbox', group: 'operations' },
+                { flag: '--fill-missing-content', i18nKey: 'fill_missing_content', type: 'checkbox', group: 'operations' },
                 { flag: '--missing-content-stats', i18nKey: 'missing_content_stats', type: 'checkbox' },
                 { flag: '--overwrite', i18nKey: 'overwrite', type: 'checkbox' },
                 { flag: '--source', i18nKey: 'source', type: 'hidden', value: 'spoj' },
@@ -303,12 +302,35 @@
             ]
         };
 
+        var GROUP_LABEL_FALLBACKS = {
+            operations: 'Primary Operations',
+            options: 'Options'
+        };
+
+        function translateOrFallback(key, fallback) {
+            var translated = i18n.t(key);
+            return translated === key ? fallback : translated;
+        }
+
         function renderArgs(source) {
             var container = document.getElementById('crawler-args-options');
             if (!container) return;
             container.innerHTML = '';
             var flags = CRAWLER_CONFIG[source] || [];
+            var currentGroup = null;
             flags.forEach(function(f) {
+                var group = f.group || 'options';
+                if (group !== currentGroup) {
+                    var title = document.createElement('div');
+                    title.className = 'flag-group-title';
+                    title.textContent = translateOrFallback(
+                        'crawlers.groups.' + group,
+                        GROUP_LABEL_FALLBACKS[group] || group
+                    );
+                    container.appendChild(title);
+                    currentGroup = group;
+                }
+
                 var item = document.createElement('div');
                 item.className = 'flag-item';
 
@@ -319,7 +341,7 @@
 
                 var lbl = document.createElement('label');
                 lbl.htmlFor = cb.id;
-                lbl.textContent = i18n.t('crawlers.flags.' + f.i18nKey);
+                lbl.textContent = translateOrFallback('crawlers.flags.' + f.i18nKey, f.flag);
 
                 item.appendChild(cb);
                 item.appendChild(lbl);

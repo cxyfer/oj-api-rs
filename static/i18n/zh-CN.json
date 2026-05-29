@@ -100,6 +100,7 @@
     "control": {
       "source": "来源",
       "args": "参数",
+      "operations": "操作",
       "trigger": "执行",
       "cancel": "取消执行"
     },
@@ -118,6 +119,10 @@
     "modal": {
       "title": "任务输出"
     },
+    "groups": {
+      "operations": "主要操作",
+      "options": "附加选项"
+    },
     "flags": {
       "init": "初始化",
       "full": "全量更新",
@@ -130,7 +135,9 @@
       "sync_kenkoooo": "同步 Kenkoooo",
       "sync_history": "同步历史",
       "fetch_all": "获取全部",
+      "fetch_contest": "获取竞赛",
       "resume": "断点续传",
+      "no_resume": "不使用续传",
       "contest": "竞赛 ID",
       "status": "状态检查",
       "reprocess_content": "重新处理内容",

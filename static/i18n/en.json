@@ -100,6 +100,7 @@
     "control": {
       "source": "Source",
       "args": "Arguments",
+      "operations": "Operations",
       "trigger": "Trigger",
       "cancel": "Cancel"
     },
@@ -118,6 +119,10 @@
     "modal": {
       "title": "Job Output"
     },
+    "groups": {
+      "operations": "Primary Operations",
+      "options": "Options"
+    },
     "flags": {
       "init": "Init",
       "full": "Full",
@@ -130,7 +135,9 @@
       "sync_kenkoooo": "Sync Kenkoooo",
       "sync_history": "Sync History",
       "fetch_all": "Fetch All",
+      "fetch_contest": "Fetch Contest",
       "resume": "Resume",
+      "no_resume": "Disable Resume",
       "contest": "Contest",
       "status": "Status",
       "reprocess_content": "Reprocess Content",

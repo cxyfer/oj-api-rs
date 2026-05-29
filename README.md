@@ -383,10 +383,10 @@ src/
     └── settings.rs   # App-wide settings (token auth toggle)
 
 scripts/              # Python crawlers and embedding pipeline
-├── leetcode.py       # LeetCode crawler (--daily, --date, --init, --monthly, ...)
-├── atcoder.py        # AtCoder crawler (--fetch-all, --resume, --contest, ...)
-├── codeforces.py     # Codeforces crawler (--sync-problemset, --fetch-all, ...)
-├── luogu.py          # Luogu crawler (--fetch-all, --training, --sync-spoj, ...)
+├── leetcode.py       # LeetCode crawler (--sync-problemset, --daily, --date, ...)
+├── atcoder.py        # AtCoder crawler (--sync-problemset, --fetch-contest, ...)
+├── codeforces.py     # Codeforces crawler (--sync-problemset, --fetch-contest, ...)
+├── luogu.py          # Luogu/SPOJ crawler (--sync-problemset, --training-list, ...)
 ├── embedding_cli.py  # Embedding pipeline (--build, --embed-text)
 ├── utils/            # Shared utilities (config, database, logger, html_converter)
 └── embeddings/       # Embedding modules (generator, rewriter, searcher, storage)
@@ -401,6 +401,20 @@ static/               # Frontend assets
 ├── i18n.js           # i18n loader
 └── i18n/             # Translation files (en.json, zh-TW.json, zh-CN.json)
 ```
+
+## Crawler CLI Operations
+
+Crawler scripts use three canonical operation flags where the platform supports them:
+
+| Operation | Purpose | Supported sources |
+| --- | --- | --- |
+| `--sync-problemset` | Fetch initial problem metadata and skip existing problems unless a source-specific overwrite flag is used. | LeetCode, AtCoder, Codeforces, Luogu, SPOJ |
+| `--fetch-contest` | Fetch contest/archive problems and their content. | AtCoder, Codeforces |
+| `--fill-missing-content` | Fill content for existing metadata-only problems. | LeetCode, AtCoder, Codeforces, Luogu, SPOJ |
+
+AtCoder and Codeforces contest fetching resumes by default from their JSON progress files. Use `--no-resume` with `--fetch-contest` to ignore saved progress and rescan contests.
+
+Legacy operation flags remain compatibility aliases for existing jobs: LeetCode `--init`, Luogu `--sync`, SPOJ `--sync-spoj`, AtCoder `--sync-kenkoooo` / `--sync-history`, and AtCoder/Codeforces `--fetch-all` / `--resume`. Prefer the canonical flags in new commands and admin-triggered runs.
 
 ## Development
 

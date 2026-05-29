@@ -17,7 +17,7 @@
             </div>
         </div>
         <div class="form-group">
-            <label data-i18n="crawlers.control.args">Arguments</label>
+            <label data-i18n="crawlers.control.operations">Operations</label>
             <div id="crawler-args-options" class="args-grid"></div>
         </div>
         <button class="btn btn-primary" id="crawler-trigger-btn"{% if is_manual_running %} disabled{% endif %} data-i18n="crawlers.control.trigger">Trigger</button>
@@ -42,7 +42,7 @@
     {% endif %}
 </div>
 
-<div class="card">
+<div class="card table-scroll-card">
     <table id="crawler-history-table">
         <thead>
             <tr>

@@ -100,6 +100,7 @@
     "control": {
       "source": "來源",
       "args": "參數",
+      "operations": "操作",
       "trigger": "執行",
       "cancel": "取消執行"
     },
@@ -118,6 +119,10 @@
     "modal": {
       "title": "工作輸出"
     },
+    "groups": {
+      "operations": "主要操作",
+      "options": "附加選項"
+    },
     "flags": {
       "init": "初始化",
       "full": "全量更新",
@@ -130,7 +135,9 @@
       "sync_kenkoooo": "同步 Kenkoooo",
       "sync_history": "同步歷史",
       "fetch_all": "獲取全部",
+      "fetch_contest": "獲取競賽",
       "resume": "斷點續傳",
+      "no_resume": "不使用續傳",
       "contest": "競賽 ID",
       "status": "狀態檢查",
       "reprocess_content": "重新處理內容",

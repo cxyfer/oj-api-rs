@@ -619,6 +619,7 @@ pub enum ValueType {
     Str,
     YearMonth,
     Domain,
+    Source,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -632,10 +633,16 @@ pub struct ArgSpec {
 
 pub static LEETCODE_ARGS: &[ArgSpec] = &[
     ArgSpec {
-        flag: "--init",
+        flag: "--sync-problemset",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--init",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
     },
     ArgSpec {
         flag: "--full",
@@ -689,13 +696,25 @@ pub static LEETCODE_ARGS: &[ArgSpec] = &[
 
 pub static ATCODER_ARGS: &[ArgSpec] = &[
     ArgSpec {
-        flag: "--sync-kenkoooo",
+        flag: "--sync-problemset",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
     },
     ArgSpec {
+        flag: "--sync-kenkoooo",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
+    },
+    ArgSpec {
         flag: "--sync-history",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
+    },
+    ArgSpec {
+        flag: "--fetch-contest",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
@@ -704,10 +723,16 @@ pub static ATCODER_ARGS: &[ArgSpec] = &[
         flag: "--fetch-all",
         arity: 0,
         value_type: ValueType::None,
-        ui_exposed: true,
+        ui_exposed: false,
     },
     ArgSpec {
         flag: "--resume",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
+    },
+    ArgSpec {
+        flag: "--no-resume",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
@@ -770,13 +795,25 @@ pub static CODEFORCES_ARGS: &[ArgSpec] = &[
         ui_exposed: true,
     },
     ArgSpec {
-        flag: "--fetch-all",
+        flag: "--fetch-contest",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
     },
     ArgSpec {
+        flag: "--fetch-all",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
+    },
+    ArgSpec {
         flag: "--resume",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
+    },
+    ArgSpec {
+        flag: "--no-resume",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
@@ -845,10 +882,16 @@ pub static CODEFORCES_ARGS: &[ArgSpec] = &[
 
 pub static LUOGU_ARGS: &[ArgSpec] = &[
     ArgSpec {
-        flag: "--sync",
+        flag: "--sync-problemset",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--sync",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
     },
     ArgSpec {
         flag: "--fill-missing-content",
@@ -895,7 +938,7 @@ pub static LUOGU_ARGS: &[ArgSpec] = &[
     ArgSpec {
         flag: "--source",
         arity: 1,
-        value_type: ValueType::Str,
+        value_type: ValueType::Source,
         ui_exposed: true,
     },
     ArgSpec {
@@ -914,10 +957,16 @@ pub static LUOGU_ARGS: &[ArgSpec] = &[
 
 pub static SPOJ_ARGS: &[ArgSpec] = &[
     ArgSpec {
-        flag: "--sync-spoj",
+        flag: "--sync-problemset",
         arity: 0,
         value_type: ValueType::None,
         ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--sync-spoj",
+        arity: 0,
+        value_type: ValueType::None,
+        ui_exposed: false,
     },
     ArgSpec {
         flag: "--fill-missing-content",
@@ -940,7 +989,7 @@ pub static SPOJ_ARGS: &[ArgSpec] = &[
     ArgSpec {
         flag: "--source",
         arity: 1,
-        value_type: ValueType::Str,
+        value_type: ValueType::Source,
         ui_exposed: false,
     },
     ArgSpec {
@@ -1094,6 +1143,15 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
                     ));
                 }
             }
+            ValueType::Source => {
+                let v = &raw_args[i + 1];
+                if v != "luogu" && v != "spoj" {
+                    return Err(format!(
+                        "{}: invalid source '{}', expected 'luogu' or 'spoj'",
+                        token, v
+                    ));
+                }
+            }
             ValueType::YearMonth => {
                 let yv = &raw_args[i + 1];
                 let mv = &raw_args[i + 2];
@@ -1115,7 +1173,26 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
         i += 1 + arity;
     }
 
-    Ok(raw_args.to_vec())
+    let mut result = raw_args.to_vec();
+
+    // SPOJ runs through luogu.py, which defaults to source="luogu". The admin
+    // handler does not inject --source, so enforce it here as the security
+    // boundary: a SPOJ request must resolve to --source spoj regardless of caller.
+    if matches!(source, CrawlerSource::Spoj) {
+        match result.iter().position(|a| a == "--source") {
+            Some(idx) => {
+                if result.get(idx + 1).map(String::as_str) != Some("spoj") {
+                    return Err("spoj source requires --source spoj".to_string());
+                }
+            }
+            None => {
+                result.push("--source".to_string());
+                result.push("spoj".to_string());
+            }
+        }
+    }
+
+    Ok(result)
 }
 
 pub struct DailyFallbackEntry {
@@ -1238,5 +1315,135 @@ impl EmbeddingJob {
     pub fn set_output(&mut self, stdout: Vec<u8>, stderr: Vec<u8>) {
         self.stdout = lossy_tail(&stdout);
         self.stderr = lossy_tail(&stderr);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_args, CrawlerSource};
+
+    fn args(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    #[test]
+    fn validate_args_accepts_canonical_crawler_flags() {
+        assert!(validate_args(&CrawlerSource::LeetCode, &args(&["--sync-problemset"])).is_ok());
+        assert!(validate_args(
+            &CrawlerSource::AtCoder,
+            &args(&["--sync-problemset", "--fetch-contest", "--no-resume"])
+        )
+        .is_ok());
+        assert!(validate_args(
+            &CrawlerSource::Codeforces,
+            &args(&[
+                "--sync-problemset",
+                "--fetch-contest",
+                "--no-resume",
+                "--include-gym",
+            ])
+        )
+        .is_ok());
+        assert!(validate_args(&CrawlerSource::Luogu, &args(&["--sync-problemset"])).is_ok());
+        assert!(validate_args(
+            &CrawlerSource::Spoj,
+            &args(&["--sync-problemset", "--source", "spoj"])
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn validate_args_accepts_legacy_crawler_aliases() {
+        assert!(validate_args(&CrawlerSource::LeetCode, &args(&["--init"])).is_ok());
+        assert!(validate_args(
+            &CrawlerSource::AtCoder,
+            &args(&[
+                "--sync-kenkoooo",
+                "--sync-history",
+                "--fetch-all",
+                "--resume"
+            ])
+        )
+        .is_ok());
+        assert!(validate_args(
+            &CrawlerSource::Codeforces,
+            &args(&["--fetch-all", "--resume"])
+        )
+        .is_ok());
+        assert!(validate_args(&CrawlerSource::Luogu, &args(&["--sync"])).is_ok());
+        assert!(validate_args(&CrawlerSource::Spoj, &args(&["--sync-spoj"])).is_ok());
+    }
+
+    #[test]
+    fn validate_args_rejects_unsupported_canonical_flags() {
+        for source in [
+            CrawlerSource::LeetCode,
+            CrawlerSource::Luogu,
+            CrawlerSource::Spoj,
+        ] {
+            let err = validate_args(&source, &args(&["--fetch-contest"])).unwrap_err();
+            assert_eq!(err, "unknown argument: --fetch-contest");
+        }
+    }
+
+    #[test]
+    fn validate_args_rejects_invalid_crawler_values() {
+        let err = validate_args(&CrawlerSource::LeetCode, &args(&["--domain", "tw"])).unwrap_err();
+        assert!(err.contains("invalid domain"));
+
+        let err =
+            validate_args(&CrawlerSource::Codeforces, &args(&["--contest", "abc"])).unwrap_err();
+        assert!(err.contains("invalid integer"));
+    }
+
+    #[test]
+    fn validate_args_enforces_spoj_source() {
+        // Bare SPOJ request gets --source spoj injected so luogu.py does not
+        // fall back to its default Luogu sync.
+        let out = validate_args(&CrawlerSource::Spoj, &args(&["--sync-problemset"])).expect("ok");
+        assert_eq!(out, args(&["--sync-problemset", "--source", "spoj"]));
+
+        // Explicit --source spoj passes through unchanged (no duplicate).
+        let out = validate_args(
+            &CrawlerSource::Spoj,
+            &args(&["--sync-problemset", "--source", "spoj"]),
+        )
+        .expect("ok");
+        assert_eq!(out, args(&["--sync-problemset", "--source", "spoj"]));
+
+        // A SPOJ request that tries to force Luogu source is rejected.
+        let err = validate_args(
+            &CrawlerSource::Spoj,
+            &args(&["--sync-problemset", "--source", "luogu"]),
+        )
+        .unwrap_err();
+        assert_eq!(err, "spoj source requires --source spoj");
+    }
+
+    #[test]
+    fn validate_args_restricts_source_value() {
+        let err = validate_args(
+            &CrawlerSource::Luogu,
+            &args(&["--sync-problemset", "--source", "../etc"]),
+        )
+        .unwrap_err();
+        assert!(err.contains("invalid source"));
+
+        assert!(validate_args(
+            &CrawlerSource::Luogu,
+            &args(&["--sync-problemset", "--source", "luogu"])
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn validate_args_rejects_path_traversal_in_paths() {
+        let err =
+            validate_args(&CrawlerSource::AtCoder, &args(&["--data-dir", "/abs"])).unwrap_err();
+        assert!(err.contains("relative path"));
+
+        let err =
+            validate_args(&CrawlerSource::AtCoder, &args(&["--db-path", "../x"])).unwrap_err();
+        assert!(err.contains("'..'"));
     }
 }
