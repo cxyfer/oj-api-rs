@@ -7,6 +7,7 @@ use sqlite_vec::sqlite3_vec_init;
 pub mod daily;
 pub mod embeddings;
 pub mod problems;
+pub mod random;
 pub mod settings;
 pub mod tokens;
 

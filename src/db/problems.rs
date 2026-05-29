@@ -44,7 +44,7 @@ pub fn platform_stats(pool: &DbPool) -> Vec<PlatformStats> {
     .unwrap_or_default()
 }
 
-fn row_to_problem_record(row: &Row<'_>) -> rusqlite::Result<ProblemRecord> {
+pub(crate) fn row_to_problem_record(row: &Row<'_>) -> rusqlite::Result<ProblemRecord> {
     let tags_raw: Option<String> = row.get("tags")?;
     let similar_raw: Option<String> = row.get("similar_questions")?;
     Ok(ProblemRecord {

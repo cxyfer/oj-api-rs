@@ -115,6 +115,12 @@ pub(crate) struct BatchResponse<T: Serialize + utoipa::ToSchema> {
     pub results: Vec<T>,
     pub not_found: Vec<BatchNotFoundItem>,
 }
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct RandomResponse {
+    pub results: Vec<ProblemDetailResponse>,
+}
+
 pub(crate) const VALID_SORT_BY: &[&str] = &["id", "difficulty", "rating", "ac_rate"];
 pub(crate) const VALID_SORT_ORDER: &[&str] = &["asc", "desc"];
 pub(crate) const VALID_TAG_MODES: &[&str] = &["any", "all"];

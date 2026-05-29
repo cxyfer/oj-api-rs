@@ -11,6 +11,7 @@ pub mod daily;
 pub mod error;
 pub mod openapi;
 pub mod problems;
+pub mod random;
 pub mod resolve;
 pub mod similar;
 pub mod status;
@@ -25,6 +26,7 @@ pub fn public_router() -> Router<Arc<AppState>> {
         .route("/api/v1/problems/{source}/{id}", get(problems::get_problem))
         .route("/api/v1/problems/batch", post(problems::batch_problems))
         .route("/api/v1/problems/{source}", get(problems::list_problems))
+        .route("/api/v1/random", get(random::random_problems))
         .route("/api/v1/tags/{source}", get(problems::list_tags))
         .route("/api/v1/resolve/{*query}", get(resolve::resolve))
         .route("/api/v1/daily", get(daily::get_daily))
