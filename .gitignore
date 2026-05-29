@@ -240,6 +240,7 @@ __marimo__/
 # AI tools
 .ace-tool/
 .claude/
+.ccg/
 .codex/
 .gemini/
 .omc/
