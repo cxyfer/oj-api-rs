@@ -1,0 +1,29 @@
+# OJ API - Pull pre-built nightly image from GHCR
+# Usage:
+#   docker compose -f docker-compose.ghcr.yml pull   # pull latest nightly
+#   docker compose -f docker-compose.ghcr.yml up -d  # start
+#   docker compose -f docker-compose.ghcr.yml logs -f
+#   docker compose -f docker-compose.ghcr.yml down
+
+services:
+  oj-api:
+    image: ghcr.io/cxyfer/oj-api-rs:nightly
+    init: true
+    container_name: oj-api
+    ports:
+      - "7856:7856"
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - oj-data:/app/data
+    environment:
+      - RUST_LOG=debug
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7856/health', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  oj-data:
