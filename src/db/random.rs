@@ -141,7 +141,7 @@ fn build_difficulty_conditions(
             let values: &[&str] = match difficulty {
                 "easy" => &["暂无评定", "入门", "普及−"],
                 "medium" => &["普及/提高−", "普及+/提高"],
-                "hard" => &["提高+/省选−", "省选/NOI−"],
+                "hard" => &["提高+/省选−", "省选/NOI−", "NOI/NOI+/CTSC"],
                 _ => return conditions,
             };
             let mut placeholders: Vec<String> = Vec::new();
