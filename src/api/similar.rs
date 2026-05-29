@@ -169,7 +169,7 @@ pub async fn similar_by_text(
 
     let text = match processed {
         Some("") => {
-            return ProblemDetail::bad_request("query parameter is required").into_response();
+            return ProblemDetail::bad_request("query field is required").into_response();
         }
         Some(q) if q.len() > 2000 => {
             return ProblemDetail::bad_request("query must be at most 2000 characters")
@@ -181,7 +181,7 @@ pub async fn similar_by_text(
         }
         Some(q) => q.to_string(),
         None => {
-            return ProblemDetail::bad_request("query parameter is required").into_response();
+            return ProblemDetail::bad_request("query field is required").into_response();
         }
     };
 
