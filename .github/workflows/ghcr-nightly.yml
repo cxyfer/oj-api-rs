@@ -39,10 +39,7 @@ jobs:
           # Delete existing nightly release and tag (if any)
           gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
           # Create new nightly pre-release pointing to current master HEAD
-          gh release create nightly \
-            --prerelease \
-            --title "Nightly Build" \
-            --notes "Automated pre-release build from \`master\` branch.
+          NOTES="Automated pre-release build from \`master\` branch.
 
           **Commit:** \`${{ github.sha }}\`
           **Date:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')
@@ -53,6 +50,10 @@ jobs:
           \`\`\`bash
           docker compose -f docker-compose.ghcr.yml up -d
           \`\`\`"
+          gh release create nightly \
+            --prerelease \
+            --title "Nightly Build" \
+            --notes "$NOTES" \
             --target master
         env:
           GH_TOKEN: ${{ github.token }}
