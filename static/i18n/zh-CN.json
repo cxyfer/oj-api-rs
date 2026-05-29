@@ -357,7 +357,7 @@
         "title": "按查询找相似题",
         "purpose": "通过自由文本查询查找相似题目。",
         "auth_rule": "Bearer auth 取决于现有公开 API middleware 配置。",
-        "inputs": "Query 参数可包含 query、limit、threshold 与 source。",
+        "inputs": "JSON body 字段可包含 query、limit、threshold 与 source。",
         "success_shape": "JSON 对象，包含排序后的相似题结果。"
       },
       "service_status": {
@@ -449,7 +449,7 @@
       "find_similar_problems": {
         "title": "搜索相似题目",
         "required_inputs": "query or source+id, plus limit/threshold/source_filter?",
-        "rest_capability": "对应 GET /api/v1/similar 与 GET /api/v1/similar/{source}/{id}。",
+        "rest_capability": "对应 POST /api/v1/similar 与 GET /api/v1/similar/{source}/{id}。",
         "output_style": "以文字排名返回相似题目与相似度分数。",
         "usage_note": "文本查询模式适合语义搜索；source+id 模式适合从既有题目展开。"
       },

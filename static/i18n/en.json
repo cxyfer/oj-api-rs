@@ -357,7 +357,7 @@
         "title": "Similar by query",
         "purpose": "Find similar problems from a free-text query.",
         "auth_rule": "Bearer auth follows the existing public API middleware setting.",
-        "inputs": "Query params include query, limit, threshold, and source.",
+        "inputs": "JSON body fields include query, limit, threshold, and source.",
         "success_shape": "JSON object with ranked similar-problem results."
       },
       "service_status": {
@@ -449,7 +449,7 @@
       "find_similar_problems": {
         "title": "Search similar problems",
         "required_inputs": "query or source+id, plus limit/threshold/source_filter?",
-        "rest_capability": "Maps to GET /api/v1/similar and GET /api/v1/similar/{source}/{id}.",
+        "rest_capability": "Maps to POST /api/v1/similar and GET /api/v1/similar/{source}/{id}.",
         "output_style": "Text ranking of similar problems with similarity scores.",
         "usage_note": "Use text query mode for semantic search or source+id mode for seed-problem lookup."
       },

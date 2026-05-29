@@ -180,23 +180,24 @@ The successful daily challenge response uses the same hydrated `similar_question
 ### Similarity Search
 
 ```
-GET /api/v1/similar/{source}/{id}     # Find similar problems by embedding
-GET /api/v1/similar?q=<text>          # Find similar problems by text query
-                                      # ?query=<text> also accepted
+GET  /api/v1/similar/{source}/{id}    # Find similar problems by embedding
+POST /api/v1/similar                  # Find similar problems by text query
 ```
 
-Text query mode delegates to a Python subprocess for real-time Gemini embedding generation. Surrounding double quotes in the query value (e.g. `%22two-sum%22`) are automatically stripped.
+Text query mode delegates to a Python subprocess for real-time Gemini embedding generation. Surrounding double quotes in the `query` body field are automatically stripped.
 
 <details>
-<summary>Query Parameters (both endpoints)</summary>
+<summary>Parameters</summary>
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `limit` | integer | `10` | Max results (max `50`) |
-| `threshold` | float | `0.0` | Minimum similarity score |
-| `source` | string | — | Comma-separated source filter (e.g. `leetcode,atcoder`) |
-
-For `GET /api/v1/similar?q=`, `q` / `query` (3–2000 chars) is required.
+| Endpoint | Parameter | Location | Type | Default | Description |
+|----------|-----------|----------|------|---------|-------------|
+| `GET /api/v1/similar/{source}/{id}` | `limit` | query | integer | `10` | Max results (max `50`) |
+| `GET /api/v1/similar/{source}/{id}` | `threshold` | query | float | `0.0` | Minimum similarity score |
+| `GET /api/v1/similar/{source}/{id}` | `source` | query | string | — | Comma-separated source filter (e.g. `leetcode,atcoder`) |
+| `POST /api/v1/similar` | `query` | JSON body | string | — | Required text query (3–2000 chars); `q` is also accepted |
+| `POST /api/v1/similar` | `limit` | JSON body | integer | `10` | Max results (max `50`) |
+| `POST /api/v1/similar` | `threshold` | JSON body | float | `0.0` | Minimum similarity score |
+| `POST /api/v1/similar` | `source` | JSON body | string | — | Comma-separated source filter (e.g. `leetcode,atcoder`) |
 
 </details>
 

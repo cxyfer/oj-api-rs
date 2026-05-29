@@ -27,14 +27,14 @@ The system SHALL find similar problems via `GET /api/v1/similar/{source}/{id}?li
 - **THEN** system clamps `limit` to 50
 
 ### Requirement: Similar search by text
-The system SHALL find similar problems via `GET /api/v1/similar?query={text}&limit={n}&threshold={f}&source={filter}`. It SHALL invoke the Python subprocess `embedding_cli.py --embed-text` to generate an embedding, then perform KNN search.
+The system SHALL find similar problems via `POST /api/v1/similar` with JSON body fields `query`, `limit`, `threshold`, and `source`. It SHALL invoke the Python subprocess `embedding_cli.py --embed-text` to generate an embedding, then perform KNN search.
 
 #### Scenario: Successful text search
-- **WHEN** client sends `GET /api/v1/similar?query=binary+search+on+sorted+array&limit=5`
+- **WHEN** client sends `POST /api/v1/similar` with JSON body `{"query":"binary search on sorted array","limit":5}`
 - **THEN** system returns up to 5 similar problems with similarity scores
 
 #### Scenario: Query too short
-- **WHEN** client sends `GET /api/v1/similar?query=ab` (less than 3 characters)
+- **WHEN** client sends `POST /api/v1/similar` with JSON body `{"query":"ab"}` (less than 3 characters)
 - **THEN** system returns HTTP 400 with error detail indicating minimum 3 characters
 
 #### Scenario: Python subprocess timeout
@@ -82,7 +82,7 @@ The system SHALL use `over_fetch_factor` (default 4) for KNN `k` calculation: `k
 Both similar search endpoints SHALL return `{ rewritten_query: string | null, results: [...] }` instead of a bare array. For text queries, `rewritten_query` is extracted from Python subprocess output field `rewritten` (trimmed, empty → null). For problem queries, `rewritten_query` is read from `problem_embeddings.rewritten_content` (trimmed, empty/null → null). `rewritten_query` is either null or a non-empty string (never empty string `""`).
 
 #### Scenario: Response is object, not array
-- **INVARIANT** `GET /api/v1/similar?q=...` returns `{ rewritten_query, results }` (object)
+- **INVARIANT** `POST /api/v1/similar` returns `{ rewritten_query, results }` (object)
 - **INVARIANT** `GET /api/v1/similar/{source}/{id}` returns `{ rewritten_query, results }` (object)
 - **FALSIFICATION** Response JSON starts with `[` instead of `{`
 
