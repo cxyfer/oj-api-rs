@@ -357,7 +357,7 @@
         "title": "Similar by query",
         "purpose": "Find similar problems from a free-text query.",
         "auth_rule": "Bearer auth follows the existing public API middleware setting.",
-        "inputs": "Query params include query, limit, threshold, and source.",
+        "inputs": "JSON body fields include query, limit, threshold, and source.",
         "success_shape": "JSON object with ranked similar-problem results."
       },
       "service_status": {

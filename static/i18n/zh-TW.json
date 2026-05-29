@@ -357,7 +357,7 @@
         "title": "依查詢找相似題",
         "purpose": "透過自由文字查詢尋找相似題目。",
         "auth_rule": "Bearer auth 依現有公開 API middleware 設定決定。",
-        "inputs": "Query 參數可包含 query、limit、threshold 與 source。",
+        "inputs": "JSON body 欄位可包含 query、limit、threshold 與 source。",
         "success_shape": "JSON 物件，包含排序後的相似題結果。"
       },
       "service_status": {

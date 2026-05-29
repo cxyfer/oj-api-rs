@@ -357,7 +357,7 @@
         "title": "按查询找相似题",
         "purpose": "通过自由文本查询查找相似题目。",
         "auth_rule": "Bearer auth 取决于现有公开 API middleware 配置。",
-        "inputs": "Query 参数可包含 query、limit、threshold 与 source。",
+        "inputs": "JSON body 字段可包含 query、limit、threshold 与 source。",
         "success_shape": "JSON 对象，包含排序后的相似题结果。"
       },
       "service_status": {
