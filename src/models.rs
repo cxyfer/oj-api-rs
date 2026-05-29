@@ -619,6 +619,7 @@ pub enum ValueType {
     Str,
     YearMonth,
     Domain,
+    Source,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -937,7 +938,7 @@ pub static LUOGU_ARGS: &[ArgSpec] = &[
     ArgSpec {
         flag: "--source",
         arity: 1,
-        value_type: ValueType::Str,
+        value_type: ValueType::Source,
         ui_exposed: true,
     },
     ArgSpec {
@@ -988,7 +989,7 @@ pub static SPOJ_ARGS: &[ArgSpec] = &[
     ArgSpec {
         flag: "--source",
         arity: 1,
-        value_type: ValueType::Str,
+        value_type: ValueType::Source,
         ui_exposed: false,
     },
     ArgSpec {
@@ -1142,6 +1143,15 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
                     ));
                 }
             }
+            ValueType::Source => {
+                let v = &raw_args[i + 1];
+                if v != "luogu" && v != "spoj" {
+                    return Err(format!(
+                        "{}: invalid source '{}', expected 'luogu' or 'spoj'",
+                        token, v
+                    ));
+                }
+            }
             ValueType::YearMonth => {
                 let yv = &raw_args[i + 1];
                 let mv = &raw_args[i + 2];
@@ -1163,7 +1173,26 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
         i += 1 + arity;
     }
 
-    Ok(raw_args.to_vec())
+    let mut result = raw_args.to_vec();
+
+    // SPOJ runs through luogu.py, which defaults to source="luogu". The admin
+    // handler does not inject --source, so enforce it here as the security
+    // boundary: a SPOJ request must resolve to --source spoj regardless of caller.
+    if matches!(source, CrawlerSource::Spoj) {
+        match result.iter().position(|a| a == "--source") {
+            Some(idx) => {
+                if result.get(idx + 1).map(String::as_str) != Some("spoj") {
+                    return Err("spoj source requires --source spoj".to_string());
+                }
+            }
+            None => {
+                result.push("--source".to_string());
+                result.push("spoj".to_string());
+            }
+        }
+    }
+
+    Ok(result)
 }
 
 pub struct DailyFallbackEntry {
@@ -1365,5 +1394,56 @@ mod tests {
         let err =
             validate_args(&CrawlerSource::Codeforces, &args(&["--contest", "abc"])).unwrap_err();
         assert!(err.contains("invalid integer"));
+    }
+
+    #[test]
+    fn validate_args_enforces_spoj_source() {
+        // Bare SPOJ request gets --source spoj injected so luogu.py does not
+        // fall back to its default Luogu sync.
+        let out = validate_args(&CrawlerSource::Spoj, &args(&["--sync-problemset"])).expect("ok");
+        assert_eq!(out, args(&["--sync-problemset", "--source", "spoj"]));
+
+        // Explicit --source spoj passes through unchanged (no duplicate).
+        let out = validate_args(
+            &CrawlerSource::Spoj,
+            &args(&["--sync-problemset", "--source", "spoj"]),
+        )
+        .expect("ok");
+        assert_eq!(out, args(&["--sync-problemset", "--source", "spoj"]));
+
+        // A SPOJ request that tries to force Luogu source is rejected.
+        let err = validate_args(
+            &CrawlerSource::Spoj,
+            &args(&["--sync-problemset", "--source", "luogu"]),
+        )
+        .unwrap_err();
+        assert_eq!(err, "spoj source requires --source spoj");
+    }
+
+    #[test]
+    fn validate_args_restricts_source_value() {
+        let err = validate_args(
+            &CrawlerSource::Luogu,
+            &args(&["--sync-problemset", "--source", "../etc"]),
+        )
+        .unwrap_err();
+        assert!(err.contains("invalid source"));
+
+        assert!(validate_args(
+            &CrawlerSource::Luogu,
+            &args(&["--sync-problemset", "--source", "luogu"])
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn validate_args_rejects_path_traversal_in_paths() {
+        let err =
+            validate_args(&CrawlerSource::AtCoder, &args(&["--data-dir", "/abs"])).unwrap_err();
+        assert!(err.contains("relative path"));
+
+        let err =
+            validate_args(&CrawlerSource::AtCoder, &args(&["--db-path", "../x"])).unwrap_err();
+        assert!(err.contains("'..'"));
     }
 }
