@@ -10,6 +10,7 @@ use axum::Router;
 
 use crate::AppState;
 
+pub(crate) const DOCS_PATH: &str = "/docs";
 pub(crate) const API_DOCS_PATH: &str = "/docs/api";
 pub(crate) const MCP_DOCS_PATH: &str = "/docs/mcp";
 
@@ -92,21 +93,21 @@ const HOMEPAGE_CARDS: [HomepageCard; 3] = [
         method: "GET",
         path: "/api/v1/problems/{source}/{id}",
         summary: "Fetch a normalized problem record by platform source and problem ID.",
-        docs_href: "/docs/api#problem-detail",
+        docs_href: "/docs#tag/problems",
     },
     HomepageCard {
         title: "Daily challenge",
         method: "GET",
         path: "/api/v1/daily",
         summary: "Fetch the current LeetCode daily challenge with the existing fallback behavior.",
-        docs_href: "/docs/api#daily-challenge",
+        docs_href: "/docs#tag/daily",
     },
     HomepageCard {
         title: "Similar search",
         method: "POST",
         path: "/api/v1/similar",
         summary: "Search related problems by free-text query against the public similarity index.",
-        docs_href: "/docs/api#similar-search",
+        docs_href: "/docs#tag/similar",
     },
 ];
 
@@ -417,7 +418,7 @@ struct HomeTemplate {
     token_auth_enabled: bool,
     version: &'static str,
     docs: DocsRegistry,
-    api_docs_path: &'static str,
+    docs_path: &'static str,
     mcp_docs_path: &'static str,
 }
 
@@ -438,7 +439,7 @@ struct McpDocsTemplate {
     docs: DocsRegistry,
     version: &'static str,
     home_path: &'static str,
-    api_docs_path: &'static str,
+    docs_path: &'static str,
     token_auth_enabled: bool,
 }
 
@@ -462,7 +463,7 @@ pub async fn index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         token_auth_enabled,
         version: env!("CARGO_PKG_VERSION"),
         docs: docs_registry(),
-        api_docs_path: API_DOCS_PATH,
+        docs_path: DOCS_PATH,
         mcp_docs_path: MCP_DOCS_PATH,
     }
     .render()
@@ -482,7 +483,7 @@ pub async fn mcp_docs(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         docs: docs_registry(),
         version: env!("CARGO_PKG_VERSION"),
         home_path: "/",
-        api_docs_path: API_DOCS_PATH,
+        docs_path: DOCS_PATH,
         token_auth_enabled,
     }
     .render()
@@ -554,7 +555,7 @@ mod tests {
             token_auth_enabled: true,
             version: "0.3.2-test",
             docs: docs_registry(),
-            api_docs_path: API_DOCS_PATH,
+            docs_path: DOCS_PATH,
             mcp_docs_path: MCP_DOCS_PATH,
         }
         .render()
@@ -565,7 +566,10 @@ mod tests {
         assert!(html.contains("/api/v1/problems/{source}/{id}"));
         assert!(html.contains("/api/v1/daily"));
         assert!(html.contains("/api/v1/similar"));
-        assert!(html.contains("/docs/api"));
+        assert!(html.contains("/docs"));
+        assert!(html.contains("/docs#tag/problems"));
+        assert!(html.contains("/docs#tag/daily"));
+        assert!(html.contains("/docs#tag/similar"));
         assert!(html.contains("/docs/mcp"));
         assert!(!html.contains("Dashboard"));
     }
@@ -577,7 +581,7 @@ mod tests {
             token_auth_enabled: false,
             version: "0.3.2-test",
             docs: docs_registry(),
-            api_docs_path: API_DOCS_PATH,
+            docs_path: DOCS_PATH,
             mcp_docs_path: MCP_DOCS_PATH,
         }
         .render()
@@ -743,7 +747,7 @@ mod tests {
             docs: docs_registry(),
             version: "0.3.2-test",
             home_path: "/",
-            api_docs_path: API_DOCS_PATH,
+            docs_path: DOCS_PATH,
             token_auth_enabled: true,
         }
         .render()
@@ -771,7 +775,7 @@ mod tests {
             token_auth_enabled: true,
             version: "0.3.2-test",
             docs: docs_registry(),
-            api_docs_path: API_DOCS_PATH,
+            docs_path: DOCS_PATH,
             mcp_docs_path: MCP_DOCS_PATH,
         }
         .render()
@@ -861,7 +865,7 @@ mod tests {
             docs: docs_registry(),
             version: "0.3.2-test",
             home_path: "/",
-            api_docs_path: API_DOCS_PATH,
+            docs_path: DOCS_PATH,
             token_auth_enabled: true,
         }
         .render()
