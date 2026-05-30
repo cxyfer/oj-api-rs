@@ -1,3 +1,8 @@
+# embedding-reliability Specification
+
+## Purpose
+Define reliability and failure-reporting requirements for embedding generation and embedding-backed text search.
+
 ## Requirements
 ### Requirement: Embed-text command reports stage-aware failures
 The `embedding_cli.py --embed-text` mode SHALL report failures using a structured JSON error envelope on stdout before exiting non-zero when failure occurs during configuration, query rewrite, or embedding generation. The error envelope SHALL include `error.stage`, `error.kind`, and `error.message`. The public `error.message` SHALL be sanitized and SHALL NOT include provider exception text, API keys, model names, base URLs, prompts, or stack traces.

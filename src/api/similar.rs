@@ -68,9 +68,7 @@ fn embed_text_stage_detail(stage: &str) -> Option<&'static str> {
 }
 
 fn parse_embed_text_error(stdout: &str) -> Option<EmbedTextErrorOutput> {
-    serde_json::from_str::<EmbedTextErrorOutput>(stdout)
-        .ok()
-        .filter(|output| embed_text_stage_detail(&output.error.stage).is_some())
+    serde_json::from_str::<EmbedTextErrorOutput>(stdout).ok()
 }
 
 fn parse_embed_text_output(stdout: &str) -> Result<EmbedTextOutput, ProblemDetail> {
@@ -323,7 +321,7 @@ pub async fn similar_by_text(
     let pool = state.ro_pool.clone();
     let over_fetch = state.config.embedding.over_fetch_factor;
 
-    let result = tokio::task::spawn_blocking(move || {
+    match tokio::task::spawn_blocking(move || {
         let k = (limit * over_fetch).min(200);
         let knn_results = crate::db::embeddings::knn_search(&pool, &embedding, k);
 
@@ -361,12 +359,17 @@ pub async fn similar_by_text(
         results
     })
     .await
-    .unwrap_or_default();
-    Json(SimilarResponse {
-        rewritten_query,
-        results: result,
-    })
-    .into_response()
+    {
+        Ok(results) => Json(SimilarResponse {
+            rewritten_query,
+            results,
+        })
+        .into_response(),
+        Err(e) => {
+            tracing::error!("similar text search task join error: {}", e);
+            ProblemDetail::internal("task join error").into_response()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -383,8 +386,6 @@ mod tests {
 
     use super::*;
     use crate::config::Config;
-
-    static PATH_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     fn test_db_path() -> String {
         std::env::temp_dir()
@@ -455,17 +456,24 @@ mod tests {
 
     struct EnvPathGuard {
         old_path: Option<String>,
+        _path_lock: std::sync::MutexGuard<'static, ()>,
     }
 
     impl EnvPathGuard {
         fn prepend(dir: &std::path::Path) -> Self {
+            let path_lock = crate::utils::TEST_PATH_MUTEX
+                .lock()
+                .unwrap_or_else(|err| err.into_inner());
             let old_path = std::env::var("PATH").ok();
             let new_path = match &old_path {
                 Some(path) => format!("{}:{path}", dir.display()),
                 None => dir.display().to_string(),
             };
             std::env::set_var("PATH", new_path);
-            Self { old_path }
+            Self {
+                old_path,
+                _path_lock: path_lock,
+            }
         }
     }
 
@@ -505,11 +513,7 @@ mod tests {
     }
 
     #[test]
-    fn embed_text_error_rejects_unknown_or_invalid_envelopes() {
-        assert!(parse_embed_text_error(
-            r#"{"error":{"stage":"unknown","kind":"provider_error","message":"raw"}}"#
-        )
-        .is_none());
+    fn embed_text_error_rejects_invalid_envelopes() {
         assert!(parse_embed_text_error("not json").is_none());
         assert!(parse_embed_text_error(r#"{"embedding":[0.1],"rewritten":"ok"}"#).is_none());
     }
@@ -536,11 +540,10 @@ mod tests {
     fn embed_text_unknown_failure_stage_keeps_generic_fallback() {
         let stdout = r#"{"error":{"stage":"provider","kind":"provider_error","message":"secret"}}"#;
 
-        assert!(parse_embed_text_error(stdout).is_none());
-        assert_eq!(
-            ProblemDetail::bad_gateway("embedding service failed").detail,
-            "embedding service failed"
-        );
+        let parsed = parse_embed_text_error(stdout).unwrap();
+        assert_eq!(parsed.error.stage, "provider");
+        assert_eq!(parsed.error.kind, "provider_error");
+        assert!(embed_text_stage_detail(&parsed.error.stage).is_none());
     }
 
     async fn call_similar_by_text_with_fake_uv(
@@ -570,7 +573,6 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn similar_by_text_maps_subprocess_rewrite_stage_to_sanitized_detail() {
-        let _guard = PATH_LOCK.lock().await;
         let (status, json) = call_similar_by_text_with_fake_uv(
             r#"{"error":{"stage":"rewrite","kind":"provider_error","message":"secret provider message"}}"#,
             "stack trace with secret provider message",
@@ -586,7 +588,6 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn similar_by_text_keeps_generic_fallback_for_unknown_subprocess_stage() {
-        let _guard = PATH_LOCK.lock().await;
         let (status, json) = call_similar_by_text_with_fake_uv(
             r#"{"error":{"stage":"provider","kind":"provider_error","message":"secret provider message"}}"#,
             "stack trace with secret provider message",
