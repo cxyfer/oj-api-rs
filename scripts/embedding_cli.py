@@ -74,6 +74,48 @@ class BuildReport:
         return sum(self.failed.values())
 
 
+def _embed_text_error(stage: str, kind: str, message: str) -> dict:
+    return {"error": {"stage": stage, "kind": kind, "message": message}}
+
+
+def _emit_embed_text_error(stage: str, kind: str, message: str) -> None:
+    print(json.dumps(_embed_text_error(stage, kind, message)))
+
+
+async def _embed_text(text: str, config) -> dict:
+    try:
+        rewriter = EmbeddingRewriter(config)
+        generator = EmbeddingGenerator(config)
+    except Exception as exc:
+        logger.error(
+            "Failed to initialize embed-text providers: %s", exc, exc_info=True
+        )
+        _emit_embed_text_error(
+            "config", "provider_error", "embedding service configuration failed"
+        )
+        raise SystemExit(1) from exc
+
+    try:
+        rewritten = await rewriter.rewrite(text)
+    except Exception as exc:
+        logger.error("Failed to rewrite embed-text query: %s", exc, exc_info=True)
+        _emit_embed_text_error(
+            "rewrite", "provider_error", "query rewrite service failed"
+        )
+        raise SystemExit(1) from exc
+
+    try:
+        embedding = await generator.embed(rewritten)
+    except Exception as exc:
+        logger.error("Failed to generate embed-text embedding: %s", exc, exc_info=True)
+        _emit_embed_text_error(
+            "embedding", "provider_error", "embedding service failed"
+        )
+        raise SystemExit(1) from exc
+
+    return {"embedding": embedding, "rewritten": rewritten}
+
+
 def _progress_path_from_env() -> Optional[str]:
     value = os.getenv("OJ_PROGRESS_PATH")
     if value is None:
@@ -664,6 +706,27 @@ async def main() -> None:
     )
 
     args = parser.parse_args()
+
+    if args.embed_text:
+        try:
+            config = get_config()
+        except Exception as exc:
+            logger.error(
+                "Failed to load embed-text configuration: %s", exc, exc_info=True
+            )
+            _emit_embed_text_error(
+                "config",
+                "configuration_error",
+                "embedding service configuration failed",
+            )
+            raise SystemExit(1) from exc
+        print(json.dumps(await _embed_text(args.embed_text, config)))
+        return
+
+    if not (args.build or args.rebuild or args.query or args.stats):
+        parser.print_help()
+        return
+
     config = get_config()
     similar_config = config.get_similar_config()
     embedding_config = config.get_embedding_model_config()
@@ -678,20 +741,6 @@ async def main() -> None:
     batch_size = args.batch_size or embedding_config.batch_size
     filter_pattern = args.filter
     job_id = args.job_id or str(uuid.uuid4())
-
-    if not (args.build or args.rebuild or args.query or args.stats or args.embed_text):
-        parser.print_help()
-        return
-
-    if args.embed_text:
-        import json as _json
-
-        rewriter = EmbeddingRewriter(config)
-        generator = EmbeddingGenerator(config)
-        rewritten = await rewriter.rewrite(args.embed_text)
-        embedding = await generator.embed(rewritten)
-        print(_json.dumps({"embedding": embedding, "rewritten": rewritten}))
-        return
 
     db = EmbeddingDatabaseManager(db_path=config.database_path)
     storage = EmbeddingStorage(db)
