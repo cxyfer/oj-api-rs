@@ -11,11 +11,12 @@
 ### R2: SPOJ_ARGS Whitelist
 | Flag | Arity | ValueType | ui_exposed |
 |---|---|---|---|
-| `--sync-spoj` | 0 | None | true |
+| `--sync-problemset` | 0 | None | true |
+| `--sync-spoj` | 0 | None | false |
 | `--fill-missing-content` | 0 | None | true |
 | `--missing-content-stats` | 0 | None | true |
 | `--overwrite` | 0 | None | true |
-| `--source` | 1 | Str | true |
+| `--source` | 1 | Source | false |
 | `--rate-limit` | 1 | Float | true |
 | `--batch-size` | 1 | Int | true |
 | `--data-dir` | 1 | Str | false |
@@ -29,7 +30,9 @@
 ### R4: API VALID_SOURCES
 - Add `"spoj"` to `VALID_SOURCES` in `src/api/problems.rs`
 
-### R5: Python --sync-spoj
+### R5: Python problemset sync
+- Canonical operation: `--sync-problemset --source spoj` or the SPOJ source's validated `--sync-problemset` invocation
+- Legacy alias: `--sync-spoj` remains accepted for backward compatibility
 - Crawl `https://www.luogu.com.cn/problem/list?type=SP&page={n}`, 50/page
 - DB storage: `source='spoj'`, `id='SP{n}'` (preserve Luogu numbering)
 - Title format `"CODE - Name"` → `slug=CODE`, `title=Name`
@@ -42,12 +45,12 @@
 - New `--source` argument for luogu.py (type=str, choices: luogu, spoj)
 - `--fill-missing-content --source spoj` fetches content for `source='spoj'` rows
 - Default (no --source): targets `source='luogu'` (backward compatible)
-- Rust whitelist: add `--source` to `LUOGU_ARGS` with `ValueType::Str`
+- Rust whitelist: add `--source` to `LUOGU_ARGS` with `ValueType::Source`
 
 ### R7: Admin UI
-- Add `spoj` tab in CRAWLER_CONFIG with `--sync-spoj` checkbox
+- Add `spoj` tab in CRAWLER_CONFIG with `--sync-problemset` checkbox
 - Add `spoj` to source button groups in templates (crawlers.html, problems.html, embeddings.html)
-- Add i18n keys: `sources.spoj`, `crawlers.flags.sync_spoj`
+- Add i18n keys: `sources.spoj`, `crawlers.flags.sync_problemset`
 - Add `--source` as select input in luogu tab (options: luogu, spoj)
 - Add i18n key: `crawlers.flags.source`
 - Add SPOJ difficulty labels to i18n (reuse luogu_0 through luogu_7 pattern or add spoj-specific)
@@ -79,8 +82,8 @@ CATEGORY: round_trip
 
 ### P3: Source Isolation
 ```
-INVARIANT: All rows inserted by --sync-spoj have source='spoj'; never 'luogu'
-FALSIFICATION: After sync-spoj, query DB for any row where id matches SP\d+ AND source != 'spoj'
+INVARIANT: All rows inserted by `--sync-problemset --source spoj` have source='spoj'; never 'luogu'
+FALSIFICATION: After canonical SPOJ problemset sync, query DB for any row where id matches SP\d+ AND source != 'spoj'
 CATEGORY: invariant_preservation
 ```
 
@@ -100,21 +103,21 @@ CATEGORY: invariant_preservation
 
 ### P6: Sync Idempotency
 ```
-INVARIANT: Running --sync-spoj twice produces identical DB state
+INVARIANT: Running `--sync-problemset --source spoj` twice produces identical DB state
 FALSIFICATION: Run twice, diff DB snapshots; any difference falsifies
 CATEGORY: idempotency
 ```
 
 ### P7: Argument Validation Completeness
 ```
-INVARIANT: SPOJ_ARGS whitelist accepts exactly {--sync-spoj, --fill-missing-content, --missing-content-stats, --overwrite, --source, --rate-limit, --batch-size, --data-dir, --db-path}; rejects all others
+INVARIANT: SPOJ_ARGS whitelist accepts exactly {--sync-problemset, --sync-spoj, --fill-missing-content, --missing-content-stats, --overwrite, --source, --rate-limit, --batch-size, --data-dir, --db-path}; `--sync-problemset` is the canonical UI-exposed sync flag and `--sync-spoj` is a non-UI legacy alias.
 FALSIFICATION: Generate all possible --flag combinations; validate_args must accept iff flag in whitelist
 CATEGORY: bounds
 ```
 
 ### P8: LUOGU_ARGS Extended Validation
 ```
-INVARIANT: LUOGU_ARGS accepts --training-list (Str) and --source (Str) in addition to existing flags; argument order does not affect validation result
+INVARIANT: LUOGU_ARGS accepts --training-list (Str) and --source (Source) in addition to existing flags; argument order does not affect validation result
 FALSIFICATION: Permute all valid arg combinations; any order-dependent acceptance/rejection falsifies
 CATEGORY: commutativity
 ```

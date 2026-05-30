@@ -1,7 +1,7 @@
 # homepage-api-guide Specification
 
 ## Purpose
-Define the public three-page documentation experience for `oj-api-rs`, including the curated homepage at `/`, the HTTP API reference at `/docs/api`, and the MCP reference at `/docs/mcp`.
+Define the public documentation experience for `oj-api-rs`, including the curated homepage at `/`, the interactive API docs at `/docs`, the compatibility redirect at `/docs/api`, and the MCP reference at `/docs/mcp`.
 
 ## Requirements
 
@@ -24,11 +24,12 @@ The homepage SHALL present a curated set of information only: a service summary,
 - **THEN** the page highlights exactly these three endpoints as feature cards:
   - `GET /api/v1/problems/{source}/{id}`
   - `GET /api/v1/daily`
-  - `GET /api/v1/similar`
+  - `POST /api/v1/similar`
 
 #### Scenario: Homepage exposes detailed-doc entry points
 - **WHEN** a user scans the homepage for next steps
 - **THEN** the page provides visible links to `GET /docs/api` and `GET /docs/mcp`
+- **AND** `/docs/api` serves as the compatibility entry point that redirects to `/docs`
 
 #### Scenario: Homepage includes one canonical example
 - **WHEN** a user reviews the homepage quick-start area
@@ -54,33 +55,36 @@ The homepage SHALL use the selected Bento Editorial direction rather than the ea
 - **WHEN** the homepage is rendered on tablet or mobile widths
 - **THEN** the same curated content remains available in stacked or simplified layouts without moving detailed reference content back onto `/`
 
-### Requirement: Dedicated HTTP API reference page at `/docs/api`
-The system SHALL expose a public HTML reference page at `/docs/api` that documents every public non-MCP HTTP endpoint as a distinct route card.
+### Requirement: Interactive API docs at `/docs`
+The system SHALL expose a public interactive API documentation page at `/docs` backed by the generated OpenAPI spec. This page SHALL document all public non-MCP HTTP endpoints and all JSON admin API endpoints, while excluding admin HTML page routes.
 
-#### Scenario: User opens the API reference page
+#### Scenario: User opens the API docs page
+- **WHEN** a client sends `GET /docs`
+- **THEN** the system returns HTTP 200 with an interactive API docs page
+
+#### Scenario: Legacy API docs path redirects
 - **WHEN** a client sends `GET /docs/api`
-- **THEN** the system returns HTTP 200 with an HTML page documenting these exact routes:
+- **THEN** the system returns a permanent redirect to `/docs`
+
+#### Scenario: Public API coverage is documented
+- **WHEN** a user reviews the API docs page
+- **THEN** the documented public endpoints include:
   - `GET /api/v1/problems/{source}/{id}`
+  - `POST /api/v1/problems/batch`
   - `GET /api/v1/problems/{source}`
+  - `GET /api/v1/random`
   - `GET /api/v1/tags/{source}`
   - `GET /api/v1/resolve/{*query}`
   - `GET /api/v1/daily`
   - `GET /api/v1/similar/{source}/{id}`
-  - `GET /api/v1/similar`
+  - `POST /api/v1/similar`
   - `GET /status`
   - `GET /health`
 
-#### Scenario: Each API route card contains actionable detail
-- **WHEN** a user reviews a route card on `/docs/api`
-- **THEN** the card includes method, exact path, purpose, auth rule, meaningful inputs, success response shape, and one copyable example
-
-#### Scenario: Source-based routes disclose supported source keys
-- **WHEN** a user reviews any `/docs/api` route that uses `{source}`
-- **THEN** the page explicitly lists the supported public source keys `leetcode`, `codeforces`, `atcoder`, `luogu`, and `spoj`
-
-#### Scenario: Detailed route notes are collapsible
-- **WHEN** `/docs/api` renders detailed route cards
-- **THEN** secondary details are collapsed by default, can be expanded independently, remain keyboard accessible, and expose stable fragment IDs for deep-linking
+#### Scenario: Admin JSON coverage is documented
+- **WHEN** a user reviews the API docs page
+- **THEN** the documented admin JSON endpoints include the problem, token, settings, crawler, and embedding API routes under `/admin/api/*`
+- **AND** admin HTML routes under `/admin/*` are excluded
 
 ### Requirement: Dedicated MCP reference page at `/docs/mcp`
 The system SHALL expose a public HTML reference page at `/docs/mcp` that documents MCP transport usage and all exposed MCP tools.
@@ -108,12 +112,12 @@ The system SHALL expose a public HTML reference page at `/docs/mcp` that documen
 - **THEN** the page includes at least one connection/configuration example and one MCP request example
 
 ### Requirement: Public docs pages support the existing locale set
-The homepage, HTTP API reference page, and MCP reference page SHALL support the existing locale set used by the project frontend (`en`, `zh-TW`, and `zh-CN`) for all visible non-technical guide copy.
+The homepage, API docs page, and MCP reference page SHALL support the existing locale set used by the project frontend (`en`, `zh-TW`, and `zh-CN`) for all visible non-technical guide copy.
 
 #### Scenario: Default locale on first visit
-- **WHEN** a user opens `/`, `/docs/api`, or `/docs/mcp` with no saved language preference
+- **WHEN** a user opens `/`, `/docs`, or `/docs/mcp` with no saved language preference
 - **THEN** the page renders using the default frontend locale behavior already established by the project
 
 #### Scenario: User switches docs-page language
 - **WHEN** a user changes the language using the shared frontend localization mechanism
-- **THEN** all translatable copy on `/`, `/docs/api`, and `/docs/mcp` updates using the selected locale among `en`, `zh-TW`, and `zh-CN`
+- **THEN** all translatable copy on `/`, `/docs`, and `/docs/mcp` updates using the selected locale among `en`, `zh-TW`, and `zh-CN`

@@ -34,8 +34,12 @@ The system SHALL validate all `source` values in the request body against the al
 - **THEN** the response is HTTP 400 with detail indicating the invalid source
 
 ### Requirement: API documentation reflects batch endpoint
-The API docs page at `/docs/api` SHALL display a card for the batch endpoint under the "Problems" group. The homepage and i18n translations SHALL reflect the updated route count.
+The API docs page at `/docs` SHALL document the batch endpoint under the "Problems" group. The legacy `/docs/api` path SHALL redirect to `/docs`.
 
 #### Scenario: Docs page renders batch card
-- **WHEN** a user visits `/docs/api`
+- **WHEN** a user visits `/docs`
 - **THEN** a card with method `POST`, path `/api/v1/problems/batch`, and title "Batch fetch" appears in the Problems group
+
+#### Scenario: Legacy docs path redirects
+- **WHEN** a user visits `/docs/api`
+- **THEN** the request is redirected to `/docs`

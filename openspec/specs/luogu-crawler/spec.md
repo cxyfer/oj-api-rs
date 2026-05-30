@@ -7,7 +7,7 @@ TBD - created by archiving change luogu-crawler. Update Purpose after archive.
 The crawler SHALL fetch problem lists from `https://www.luogu.com.cn/problem/list?page=N` and extract embedded JSON from the `<script type="application/json">` tag with `lentille-context` attribute. The JSON path `data.problems.result[]` SHALL provide the problem array and `data.problems.count` SHALL provide the total count. Each page contains 50 problems. The crawler SHALL iterate all pages until `page > ceil(count / 50)`, dynamically updating total pages from each response.
 
 #### Scenario: Successful full sync
-- **WHEN** `--sync` is invoked and Luogu has 15400 problems (308 pages)
+- **WHEN** `--sync-problemset` is invoked and Luogu has 15400 problems (308 pages)
 - **THEN** the crawler SHALL fetch all 308 pages sequentially, extract problems from each, and write them to the DB with `source="luogu"`
 
 #### Scenario: Empty result array on valid page
@@ -71,7 +71,7 @@ The crawler SHALL write to the `problems` table with `source = "luogu"`. Field m
 The crawler SHALL use `ProblemsDatabaseManager.update_problems()` (INSERT OR IGNORE) per page. The `tags` field MUST be pre-serialized via `json.dumps()` before passing to `update_problems()`. Repeated sync runs over the same data SHALL NOT create duplicate rows or modify existing rows.
 
 #### Scenario: Idempotent re-sync
-- **WHEN** `--sync` is run twice with identical upstream data
+- **WHEN** `--sync-problemset` is run twice with identical upstream data
 - **THEN** the second run SHALL insert 0 new rows and the DB state SHALL be identical
 
 #### Scenario: Tags serialization
@@ -105,11 +105,11 @@ The crawler SHALL implement `_is_rate_limited(html)` that returns `True` when th
 - **THEN** the crawler SHALL treat this as suspected block and trigger retry with backoff
 
 ### Requirement: Progress tracking with resume
-The crawler SHALL maintain `data/luogu_progress.json` with fields: `completed_pages` (array of page number strings), `last_completed_page` (int), `total_count_snapshot` (int), `tags_map` (object), `last_updated` (ISO8601 UTC). Progress SHALL be written atomically (tmp file → fsync → rename). A page SHALL be added to `completed_pages` only after its DB commit succeeds. `--sync` SHALL skip pages already in `completed_pages`.
+The crawler SHALL maintain `data/luogu_progress.json` with fields: `completed_pages` (array of page number strings), `last_completed_page` (int), `total_count_snapshot` (int), `tags_map` (object), `last_updated` (ISO8601 UTC). Progress SHALL be written atomically (tmp file → fsync → rename). A page SHALL be added to `completed_pages` only after its DB commit succeeds. `--sync-problemset` SHALL skip pages already in `completed_pages`.
 
 #### Scenario: Resume after interruption
 - **WHEN** sync was interrupted at page 150 and `completed_pages` contains pages 1-149
-- **THEN** re-running `--sync` SHALL start from page 150 (first page not in completed_pages)
+- **THEN** re-running `--sync-problemset` SHALL start from page 150 (first page not in completed_pages)
 
 #### Scenario: Atomic write on crash
 - **WHEN** the process crashes during progress file write
@@ -120,10 +120,10 @@ The crawler SHALL maintain `data/luogu_progress.json` with fields: `completed_pa
 - **THEN** `completed_pages` SHALL only grow (set inclusion: S_next ⊇ S_prev)
 
 ### Requirement: CLI interface
-The crawler SHALL provide the following CLI arguments via argparse: `--sync` (sync all problem pages), `--fill-missing-content` (fetch problem content for all problems with NULL content), `--missing-content-stats` (show count of problems missing content), `--status` (show progress), `--overwrite` (overwrite existing problems instead of skipping), `--rate-limit <float>` (request interval, default 1.0, min 1.0), `--batch-size <int>` (DB write batch size for content sync, default 10), `--data-dir <str>` (data directory), `--db-path <str>` (database path). If no action flag is provided, the crawler SHALL print help and exit.
+The crawler SHALL provide canonical CLI arguments via argparse: `--sync-problemset` (sync all problem pages), `--fill-missing-content` (fetch problem content for all problems with NULL content), `--missing-content-stats` (show count of problems missing content), `--status` (show progress), `--overwrite` (overwrite existing problems instead of skipping), `--rate-limit <float>` (request interval, default 1.0, min 1.0), `--batch-size <int>` (DB write batch size for content sync, default 10), `--training-list <str>`, `--source <luogu|spoj>`, `--data-dir <str>` (data directory), and `--db-path <str>` (database path). The legacy `--sync` alias SHALL remain accepted for backward compatibility but SHALL NOT be the primary operation name. If no action flag is provided, the crawler SHALL print help and exit.
 
 #### Scenario: Sync invocation
-- **WHEN** `python3 luogu.py --sync` is executed
+- **WHEN** `python3 luogu.py --sync-problemset` is executed
 - **THEN** the crawler SHALL fetch tags, then iterate all pages writing problems to DB
 
 #### Scenario: Fill missing content invocation

@@ -22,28 +22,43 @@ The `CrawlerSource` enum in `src/models.rs` SHALL include a `Luogu` variant. `Cr
 - **THEN** it SHALL return `"luogu.py"`
 
 ### Requirement: LUOGU_ARGS whitelist
-A static `LUOGU_ARGS: &[ArgSpec]` SHALL be defined with exactly 10 entries matching the Python CLI:
+A static `LUOGU_ARGS: &[ArgSpec]` SHALL be defined with canonical crawler operation flags and legacy aliases scoped to backward compatibility:
 
 | Flag | Arity | ValueType | ui_exposed |
 |---|---|---|---|
-| `--sync` | 0 | None | true |
+| `--sync-problemset` | 0 | None | true |
+| `--sync` | 0 | None | false |
 | `--fill-missing-content` | 0 | None | true |
 | `--missing-content-stats` | 0 | None | true |
 | `--status` | 0 | None | true |
 | `--overwrite` | 0 | None | true |
 | `--rate-limit` | 1 | Float | true |
 | `--batch-size` | 1 | Int | true |
+| `--training-list` | 1 | Str | true |
+| `--source` | 1 | Source | true |
 | `--data-dir` | 1 | Str | false |
 | `--db-path` | 1 | Str | false |
 
 `CrawlerSource::Luogu.arg_specs()` SHALL return `LUOGU_ARGS`.
 
-#### Scenario: Valid sync argument
+#### Scenario: Valid canonical sync argument
+- **WHEN** `validate_args(&CrawlerSource::Luogu, &["--sync-problemset".into()])` is called
+- **THEN** it SHALL return `Ok` with the args vector
+
+#### Scenario: Legacy sync alias remains accepted
 - **WHEN** `validate_args(&CrawlerSource::Luogu, &["--sync".into()])` is called
 - **THEN** it SHALL return `Ok` with the args vector
 
 #### Scenario: Valid fill-missing-content argument
 - **WHEN** `validate_args(&CrawlerSource::Luogu, &["--fill-missing-content".into()])` is called
+- **THEN** it SHALL return `Ok` with the args vector
+
+#### Scenario: Valid source argument
+- **WHEN** `validate_args(&CrawlerSource::Luogu, &["--sync-problemset".into(), "--source".into(), "luogu".into()])` is called
+- **THEN** it SHALL return `Ok` with the args vector
+
+#### Scenario: Valid training-list argument
+- **WHEN** `validate_args(&CrawlerSource::Luogu, &["--training-list".into(), "42".into()])` is called
 - **THEN** it SHALL return `Ok` with the args vector
 
 #### Scenario: Valid missing-content-stats argument
@@ -58,7 +73,11 @@ A static `LUOGU_ARGS: &[ArgSpec]` SHALL be defined with exactly 10 entries match
 - **WHEN** `validate_args(&CrawlerSource::Luogu, &["--rate-limit".into(), "-1.0".into()])` is called
 - **THEN** it SHALL return `Err` containing "invalid positive float"
 
-#### Scenario: Unknown argument rejected
+#### Scenario: Unsupported contest fetch rejected
+- **WHEN** `validate_args(&CrawlerSource::Luogu, &["--fetch-contest".into()])` is called
+- **THEN** it SHALL return `Err` containing "unknown argument"
+
+#### Scenario: Legacy contest argument rejected
 - **WHEN** `validate_args(&CrawlerSource::Luogu, &["--fetch-all".into()])` is called
 - **THEN** it SHALL return `Err` containing "unknown argument"
 
