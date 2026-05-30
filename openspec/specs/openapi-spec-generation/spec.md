@@ -7,7 +7,7 @@ Define the runtime-generated OpenAPI 3.1 contract for `oj-api-rs`, including the
 
 ### Hard Constraints
 
-1. **utoipa 5.x + utoipa-axum 0.2.x + utoipa-scalar 0.3.x** are used for spec generation and UI integration.
+1. **utoipa 5.x + utoipa-scalar 0.3.x** are used for spec generation and UI integration.
 2. **`/openapi.json`** is public and MUST NOT require bearer auth.
 3. **`/docs`** is the interactive API docs surface.
 4. **`/docs/api`** MUST permanently redirect to `/docs` for backward compatibility.
