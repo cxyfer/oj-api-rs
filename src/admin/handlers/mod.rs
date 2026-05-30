@@ -4,9 +4,9 @@ pub(crate) mod crawler;
 pub(crate) mod embedding;
 mod problem;
 mod settings;
-mod token;
 #[cfg(test)]
 mod tests;
+mod token;
 
 pub use auth::*;
 pub(crate) use common::{CrawlerStatusResponse, EmbeddingStatusResponse};

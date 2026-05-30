@@ -291,10 +291,7 @@ pub(super) fn clear_embedding_launch_guard_if_matches(
     }
 }
 
-pub(super) fn push_or_replace_crawler_history(
-    history: &mut VecDeque<CrawlerJob>,
-    job: CrawlerJob,
-) {
+pub(super) fn push_or_replace_crawler_history(history: &mut VecDeque<CrawlerJob>, job: CrawlerJob) {
     crate::utils::push_or_replace_crawler_history(history, job);
 }
 

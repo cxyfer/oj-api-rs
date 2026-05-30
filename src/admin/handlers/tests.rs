@@ -24,9 +24,9 @@ use super::crawler::TriggerCrawlerRequest;
 use super::embedding::TriggerEmbeddingRequest;
 use crate::config::Config;
 use crate::models::{
-    daily_fallback_crawler_runtime_key, manual_crawler_runtime_key, ActiveCrawlerPid,
-    CrawlerJob, CrawlerPhase, CrawlerProgress, CrawlerStatus, CrawlerTrigger,
-    DailyFallbackEntry, EmbeddingJob, JobType,
+    daily_fallback_crawler_runtime_key, manual_crawler_runtime_key, ActiveCrawlerPid, CrawlerJob,
+    CrawlerPhase, CrawlerProgress, CrawlerStatus, CrawlerTrigger, DailyFallbackEntry, EmbeddingJob,
+    JobType,
 };
 use crate::utils::CapturedOutput;
 use crate::AppState;
@@ -839,10 +839,9 @@ async fn trigger_crawler_injects_job_env_into_manual_subprocess() {
     let env_job_dir = tokio::fs::read_to_string(paths.job_dir.join("env-job-dir.txt"))
         .await
         .unwrap();
-    let env_progress_path =
-        tokio::fs::read_to_string(paths.job_dir.join("env-progress-path.txt"))
-            .await
-            .unwrap();
+    let env_progress_path = tokio::fs::read_to_string(paths.job_dir.join("env-progress-path.txt"))
+        .await
+        .unwrap();
     let env_python_log_path =
         tokio::fs::read_to_string(paths.job_dir.join("env-python-log-path.txt"))
             .await
@@ -941,9 +940,7 @@ async fn trigger_crawler_persists_running_progress_phase_for_manual_job() {
     .into_response();
     assert_eq!(response.status(), StatusCode::ACCEPTED);
 
-    assert!(
-        wait_for_manual_job_progress_phase(&state, &runtime_key, CrawlerPhase::Running).await
-    );
+    assert!(wait_for_manual_job_progress_phase(&state, &runtime_key, CrawlerPhase::Running).await);
 
     wait_for_manual_job_terminal(&state, &runtime_key).await;
 
@@ -1031,8 +1028,7 @@ async fn trigger_embedding_injects_job_env_into_subprocess() {
         let lock = state.embedding_lock.lock().await;
         lock.as_ref().unwrap().job_id.clone()
     };
-    let paths =
-        crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
+    let paths = crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
 
     let env_job_id = tokio::fs::read_to_string(paths.job_dir.join("env-job-id.txt"))
         .await
@@ -1043,10 +1039,9 @@ async fn trigger_embedding_injects_job_env_into_subprocess() {
     let env_job_dir = tokio::fs::read_to_string(paths.job_dir.join("env-job-dir.txt"))
         .await
         .unwrap();
-    let env_progress_path =
-        tokio::fs::read_to_string(paths.job_dir.join("env-progress-path.txt"))
-            .await
-            .unwrap();
+    let env_progress_path = tokio::fs::read_to_string(paths.job_dir.join("env-progress-path.txt"))
+        .await
+        .unwrap();
     let env_python_log_path =
         tokio::fs::read_to_string(paths.job_dir.join("env-python-log-path.txt"))
             .await
@@ -1079,8 +1074,7 @@ async fn embedding_status_reports_queued_when_progress_file_is_missing() {
         .unwrap_or_else(|err| err.into_inner());
     let state = test_state();
     let job_id = uuid::Uuid::new_v4().to_string();
-    let paths =
-        crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
+    let paths = crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
     let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
 
     *state.embedding_lock.lock().await = Some(EmbeddingJob {
@@ -1098,7 +1092,9 @@ async fn embedding_status_reports_queued_when_progress_file_is_missing() {
         stderr: None,
     });
 
-    let response = super::embedding::embedding_status(State(state)).await.into_response();
+    let response = super::embedding::embedding_status(State(state))
+        .await
+        .into_response();
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
@@ -1133,8 +1129,7 @@ async fn embedding_output_returns_empty_strings_when_stream_files_are_missing() 
         stdout: None,
         stderr: None,
     };
-    let paths =
-        crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
+    let paths = crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
     let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
     crate::utils::persist_job_metadata(&paths, crate::models::JobArtifactMetadata::from(&job))
         .await
@@ -1164,8 +1159,7 @@ async fn embedding_output_returns_not_found_after_artifacts_are_removed() {
         .unwrap_or_else(|err| err.into_inner());
     let state = test_state();
     let job_id = uuid::Uuid::new_v4().to_string();
-    let paths =
-        crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
+    let paths = crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
     let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
 
     state
@@ -1227,8 +1221,7 @@ async fn trigger_embedding_writes_python_log_and_output_endpoint_includes_all_st
         let lock = state.embedding_lock.lock().await;
         lock.as_ref().unwrap().job_id.clone()
     };
-    let paths =
-        crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
+    let paths = crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
     let python_log = tokio::fs::read_to_string(&paths.python_log).await.unwrap();
     assert!(python_log.contains("python logger ready"));
     assert!(!python_log.contains('\u{1b}'));
@@ -1288,8 +1281,7 @@ async fn trigger_embedding_preserves_summary_and_writes_terminal_metadata() {
         let lock = state.embedding_lock.lock().await;
         lock.as_ref().unwrap().job_id.clone()
     };
-    let paths =
-        crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
+    let paths = crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
     let content = tokio::fs::read_to_string(&paths.progress).await.unwrap();
     let payload: serde_json::Value = serde_json::from_str(&content).unwrap();
 
@@ -1365,8 +1357,7 @@ async fn trigger_embedding_spawn_failure_persists_failed_progress() {
     );
     assert!(payload["metadata"]["finished_at"].is_string());
 
-    let paths =
-        crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
+    let paths = crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
     let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
 }
 
@@ -1487,8 +1478,7 @@ async fn embedding_progress_reports_unknown_for_malformed_progress_json() {
         .lock()
         .unwrap_or_else(|err| err.into_inner());
     let job_id = uuid::Uuid::new_v4().to_string();
-    let paths =
-        crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
+    let paths = crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
     let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
     tokio::fs::create_dir_all(&paths.job_dir).await.unwrap();
     tokio::fs::write(&paths.progress, b"{not-json")
@@ -1547,7 +1537,9 @@ async fn crawler_status_projects_manual_job_while_daily_fallback_coexists() {
         },
     );
 
-    let response = super::crawler::crawler_status(State(state)).await.into_response();
+    let response = super::crawler::crawler_status(State(state))
+        .await
+        .into_response();
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
@@ -1628,8 +1620,7 @@ async fn embedding_progress_returns_not_found_for_missing_non_running_job() {
         .lock()
         .unwrap_or_else(|err| err.into_inner());
     let job_id = uuid::Uuid::new_v4().to_string();
-    let paths =
-        crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
+    let paths = crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id).unwrap();
     let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
 
     let response = super::embedding::embedding_progress(Path(job_id))

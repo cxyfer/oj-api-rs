@@ -129,7 +129,10 @@ fn build_difficulty_conditions(
         conditions.push(if source_already_filtered {
             format!("LOWER(difficulty) = LOWER(?{})", *idx)
         } else {
-            format!("(source = 'leetcode' AND LOWER(difficulty) = LOWER(?{}))", *idx)
+            format!(
+                "(source = 'leetcode' AND LOWER(difficulty) = LOWER(?{}))",
+                *idx
+            )
         });
         sql_params.push(Box::new(value.to_string()));
         *idx += 1;

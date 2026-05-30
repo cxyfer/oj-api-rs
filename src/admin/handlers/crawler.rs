@@ -88,8 +88,11 @@ pub async fn trigger_crawler(
 
     let artifact_paths = crate::utils::canonical_job_artifact_paths(JobType::Crawler, &job_id)
         .expect("uuid job id should produce safe artifact paths");
-    if let Err(err) =
-        crate::utils::persist_job_metadata(&artifact_paths, crate::models::JobArtifactMetadata::from(&job)).await
+    if let Err(err) = crate::utils::persist_job_metadata(
+        &artifact_paths,
+        crate::models::JobArtifactMetadata::from(&job),
+    )
+    .await
     {
         tracing::warn!("failed to persist crawler metadata: {}", err);
         {

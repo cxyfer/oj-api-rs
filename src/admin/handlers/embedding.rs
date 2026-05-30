@@ -136,8 +136,11 @@ pub async fn trigger_embedding(
 
     let artifact_paths = crate::utils::canonical_job_artifact_paths(JobType::Embedding, &job_id)
         .expect("uuid job id should produce safe artifact paths");
-    if let Err(err) =
-        crate::utils::persist_job_metadata(&artifact_paths, crate::models::JobArtifactMetadata::from(&job)).await
+    if let Err(err) = crate::utils::persist_job_metadata(
+        &artifact_paths,
+        crate::models::JobArtifactMetadata::from(&job),
+    )
+    .await
     {
         tracing::warn!("failed to persist embedding metadata: {}", err);
         let failed_job = if let Some(slot) = lock.as_mut() {
@@ -451,7 +454,6 @@ pub async fn embedding_status(State(state): State<Arc<AppState>>) -> impl IntoRe
         .into_response(),
     }
 }
-
 
 #[utoipa::path(
     get,

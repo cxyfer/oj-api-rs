@@ -6,7 +6,9 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::api::error::ProblemDetail;
-use crate::api::problems::{build_problem_detail_response, ProblemDetailResponse, RandomResponse, VALID_SOURCES};
+use crate::api::problems::{
+    build_problem_detail_response, ProblemDetailResponse, RandomResponse, VALID_SOURCES,
+};
 use crate::AppState;
 
 #[derive(Deserialize, utoipa::IntoParams)]

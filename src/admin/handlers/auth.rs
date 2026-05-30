@@ -1,6 +1,6 @@
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{Extension, Form};
-use axum::http::StatusCode;
 use rand::Rng;
 use serde::Deserialize;
 
