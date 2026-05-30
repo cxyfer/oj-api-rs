@@ -28,7 +28,7 @@ The homepage SHALL present a curated set of information only: a service summary,
 
 #### Scenario: Homepage exposes detailed-doc entry points
 - **WHEN** a user scans the homepage for next steps
-- **THEN** the page provides visible links to `GET /docs/api` and `GET /docs/mcp`
+- **THEN** the page provides visible links to `GET /docs` and `GET /docs/mcp`
 - **AND** `/docs/api` serves as the compatibility entry point that redirects to `/docs`
 
 #### Scenario: Homepage includes one canonical example
@@ -49,7 +49,7 @@ The homepage SHALL use the selected Bento Editorial direction rather than the ea
 #### Scenario: User sees the first screen on desktop
 - **WHEN** a user opens `/` on a desktop-sized viewport
 - **THEN** the initial viewport presents the value proposition, auth matrix, three featured endpoint cards, and one example as a coherent first-screen composition without requiring detailed route catalogs to remain on the homepage
-- **AND** the canonical request card occupies a wider row than the docs CTA cards, with the `GET /docs/api` and `GET /docs/mcp` CTA cards placed on the following row
+- **AND** the canonical request card occupies a wider row than the docs CTA cards, with the `GET /docs` and `GET /docs/mcp` CTA cards placed on the following row
 
 #### Scenario: Homepage stays curated on smaller screens
 - **WHEN** the homepage is rendered on tablet or mobile widths
