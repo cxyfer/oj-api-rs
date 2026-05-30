@@ -6,7 +6,7 @@ use utoipa::OpenApi;
 #[openapi(
     info(
         title = "OJ API",
-        version = "0.3.3",
+        version = "0.4.0",
         description = "REST API for querying competitive programming problems across multiple online judges (LeetCode, AtCoder, Codeforces, Luogu, SPOJ)."
     ),
     tags(

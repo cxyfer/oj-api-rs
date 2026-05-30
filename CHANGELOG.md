@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.4.0] - 2026-05-31
+
+### Features
+
+- **api**: add batch problem fetch endpoint for resolving up to 50 `(source, id)` pairs in one request (#19)
+- **api**: add OpenAPI 3.1 generation with `/openapi.json` and Scalar UI at `/docs` (#20)
+- **crawler**: unify crawler CLI operations across admin-triggered and script workflows (#25)
+- **api**: add random problem endpoint with cross-platform difficulty mapping (#27)
+
+### Bug Fixes
+
+- **api**: change similar text search from GET query parameters to POST JSON body to avoid long-query URL limits (#26)
+- **embedding**: increase example timeout defaults for longer rewrite and embedding operations
+- **api**: improve similar search error reporting and validation feedback (#28)
+- **ci**: stabilize nightly release creation and remove the unnecessary SHA tag from nightly Docker images
+
+### Breaking Changes
+
+- **api**: `GET /api/v1/similar/text?q=...` is replaced by `POST /api/v1/similar/text` with a JSON request body. Clients using text-based similar search must update the HTTP method and payload format.
+
+### Tests
+
+- **api**: add HTTP integration tests for public, admin, and health endpoints (#22)
+
+### Docs
+
+- **api**: document batch, OpenAPI, Scalar UI, random problem, and updated similar-search behavior in README, homepage docs, and OpenSpec specs (#19, #20, #26, #27, #29, #30)
+
+### Chore
+
+- **admin**: split admin handlers into focused modules for maintainability (#21)
+- **docker**: add Docker Compose configurations for local development and GHCR deployment (#23)
+- **ci**: add rolling nightly GHCR pre-release workflow
+- **scripts**: bump crawler script dependencies for `google-genai` and `openai` (#31)
+
 ## [0.3.3] - 2026-04-28
 
 ### Features
