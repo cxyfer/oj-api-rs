@@ -22,6 +22,13 @@
 - **WHEN** `scripts/pyproject.toml` is inspected
 - **THEN** `aiohttp-socks` appears in the dependencies list
 
+### Requirement: config.toml.example documents embedding timeout defaults
+`config.toml.example` SHALL document the `[embedding]` section with both `timeout_secs` and `batch_timeout_secs` so the example configuration reflects the default query and batch embedding timeouts.
+
+#### Scenario: Embedding timeout settings are present
+- **WHEN** `config.toml.example` is inspected
+- **THEN** it contains `[embedding] timeout_secs = 300` and `batch_timeout_secs = 3600`
+
 ### Requirement: config.toml.example documents MCP host allow-list
 `config.toml.example` SHALL document the `[mcp]` section with `allowed_hosts = []` and explain that it controls Host allow-list validation for `/mcp`.
 
