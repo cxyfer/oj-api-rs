@@ -12,6 +12,7 @@ use utoipa::OpenApi;
     tags(
         (name = "Problems", description = "Problem CRUD operations"),
         (name = "Tags", description = "Tag listing by source"),
+        (name = "Difficulties", description = "Difficulty listing by source"),
         (name = "Resolve", description = "Problem resolution by query"),
         (name = "Daily", description = "Daily challenge retrieval"),
         (name = "Similar", description = "Similar problem search"),
@@ -26,6 +27,7 @@ use utoipa::OpenApi;
         crate::api::problems::list_problems,
         crate::api::random::random_problems,
         crate::api::problems::list_tags,
+        crate::api::problems::list_difficulties,
         crate::api::resolve::resolve,
         crate::api::daily::get_daily,
         crate::api::similar::similar_by_problem,

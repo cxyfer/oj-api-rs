@@ -332,6 +332,13 @@
         "inputs": "Path param: {source}.",
         "success_shape": "JSON array of tag strings."
       },
+      "problem_difficulties": {
+        "title": "Difficulties",
+        "purpose": "List difficulty values for a supported source.",
+        "auth_rule": "Bearer auth follows the existing public API middleware setting.",
+        "inputs": "Path param: {source}.",
+        "success_shape": "JSON array of difficulty strings."
+      },
       "resolve_problem": {
         "title": "Resolve",
         "purpose": "Resolve a URL, slug, or prefixed identifier into a concrete problem.",

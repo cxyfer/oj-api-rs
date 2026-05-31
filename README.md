@@ -114,6 +114,7 @@ GET  /api/v1/problems/{source}/{id}    # Get a single problem
 POST /api/v1/problems/batch            # Batch fetch multiple problems
 GET  /api/v1/problems/{source}         # List problems
 GET  /api/v1/tags/{source}             # List all tags for a source
+GET  /api/v1/difficulties/{source}     # List all difficulties for a source
 ```
 
 `GET /api/v1/problems/{source}/{id}` returns the full problem record. As of 2026-03-24, the `similar_questions` field is a hydrated object array, not a slug string array:

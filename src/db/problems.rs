@@ -225,7 +225,7 @@ pub fn list_problems(pool: &DbPool, params: &ListParams<'_>) -> Option<ListResul
     let mut idx = 2u32;
 
     if let Some(diff) = params.difficulty {
-        where_clauses.push(format!("LOWER(difficulty) = LOWER(?{})", idx));
+        where_clauses.push(format!("LOWER(TRIM(difficulty)) = LOWER(TRIM(?{}))", idx));
         sql_params.push(Box::new(diff.to_string()));
         idx += 1;
     }
@@ -461,6 +461,57 @@ pub fn list_tags(pool: &DbPool, source: &str) -> Option<Vec<String>> {
     Some(rows.filter_map(|r| r.ok()).collect())
 }
 
+pub fn list_difficulties(pool: &DbPool, source: &str) -> Option<Vec<String>> {
+    let conn = pool.get().ok()?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT DISTINCT TRIM(difficulty) AS difficulty \
+             FROM problems \
+             WHERE source = ?1 AND difficulty IS NOT NULL AND TRIM(difficulty) != ''",
+        )
+        .ok()?;
+    let rows = stmt
+        .query_map(params![source], |row| row.get::<_, String>(0))
+        .ok()?;
+    let mut difficulties: Vec<String> = rows.filter_map(|r| r.ok()).collect();
+    sort_difficulties(source, &mut difficulties);
+    Some(difficulties)
+}
+
+fn sort_difficulties(source: &str, difficulties: &mut [String]) {
+    difficulties.sort_by(
+        |a, b| match (difficulty_rank(source, a), difficulty_rank(source, b)) {
+            (Some(a_rank), Some(b_rank)) => a_rank.cmp(&b_rank).then_with(|| a.cmp(b)),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.cmp(b),
+        },
+    );
+}
+
+fn difficulty_rank(source: &str, difficulty: &str) -> Option<usize> {
+    match source {
+        "leetcode" => match difficulty.to_ascii_lowercase().as_str() {
+            "easy" => Some(0),
+            "medium" => Some(1),
+            "hard" => Some(2),
+            _ => None,
+        },
+        "luogu" => match difficulty {
+            "暂无评定" => Some(0),
+            "入门" => Some(1),
+            "普及−" => Some(2),
+            "普及/提高−" => Some(3),
+            "普及+/提高" => Some(4),
+            "提高+/省选−" => Some(5),
+            "省选/NOI−" => Some(6),
+            "NOI/NOI+/CTSC" => Some(7),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -488,6 +539,117 @@ mod tests {
         ensure_data_tables(&rw_pool);
         let ro_pool = create_ro_pool(&path, 1, 1000);
         (rw_pool, ro_pool, path)
+    }
+
+    fn insert_problem_difficulty(pool: &DbPool, id: &str, source: &str, difficulty: Option<&str>) {
+        let conn = pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO problems (id, source, slug, title, difficulty) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, source, id, id, difficulty],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn list_difficulties_omits_empty_values() {
+        let (rw_pool, ro_pool, path) = setup_pools();
+        insert_problem_difficulty(&rw_pool, "null", "leetcode", None);
+        insert_problem_difficulty(&rw_pool, "empty", "leetcode", Some(""));
+        insert_problem_difficulty(&rw_pool, "blank", "leetcode", Some("   "));
+        insert_problem_difficulty(&rw_pool, "easy", "leetcode", Some("Easy"));
+
+        assert_eq!(
+            super::list_difficulties(&ro_pool, "leetcode").unwrap(),
+            vec!["Easy"]
+        );
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn list_difficulties_preserves_canonical_values() {
+        let (rw_pool, ro_pool, path) = setup_pools();
+        insert_problem_difficulty(&rw_pool, "luogu-p", "luogu", Some(" 普及− "));
+
+        assert_eq!(
+            super::list_difficulties(&ro_pool, "luogu").unwrap(),
+            vec!["普及−"]
+        );
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn list_difficulties_sorts_leetcode_values() {
+        let (rw_pool, ro_pool, path) = setup_pools();
+        insert_problem_difficulty(&rw_pool, "hard", "leetcode", Some("Hard"));
+        insert_problem_difficulty(&rw_pool, "easy", "leetcode", Some("Easy"));
+        insert_problem_difficulty(&rw_pool, "medium", "leetcode", Some("Medium"));
+
+        assert_eq!(
+            super::list_difficulties(&ro_pool, "leetcode").unwrap(),
+            vec!["Easy", "Medium", "Hard"]
+        );
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn list_difficulties_sorts_luogu_values() {
+        let (rw_pool, ro_pool, path) = setup_pools();
+        insert_problem_difficulty(&rw_pool, "noi", "luogu", Some("NOI/NOI+/CTSC"));
+        insert_problem_difficulty(&rw_pool, "beginner", "luogu", Some("入门"));
+        insert_problem_difficulty(&rw_pool, "unrated", "luogu", Some("暂无评定"));
+
+        assert_eq!(
+            super::list_difficulties(&ro_pool, "luogu").unwrap(),
+            vec!["暂无评定", "入门", "NOI/NOI+/CTSC"]
+        );
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn list_difficulties_sorts_unknown_values_after_known_values() {
+        let (rw_pool, ro_pool, path) = setup_pools();
+        insert_problem_difficulty(&rw_pool, "z", "leetcode", Some("Zeta"));
+        insert_problem_difficulty(&rw_pool, "medium", "leetcode", Some("Medium"));
+        insert_problem_difficulty(&rw_pool, "a", "leetcode", Some("Alpha"));
+
+        assert_eq!(
+            super::list_difficulties(&ro_pool, "leetcode").unwrap(),
+            vec!["Medium", "Alpha", "Zeta"]
+        );
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn list_problems_filters_trimmed_difficulty_values() {
+        let (rw_pool, ro_pool, path) = setup_pools();
+        insert_problem_difficulty(&rw_pool, "luogu-p", "luogu", Some(" 普及− "));
+
+        let result = super::list_problems(
+            &ro_pool,
+            &super::ListParams {
+                source: "luogu",
+                page: 1,
+                per_page: 20,
+                difficulty: Some("普及−"),
+                tags: None,
+                search: None,
+                sort_by: None,
+                sort_order: None,
+                tag_mode: "any",
+                rating_min: None,
+                rating_max: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.total, 1);
+        assert_eq!(result.data[0].id, "luogu-p");
+
+        let _ = fs::remove_file(path);
     }
 
     #[test]

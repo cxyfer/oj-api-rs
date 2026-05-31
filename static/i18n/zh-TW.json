@@ -332,6 +332,13 @@
         "inputs": "路徑參數：{source}。",
         "success_shape": "JSON 陣列，內容為標籤字串。"
       },
+      "problem_difficulties": {
+        "title": "難度",
+        "purpose": "列出指定支援來源的難度值。",
+        "auth_rule": "Bearer auth 依現有公開 API middleware 設定決定。",
+        "inputs": "路徑參數：{source}。",
+        "success_shape": "JSON 陣列，內容為難度字串。"
+      },
       "resolve_problem": {
         "title": "解析題目",
         "purpose": "將 URL、slug 或帶前綴的識別字解析成具體題目。",
