@@ -468,6 +468,90 @@ class ProblemsDatabaseManager:
         finally:
             conn.close()
 
+    def update_problemset_metadata(self, problems, source="leetcode"):
+        total_count = len(problems)
+        if total_count == 0:
+            return 0
+
+        values = []
+        for problem in problems:
+            problem_id = problem.get("id")
+            values.append(
+                (
+                    str(problem_id) if problem_id is not None else None,
+                    source,
+                    problem.get("slug"),
+                    problem.get("title"),
+                    problem.get("title_cn"),
+                    problem.get("difficulty"),
+                    problem.get("ac_rate"),
+                    problem.get("rating"),
+                    problem.get("contest"),
+                    problem.get("problem_index"),
+                    json.dumps(_normalize_json_string_list(problem.get("tags"))),
+                    problem.get("link"),
+                    problem.get("category"),
+                    problem.get("paid_only"),
+                    problem.get("content"),
+                    problem.get("content_cn"),
+                    json.dumps(
+                        _normalize_similar_questions(problem.get("similar_questions"))
+                    ),
+                )
+            )
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.executemany(
+                """
+                INSERT INTO problems (
+                    id, source, slug, title, title_cn, difficulty, ac_rate,
+                    rating, contest, problem_index, tags, link,
+                    category, paid_only, content, content_cn, similar_questions
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(source, id) DO UPDATE SET
+                    slug=COALESCE(NULLIF(excluded.slug, ''), problems.slug),
+                    title=COALESCE(NULLIF(excluded.title, ''), problems.title),
+                    title_cn=COALESCE(NULLIF(excluded.title_cn, ''), problems.title_cn),
+                    difficulty=COALESCE(NULLIF(excluded.difficulty, ''), problems.difficulty),
+                    ac_rate=COALESCE(excluded.ac_rate, problems.ac_rate),
+                    rating=CASE
+                        WHEN excluded.rating IS NOT NULL AND excluded.rating > 0 THEN excluded.rating
+                        WHEN problems.rating IS NOT NULL AND problems.rating > 0 THEN problems.rating
+                        ELSE COALESCE(excluded.rating, problems.rating)
+                    END,
+                    contest=COALESCE(NULLIF(excluded.contest, ''), problems.contest),
+                    problem_index=COALESCE(NULLIF(excluded.problem_index, ''), problems.problem_index),
+                    tags=CASE
+                        WHEN excluded.tags IS NULL OR excluded.tags = '[]' THEN problems.tags
+                        ELSE excluded.tags
+                    END,
+                    link=COALESCE(NULLIF(excluded.link, ''), problems.link),
+                    category=COALESCE(NULLIF(excluded.category, ''), problems.category),
+                    paid_only=COALESCE(excluded.paid_only, problems.paid_only),
+                    content=COALESCE(NULLIF(excluded.content, ''), problems.content),
+                    content_cn=COALESCE(NULLIF(excluded.content_cn, ''), problems.content_cn),
+                    similar_questions=CASE
+                        WHEN excluded.similar_questions IS NULL OR excluded.similar_questions = '[]'
+                            THEN problems.similar_questions
+                        ELSE excluded.similar_questions
+                    END
+                """,
+                values,
+            )
+            conn.commit()
+            affected_count = cursor.rowcount
+            logger.info(
+                f"Batch refreshed metadata for {affected_count}/{total_count} {source} problems"
+            )
+            return affected_count
+        except Exception as e:
+            logger.error(f"Error refreshing problem metadata: {e}")
+            return 0
+        finally:
+            conn.close()
+
     def update_problem(self, problem, force_update=False):
         """
         Insert or update single problem data.

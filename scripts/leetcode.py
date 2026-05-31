@@ -140,11 +140,63 @@ class LeetCodeClient(BaseCrawler):
         Fetch all problems from LeetCode across all categories.
         """
         problems = await self.fetch_all_problems()
-        self.problems_db.update_problems(problems)
+        ratings = await self._fetch_problemset_ratings()
+        problems = self.merge_problemset_ratings(problems, ratings)
+        self.problems_db.update_problemset_metadata(problems, source="leetcode")
         logger.debug(f"Total problems fetched: {len(problems)}")
-        if init_ratings:
-            await self.fetch_ratings()
+        if init_ratings and ratings:
+            self.ratings = ratings
+            self.ratings_last_update = int(datetime.now().timestamp())
         return problems
+
+    @staticmethod
+    def _normalize_frontend_problem_id(value):
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        if not normalized:
+            return None
+        if normalized.isdigit():
+            return str(int(normalized))
+        return normalized
+
+    async def _fetch_problemset_ratings(self):
+        try:
+            ratings = await self.fetch_ratings()
+        except Exception as exc:
+            logger.warning(f"Failed to fetch problemset ratings: {exc}")
+            return {}
+        if not ratings:
+            logger.warning(
+                "No LeetCode rating data available; syncing problemset metadata only."
+            )
+            return {}
+        return ratings
+
+    def merge_problemset_ratings(self, problems, ratings):
+        ratings_by_id = {}
+        for key, rating in (ratings or {}).items():
+            if not isinstance(rating, dict):
+                continue
+            problem_id = self._normalize_frontend_problem_id(rating.get("id", key))
+            if problem_id:
+                ratings_by_id[problem_id] = rating
+
+        merged = []
+        for problem in problems:
+            item = dict(problem)
+            rating = ratings_by_id.get(
+                self._normalize_frontend_problem_id(item.get("id"))
+            )
+            if rating:
+                item["rating"] = rating.get("rating") or item.get("rating")
+                item["contest"] = rating.get("contest") or item.get("contest")
+                item["problem_index"] = rating.get("problem_index") or item.get(
+                    "problem_index"
+                )
+                item["title_cn"] = rating.get("title_cn") or item.get("title_cn")
+            merged.append(item)
+        return merged
 
     async def fetch_all_problems(self):
         """
