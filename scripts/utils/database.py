@@ -476,9 +476,11 @@ class ProblemsDatabaseManager:
         values = []
         for problem in problems:
             problem_id = problem.get("id")
+            if problem_id is None or str(problem_id).strip() == "":
+                continue
             values.append(
                 (
-                    str(problem_id) if problem_id is not None else None,
+                    str(problem_id),
                     source,
                     problem.get("slug"),
                     problem.get("title"),
