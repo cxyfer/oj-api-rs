@@ -225,8 +225,8 @@ pub fn list_problems(pool: &DbPool, params: &ListParams<'_>) -> Option<ListResul
     let mut idx = 2u32;
 
     if let Some(diff) = params.difficulty {
-        where_clauses.push(format!("LOWER(TRIM(difficulty)) = LOWER(TRIM(?{}))", idx));
-        sql_params.push(Box::new(diff.to_string()));
+        where_clauses.push(format!("difficulty = ?{} COLLATE NOCASE", idx));
+        sql_params.push(Box::new(diff.trim().to_string()));
         idx += 1;
     }
 
@@ -366,7 +366,7 @@ pub fn insert_problem(pool: &DbPool, p: &Problem) -> rusqlite::Result<()> {
             p.slug,
             p.title,
             p.title_cn,
-            p.difficulty,
+            p.difficulty.as_deref().map(str::trim).filter(|d| !d.is_empty()),
             p.ac_rate,
             p.rating,
             p.contest,
@@ -403,7 +403,10 @@ pub fn update_problem(
             p.slug,
             p.title,
             p.title_cn,
-            p.difficulty,
+            p.difficulty
+                .as_deref()
+                .map(str::trim)
+                .filter(|d| !d.is_empty()),
             p.ac_rate,
             p.rating,
             p.contest,
@@ -497,17 +500,20 @@ fn difficulty_rank(source: &str, difficulty: &str) -> Option<usize> {
             "hard" => Some(2),
             _ => None,
         },
-        "luogu" => match difficulty {
-            "暂无评定" => Some(0),
-            "入门" => Some(1),
-            "普及−" => Some(2),
-            "普及/提高−" => Some(3),
-            "普及+/提高" => Some(4),
-            "提高+/省选−" => Some(5),
-            "省选/NOI−" => Some(6),
-            "NOI/NOI+/CTSC" => Some(7),
-            _ => None,
-        },
+        "luogu" => {
+            let normalized = difficulty.replace('−', "-");
+            match normalized.as_str() {
+                "暂无评定" => Some(0),
+                "入门" => Some(1),
+                "普及-" => Some(2),
+                "普及/提高-" => Some(3),
+                "普及+/提高" => Some(4),
+                "提高+/省选-" => Some(5),
+                "省选/NOI-" => Some(6),
+                "NOI/NOI+/CTSC" => Some(7),
+                _ => None,
+            }
+        }
         _ => None,
     }
 }
@@ -548,6 +554,41 @@ mod tests {
             params![id, source, id, id, difficulty],
         )
         .unwrap();
+    }
+
+    #[test]
+    fn insert_problem_trims_difficulty_before_persisting() {
+        let (rw_pool, ro_pool, path) = setup_pools();
+        let mut problem = Problem {
+            id: "1".to_string(),
+            source: "leetcode".to_string(),
+            slug: "two-sum".to_string(),
+            title: Some("Two Sum".to_string()),
+            title_cn: None,
+            difficulty: Some(" Easy ".to_string()),
+            ac_rate: None,
+            rating: None,
+            contest: None,
+            problem_index: None,
+            tags: Vec::new(),
+            link: None,
+            category: None,
+            paid_only: None,
+            content: None,
+            content_cn: None,
+            similar_questions: Vec::new(),
+        };
+        super::insert_problem(&rw_pool, &problem).unwrap();
+
+        let stored = super::get_problem_record(&ro_pool, "leetcode", "1").unwrap();
+        assert_eq!(stored.difficulty.as_deref(), Some("Easy"));
+
+        problem.difficulty = Some(" Medium ".to_string());
+        super::update_problem(&rw_pool, "leetcode", "1", &problem).unwrap();
+        let stored = super::get_problem_record(&ro_pool, "leetcode", "1").unwrap();
+        assert_eq!(stored.difficulty.as_deref(), Some("Medium"));
+
+        let _ = fs::remove_file(path);
     }
 
     #[test]
@@ -627,7 +668,26 @@ mod tests {
     #[test]
     fn list_problems_filters_trimmed_difficulty_values() {
         let (rw_pool, ro_pool, path) = setup_pools();
-        insert_problem_difficulty(&rw_pool, "luogu-p", "luogu", Some(" 普及− "));
+        let mut problem = Problem {
+            id: "1".to_string(),
+            source: "luogu".to_string(),
+            slug: "luogu-p".to_string(),
+            title: Some("Luogu P".to_string()),
+            title_cn: None,
+            difficulty: Some(" 普及− ".to_string()),
+            ac_rate: None,
+            rating: None,
+            contest: None,
+            problem_index: None,
+            tags: Vec::new(),
+            link: None,
+            category: None,
+            paid_only: None,
+            content: None,
+            content_cn: None,
+            similar_questions: Vec::new(),
+        };
+        super::insert_problem(&rw_pool, &problem).unwrap();
 
         let result = super::list_problems(
             &ro_pool,
@@ -647,7 +707,29 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.total, 1);
-        assert_eq!(result.data[0].id, "luogu-p");
+        assert_eq!(result.data[0].id, "1");
+
+        problem.difficulty = Some(" 普及/提高− ".to_string());
+        super::update_problem(&rw_pool, "luogu", "1", &problem).unwrap();
+        let result = super::list_problems(
+            &ro_pool,
+            &super::ListParams {
+                source: "luogu",
+                page: 1,
+                per_page: 20,
+                difficulty: Some("普及/提高−"),
+                tags: None,
+                search: None,
+                sort_by: None,
+                sort_order: None,
+                tag_mode: "any",
+                rating_min: None,
+                rating_max: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.total, 1);
+        assert_eq!(result.data[0].id, "1");
 
         let _ = fs::remove_file(path);
     }
