@@ -290,6 +290,40 @@ pub async fn list_tags(
 }
 
 #[utoipa::path(
+    get,
+    path = "/api/v1/difficulties/{source}",
+    params(
+        ("source" = String, Path, description = "Problem source"),
+    ),
+    responses(
+        (status = 200, description = "Difficulty list", body = Vec<String>),
+        (status = 400, description = "Invalid source", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Database error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Difficulties"
+)]
+pub async fn list_difficulties(
+    State(state): State<Arc<AppState>>,
+    Path(source): Path<String>,
+) -> impl IntoResponse {
+    if !VALID_SOURCES.contains(&source.as_str()) {
+        return ProblemDetail::bad_request(format!("invalid source: {}", source)).into_response();
+    }
+
+    let pool = state.ro_pool.clone();
+    let result =
+        tokio::task::spawn_blocking(move || crate::db::problems::list_difficulties(&pool, &source))
+            .await
+            .unwrap_or(None);
+
+    match result {
+        Some(difficulties) => Json(difficulties).into_response(),
+        None => ProblemDetail::internal("database error").into_response(),
+    }
+}
+
+#[utoipa::path(
     post,
     path = "/api/v1/problems/batch",
     params(
@@ -474,6 +508,57 @@ mod tests {
         let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         (status, json)
+    }
+
+    async fn call_list_difficulties(
+        state: &Arc<AppState>,
+        source: &str,
+    ) -> (StatusCode, serde_json::Value) {
+        let response = super::list_difficulties(State(state.clone()), Path(source.to_string()))
+            .await
+            .into_response();
+        let status = response.status();
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        (status, json)
+    }
+
+    #[tokio::test]
+    async fn list_difficulties_rejects_invalid_source() {
+        let (state, path) = test_state();
+        let (status, json) = call_list_difficulties(&state, "invalid_source").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(json["detail"].as_str().unwrap().contains("invalid source"));
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn list_difficulties_returns_json_array() {
+        let (state, path) = test_state();
+        let mut hard = sample_problem("3", "hard", "leetcode");
+        hard.difficulty = Some("Hard".to_string());
+        let mut easy = sample_problem("1", "easy", "leetcode");
+        easy.difficulty = Some("Easy".to_string());
+        insert_problem(&state, hard);
+        insert_problem(&state, easy);
+
+        let (status, json) = call_list_difficulties(&state, "leetcode").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json, serde_json::json!(["Easy", "Hard"]));
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn list_difficulties_returns_empty_array_without_values() {
+        let (state, path) = test_state();
+        let mut problem = sample_problem("1", "one", "atcoder");
+        problem.difficulty = None;
+        insert_problem(&state, problem);
+
+        let (status, json) = call_list_difficulties(&state, "atcoder").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json, serde_json::json!([]));
+        cleanup_db_files(&path);
     }
 
     #[tokio::test]

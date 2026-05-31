@@ -111,7 +111,7 @@ const HOMEPAGE_CARDS: [HomepageCard; 3] = [
     },
 ];
 
-const HTTP_ROUTE_CARDS: [HttpRouteCard; 10] = [
+const HTTP_ROUTE_CARDS: [HttpRouteCard; 11] = [
     HttpRouteCard {
         group: "Problems",
         fragment_id: "problem-detail",
@@ -164,6 +164,24 @@ const HTTP_ROUTE_CARDS: [HttpRouteCard; 10] = [
         success_shape: "JSON array of tag strings.",
         success_shape_i18n: "docs_api.cards.problem_tags.success_shape",
         example: "curl -H 'Authorization: Bearer <token>' http://127.0.0.1:7856/api/v1/tags/leetcode",
+        has_source_param: true,
+    },
+    HttpRouteCard {
+        group: "Problems",
+        fragment_id: "problem-difficulties",
+        method: "GET",
+        path: "/api/v1/difficulties/{source}",
+        title: "Difficulties",
+        title_i18n: "docs_api.cards.problem_difficulties.title",
+        purpose: "List difficulty values for a supported source.",
+        purpose_i18n: "docs_api.cards.problem_difficulties.purpose",
+        auth_rule: "Bearer auth follows the existing public API middleware setting.",
+        auth_rule_i18n: "docs_api.cards.problem_difficulties.auth_rule",
+        inputs: "Path param: {source}.",
+        inputs_i18n: "docs_api.cards.problem_difficulties.inputs",
+        success_shape: "JSON array of difficulty strings.",
+        success_shape_i18n: "docs_api.cards.problem_difficulties.success_shape",
+        example: "curl -H 'Authorization: Bearer <token>' http://127.0.0.1:7856/api/v1/difficulties/leetcode",
         has_source_param: true,
     },
     HttpRouteCard {
@@ -665,7 +683,7 @@ mod tests {
         let docs = docs_registry();
 
         assert_eq!(docs.homepage_cards.len(), 3);
-        assert_eq!(docs.http_route_cards.len(), 10);
+        assert_eq!(docs.http_route_cards.len(), 11);
         assert_eq!(docs.mcp_transport_cards.len(), 2);
         assert_eq!(docs.mcp_tool_cards.len(), 5);
 
@@ -726,6 +744,7 @@ mod tests {
         assert!(html.contains("/api/v1/problems/{source}/{id}"));
         assert!(html.contains("/api/v1/problems/{source}"));
         assert!(html.contains("/api/v1/tags/{source}"));
+        assert!(html.contains("/api/v1/difficulties/{source}"));
         assert!(html.contains("/api/v1/resolve/{*query}"));
         assert!(html.contains("/api/v1/daily"));
         assert!(html.contains("/api/v1/similar/{source}/{id}"));
@@ -737,7 +756,7 @@ mod tests {
         assert!(html.contains("atcoder"));
         assert!(html.contains("luogu"));
         assert!(html.contains("spoj"));
-        assert_eq!(html.matches("class=\"panel reference-card\"").count(), 10);
+        assert_eq!(html.matches("class=\"panel reference-card\"").count(), 11);
         assert!(!html.contains("/admin/"));
     }
 
@@ -798,6 +817,19 @@ mod tests {
             .expect("tags card should exist");
         assert_eq!(tags.success_shape, "JSON array of tag strings.");
 
+        let difficulties = docs
+            .http_route_cards
+            .iter()
+            .find(|card| card.fragment_id == "problem-difficulties")
+            .expect("difficulties card should exist");
+        assert_eq!(
+            difficulties.success_shape,
+            "JSON array of difficulty strings."
+        );
+        assert!(difficulties
+            .example
+            .contains("/api/v1/difficulties/leetcode"));
+
         let resolve = docs
             .http_route_cards
             .iter()
@@ -857,9 +889,9 @@ mod tests {
         }
         .render()
         .expect("api docs template should render");
-        assert_eq!(api_html.matches("class=\"reference-details\"").count(), 10);
+        assert_eq!(api_html.matches("class=\"reference-details\"").count(), 11);
         assert!(!api_html.contains("<details class=\"reference-details\" open>"));
-        assert_eq!(api_html.matches("<summary>").count(), 10);
+        assert_eq!(api_html.matches("<summary>").count(), 11);
 
         let mcp_html = McpDocsTemplate {
             docs: docs_registry(),

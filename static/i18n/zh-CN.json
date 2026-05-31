@@ -332,6 +332,13 @@
         "inputs": "路径参数：{source}。",
         "success_shape": "JSON 数组，内容为标签字符串。"
       },
+      "problem_difficulties": {
+        "title": "难度",
+        "purpose": "列出指定支持来源的难度值。",
+        "auth_rule": "Bearer auth 取决于现有公开 API middleware 配置。",
+        "inputs": "路径参数：{source}。",
+        "success_shape": "JSON 数组，内容为难度字符串。"
+      },
       "resolve_problem": {
         "title": "解析题目",
         "purpose": "将 URL、slug 或带前缀的标识解析为具体题目。",
