@@ -280,7 +280,7 @@ class CodeforcesClient(BaseCrawler):
     async def fetch_contest_problems(
         self, contest_id: int, session: AsyncSession
     ) -> list[dict]:
-        url = f"{self.CONTEST_STANDINGS_API}?contestId={contest_id}&from=1&count=1"
+        url = f"{self.CONTEST_STANDINGS_API}?contestId={contest_id}"
         payload = await self._fetch_json(session, url)
         if not payload:
             return []
