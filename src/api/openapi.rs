@@ -89,6 +89,7 @@ use utoipa::OpenApi;
         crate::api::problems::RandomResponse,
         crate::api::resolve::ResolveResponse,
         crate::api::daily::DailyChallengeResponse,
+        crate::api::daily::DailyProblemResponse,
         crate::api::daily::DailyFetchingResponse,
         crate::api::similar::SimilarResponse,
         crate::api::similar::SimilarResult,

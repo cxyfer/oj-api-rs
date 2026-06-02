@@ -17,6 +17,13 @@ pub struct TestGuard {
     db_path: PathBuf,
 }
 
+impl TestGuard {
+    #[allow(dead_code)]
+    pub fn db_path(&self) -> &std::path::Path {
+        &self.db_path
+    }
+}
+
 impl Drop for TestGuard {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.db_path);

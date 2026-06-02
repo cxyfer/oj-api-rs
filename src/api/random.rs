@@ -96,13 +96,15 @@ pub async fn random_problems(
 
         let records = crate::db::random::random_problems(
             &pool,
-            query.source.as_deref(),
-            query.difficulty.as_deref(),
-            tags,
-            query.tag_mode.as_deref().unwrap_or("any"),
-            query.rating_min,
-            query.rating_max,
-            count,
+            crate::db::random::RandomProblemFilters {
+                source: query.source.as_deref(),
+                difficulty: query.difficulty.as_deref(),
+                tags,
+                tag_mode: query.tag_mode.as_deref().unwrap_or("any"),
+                rating_min: query.rating_min,
+                rating_max: query.rating_max,
+                count,
+            },
         )?;
 
         let results: Vec<ProblemDetailResponse> = records

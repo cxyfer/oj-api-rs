@@ -10,17 +10,22 @@ use tokio::sync::Notify;
 
 use crate::api::error::ProblemDetail;
 use crate::models::{
-    ActiveCrawlerPid, DailyChallengeRecord, JobType, LeetCodeDomain, ProblemSummary,
+    ActiveCrawlerPid, DailyChallengeRecord, JobType, LeetCodeDomain, ProblemRecord, ProblemSummary,
 };
 
 #[derive(serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub(crate) struct DailyChallengeResponse {
     pub(crate) date: String,
-    pub(crate) domain: String,
+    pub(crate) source: String,
+    pub(crate) problems: Vec<DailyProblemResponse>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub(crate) struct DailyProblemResponse {
     pub(crate) id: String,
+    pub(crate) source: String,
     pub(crate) slug: String,
     pub(crate) title: Option<String>,
-    pub(crate) title_cn: Option<String>,
     pub(crate) difficulty: Option<String>,
     pub(crate) ac_rate: Option<f64>,
     pub(crate) rating: Option<f64>,
@@ -31,7 +36,6 @@ pub(crate) struct DailyChallengeResponse {
     pub(crate) category: Option<String>,
     pub(crate) paid_only: Option<i32>,
     pub(crate) content: Option<String>,
-    pub(crate) content_cn: Option<String>,
     pub(crate) similar_questions: Vec<ProblemSummary>,
 }
 
@@ -47,32 +51,86 @@ fn build_daily_response(
     pool: &crate::db::DbPool,
     record: DailyChallengeRecord,
 ) -> DailyChallengeResponse {
-    let similar_questions = crate::db::problems::resolve_similar_question_summaries(
-        pool,
-        "leetcode",
-        &record.similar_questions,
-    );
+    let daily_source = record.source.clone();
+    let problems = record
+        .problems
+        .into_iter()
+        .map(|problem| project_daily_problem(pool, &daily_source, problem))
+        .collect();
 
     DailyChallengeResponse {
         date: record.date,
-        domain: record.domain,
-        id: record.id,
-        slug: record.slug,
-        title: record.title,
-        title_cn: record.title_cn,
-        difficulty: record.difficulty,
-        ac_rate: record.ac_rate,
-        rating: record.rating,
-        contest: record.contest,
-        problem_index: record.problem_index,
-        tags: record.tags,
-        link: record.link,
-        category: record.category,
-        paid_only: record.paid_only,
-        content: record.content,
-        content_cn: record.content_cn,
+        source: record.source,
+        problems,
+    }
+}
+
+fn project_daily_problem(
+    pool: &crate::db::DbPool,
+    daily_source: &str,
+    problem: ProblemRecord,
+) -> DailyProblemResponse {
+    let mut similar_questions = crate::db::problems::resolve_similar_question_summaries(
+        pool,
+        &problem.source,
+        &problem.similar_questions,
+    );
+    for summary in &mut similar_questions {
+        summary.link = rewrite_leetcode_link(
+            daily_source,
+            &summary.source,
+            &summary.slug,
+            summary.link.clone(),
+        );
+    }
+
+    DailyProblemResponse {
+        id: problem.id,
+        source: problem.source.clone(),
+        slug: problem.slug.clone(),
+        title: localized_field(daily_source, problem.title, problem.title_cn),
+        difficulty: problem.difficulty,
+        ac_rate: problem.ac_rate,
+        rating: problem.rating,
+        contest: problem.contest,
+        problem_index: problem.problem_index,
+        tags: problem.tags,
+        link: rewrite_leetcode_link(daily_source, &problem.source, &problem.slug, problem.link),
+        category: problem.category,
+        paid_only: problem.paid_only,
+        content: localized_field(daily_source, problem.content, problem.content_cn),
         similar_questions,
     }
+}
+
+fn localized_field(
+    daily_source: &str,
+    default_value: Option<String>,
+    cn_value: Option<String>,
+) -> Option<String> {
+    if daily_source == "leetcode.cn" {
+        cn_value
+            .filter(|value| !value.trim().is_empty())
+            .or(default_value)
+    } else {
+        default_value
+    }
+}
+
+fn rewrite_leetcode_link(
+    daily_source: &str,
+    problem_source: &str,
+    slug: &str,
+    stored_link: Option<String>,
+) -> Option<String> {
+    if problem_source == "leetcode" {
+        match daily_source {
+            "leetcode.cn" => return Some(format!("https://leetcode.cn/problems/{slug}/")),
+            "leetcode.com" => return Some(format!("https://leetcode.com/problems/{slug}/")),
+            _ => {}
+        }
+    }
+    stored_link
 }
 
 #[cfg(test)]
@@ -94,13 +152,25 @@ pub struct DailyQuery {
     pub r#async: Option<bool>,
 }
 
-fn resolve_domain(
+#[derive(Debug, Clone, Copy)]
+struct DailySourceSelection {
+    source: &'static str,
+    domain: LeetCodeDomain,
+}
+
+fn resolve_daily_source(
     domain: Option<&str>,
     source: Option<&str>,
-) -> Result<LeetCodeDomain, ProblemDetail> {
+) -> Result<DailySourceSelection, ProblemDetail> {
     let from_source = match source {
-        Some("leetcode.com") => Some(LeetCodeDomain::Com),
-        Some("leetcode.cn") => Some(LeetCodeDomain::Cn),
+        Some("leetcode.com") => Some(DailySourceSelection {
+            source: "leetcode.com",
+            domain: LeetCodeDomain::Com,
+        }),
+        Some("leetcode.cn") => Some(DailySourceSelection {
+            source: "leetcode.cn",
+            domain: LeetCodeDomain::Cn,
+        }),
         Some(s) => {
             return Err(ProblemDetail::bad_request(format!(
                 "invalid source '{}', expected 'leetcode.com' or 'leetcode.cn'",
@@ -111,20 +181,35 @@ fn resolve_domain(
     };
 
     let from_domain = match domain {
-        Some(d) => Some(
-            d.parse::<LeetCodeDomain>()
-                .map_err(|_| ProblemDetail::bad_request("domain must be 'com' or 'cn'"))?,
-        ),
+        Some(d) => {
+            let domain = d
+                .parse::<LeetCodeDomain>()
+                .map_err(|_| ProblemDetail::bad_request("domain must be 'com' or 'cn'"))?;
+            Some(DailySourceSelection {
+                source: canonical_daily_source(domain),
+                domain,
+            })
+        }
         None => None,
     };
 
     match (from_domain, from_source) {
-        (Some(d), Some(s)) if d != s => {
+        (Some(d), Some(s)) if d.domain != s.domain => {
             Err(ProblemDetail::bad_request("domain and source conflict"))
         }
         (Some(d), _) => Ok(d),
         (None, Some(s)) => Ok(s),
-        (None, None) => Ok(LeetCodeDomain::Com),
+        (None, None) => Ok(DailySourceSelection {
+            source: "leetcode.com",
+            domain: LeetCodeDomain::Com,
+        }),
+    }
+}
+
+fn canonical_daily_source(domain: LeetCodeDomain) -> &'static str {
+    match domain {
+        LeetCodeDomain::Com => "leetcode.com",
+        LeetCodeDomain::Cn => "leetcode.cn",
     }
 }
 
@@ -132,7 +217,7 @@ async fn wait_and_fetch(
     notify: Arc<Notify>,
     completed: Arc<std::sync::atomic::AtomicBool>,
     state: &Arc<AppState>,
-    domain_str: String,
+    source: String,
     date: String,
 ) -> Option<DailyChallengeResponse> {
     // Register interest before checking completed flag to avoid race where
@@ -152,7 +237,7 @@ async fn wait_and_fetch(
 
     let pool = state.ro_pool.clone();
     tokio::task::spawn_blocking(move || {
-        let record = crate::db::daily::get_daily_record(&pool, &domain_str, &date)?;
+        let record = crate::db::daily::get_daily_record(&pool, &source, &date)?;
         Some(build_daily_response(&pool, record))
     })
     .await
@@ -269,10 +354,11 @@ pub async fn get_daily(
     State(state): State<Arc<AppState>>,
     Query(query): Query<DailyQuery>,
 ) -> impl IntoResponse {
-    let domain = match resolve_domain(query.domain.as_deref(), query.source.as_deref()) {
-        Ok(d) => d,
+    let selection = match resolve_daily_source(query.domain.as_deref(), query.source.as_deref()) {
+        Ok(selection) => selection,
         Err(e) => return e.into_response(),
     };
+    let domain = selection.domain;
 
     let today = domain.today();
     let date = query.date.as_deref().unwrap_or(&today);
@@ -303,10 +389,10 @@ pub async fn get_daily(
     }
 
     let pool = state.ro_pool.clone();
-    let domain_str = domain.to_string();
+    let source = selection.source.to_string();
     let date_owned = date.to_string();
     let result = tokio::task::spawn_blocking(move || {
-        let record = crate::db::daily::get_daily_record(&pool, &domain_str, &date_owned)?;
+        let record = crate::db::daily::get_daily_record(&pool, &source, &date_owned)?;
         Some(build_daily_response(&pool, record))
     })
     .await
@@ -317,7 +403,7 @@ pub async fn get_daily(
     }
 
     // Fallback: spawn crawler
-    let key = crate::models::daily_fallback_crawler_runtime_key(&domain.to_string(), date);
+    let key = crate::models::daily_fallback_crawler_runtime_key(selection.source, date);
     let now = tokio::time::Instant::now();
     let job_id = uuid::Uuid::new_v4().to_string();
 
@@ -334,7 +420,7 @@ pub async fn get_daily(
                         notify,
                         completed,
                         &state,
-                        domain.to_string(),
+                        selection.source.to_string(),
                         date.to_string(),
                     )
                     .await
@@ -624,7 +710,7 @@ pub async fn get_daily(
             notify,
             completed,
             &state,
-            domain.to_string(),
+            selection.source.to_string(),
             date.to_string(),
         )
         .await
@@ -882,7 +968,7 @@ mod tests {
 
     #[test]
     fn remove_daily_fallback_crawler_job_if_matches_keeps_newer_job_with_same_runtime_key() {
-        let runtime_key = daily_fallback_crawler_runtime_key("com", "2026-03-14");
+        let runtime_key = daily_fallback_crawler_runtime_key("leetcode.com", "2026-03-14");
         let newer_job = crate::models::CrawlerJob {
             job_id: "new-job".to_string(),
             source: "leetcode".to_string(),
@@ -924,7 +1010,7 @@ mod tests {
             .lock()
             .unwrap_or_else(|err| err.into_inner());
         let state = test_state();
-        let runtime_key = daily_fallback_crawler_runtime_key("com", "2026-03-14");
+        let runtime_key = daily_fallback_crawler_runtime_key("leetcode.com", "2026-03-14");
         let started_at = tokio::time::Instant::now();
         let job_id = uuid::Uuid::new_v4().to_string();
         let paths = crate::utils::canonical_job_artifact_paths(JobType::Crawler, &job_id).unwrap();
@@ -994,7 +1080,7 @@ mod tests {
         std::env::set_var("PATH", "");
 
         let state = test_state();
-        let runtime_key = daily_fallback_crawler_runtime_key("com", "2026-03-14");
+        let runtime_key = daily_fallback_crawler_runtime_key("leetcode.com", "2026-03-14");
 
         let response = super::get_daily(
             State(state.clone()),
@@ -1031,7 +1117,7 @@ mod tests {
             .unwrap_or_else(|err| err.into_inner());
         let fake_uv = FakeUvGuard::install_with_trailer("sleep 0.3\nexit 0\n").await;
         let state = test_state();
-        let runtime_key = daily_fallback_crawler_runtime_key("com", "2026-03-14");
+        let runtime_key = daily_fallback_crawler_runtime_key("leetcode.com", "2026-03-14");
 
         let response = super::get_daily(
             State(state.clone()),
@@ -1083,7 +1169,7 @@ mod tests {
             .unwrap_or_else(|err| err.into_inner());
         let fake_uv = FakeUvGuard::install().await;
         let state = test_state();
-        let runtime_key = daily_fallback_crawler_runtime_key("com", "2026-03-14");
+        let runtime_key = daily_fallback_crawler_runtime_key("leetcode.com", "2026-03-14");
 
         let response = super::get_daily(
             State(state.clone()),
