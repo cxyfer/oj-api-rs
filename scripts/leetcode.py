@@ -799,7 +799,9 @@ class LeetCodeClient(BaseCrawler):
             if source == "leetcode":
                 problem = self.problems_db.get_problem(id=problem_id, source="leetcode")
                 if not problem:
-                    problem = await self.get_problem(problem_id=problem_id, domain=domain)
+                    problem = await self.get_problem(
+                        problem_id=problem_id, domain=domain
+                    )
             else:
                 problem = self.problems_db.get_problem(id=problem_id, source=source)
             if problem:

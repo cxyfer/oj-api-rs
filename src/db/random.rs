@@ -2,17 +2,30 @@ use super::DbPool;
 use crate::db::problems::row_to_problem_record;
 use crate::models::ProblemRecord;
 
+pub struct RandomProblemFilters<'a> {
+    pub source: Option<&'a str>,
+    pub difficulty: Option<&'a str>,
+    pub tags: Option<Vec<&'a str>>,
+    pub tag_mode: &'a str,
+    pub rating_min: Option<f64>,
+    pub rating_max: Option<f64>,
+    pub count: u32,
+}
+
 pub fn random_problems(
     pool: &DbPool,
-    source: Option<&str>,
-    difficulty: Option<&str>,
-    tags: Option<Vec<&str>>,
-    tag_mode: &str,
-    rating_min: Option<f64>,
-    rating_max: Option<f64>,
-    count: u32,
+    filters: RandomProblemFilters<'_>,
 ) -> Option<Vec<ProblemRecord>> {
     let conn = pool.get().ok()?;
+    let RandomProblemFilters {
+        source,
+        difficulty,
+        tags,
+        tag_mode,
+        rating_min,
+        rating_max,
+        count,
+    } = filters;
     let count = count.clamp(1, 20);
 
     let mut where_clauses: Vec<String> = Vec::new();

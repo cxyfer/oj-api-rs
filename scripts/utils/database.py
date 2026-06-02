@@ -1233,13 +1233,17 @@ class DailyChallengeDatabaseManager:
         cursor = conn.cursor()
         self._create_problems_table(cursor)
         cursor.execute("DROP TABLE IF EXISTS daily_challenge_legacy_migration")
-        cursor.execute("ALTER TABLE daily_challenge RENAME TO daily_challenge_legacy_migration")
+        cursor.execute(
+            "ALTER TABLE daily_challenge RENAME TO daily_challenge_legacy_migration"
+        )
         self._create_compact_table(cursor)
         rows = self._legacy_daily_rows(cursor)
         for row in rows:
             date = row["date"]
             domain = row["domain"]
-            resolved_id = self._legacy_problem_id(cursor, row.get("id"), row.get("slug"))
+            resolved_id = self._legacy_problem_id(
+                cursor, row.get("id"), row.get("slug")
+            )
             if resolved_id is None:
                 logger.warning(
                     "Skipping unconvertible legacy daily challenge row for %s %s",
@@ -1387,7 +1391,9 @@ class DailyChallengeDatabaseManager:
             )
             problem_refs = self._normalize_problem_refs(daily)
             if not date or not source or not problem_refs:
-                raise ValueError("daily challenge requires date, source, and problem refs")
+                raise ValueError(
+                    "daily challenge requires date, source, and problem refs"
+                )
             cursor.execute(
                 """
                 INSERT INTO daily_challenge (date, source, problems)
