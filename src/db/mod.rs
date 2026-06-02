@@ -79,7 +79,7 @@ pub fn ensure_data_dir(path: &str) {
 }
 
 pub fn ensure_data_tables(pool: &DbPool) {
-    let conn = pool.get().expect("failed to get connection");
+    let mut conn = pool.get().expect("failed to get connection");
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS problems (
             id TEXT NOT NULL,
@@ -101,27 +101,6 @@ pub fn ensure_data_tables(pool: &DbPool) {
             similar_questions TEXT,
             PRIMARY KEY (source, id)
         );
-        CREATE TABLE IF NOT EXISTS daily_challenge (
-            date TEXT NOT NULL,
-            domain TEXT NOT NULL,
-            id INTEGER,
-            slug TEXT NOT NULL,
-            title TEXT,
-            title_cn TEXT,
-            difficulty TEXT,
-            ac_rate REAL,
-            rating REAL,
-            contest TEXT,
-            problem_index TEXT,
-            tags TEXT,
-            link TEXT,
-            category TEXT,
-            paid_only INTEGER,
-            content TEXT,
-            content_cn TEXT,
-            similar_questions TEXT,
-            PRIMARY KEY (date, domain)
-        );
         CREATE TABLE IF NOT EXISTS problem_embeddings (
             source TEXT NOT NULL,
             problem_id TEXT NOT NULL,
@@ -140,6 +119,7 @@ pub fn ensure_data_tables(pool: &DbPool) {
         CREATE INDEX IF NOT EXISTS idx_problems_source_difficulty_nocase ON problems(source, difficulty COLLATE NOCASE);",
     )
     .expect("failed to create data tables");
+    daily::ensure_daily_challenge_table(&mut conn).expect("failed to create daily_challenge table");
 }
 
 pub fn ensure_app_settings_table(pool: &DbPool) {

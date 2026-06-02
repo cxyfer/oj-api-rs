@@ -198,72 +198,23 @@ impl From<ProblemRecord> for ProblemSummary {
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DailyChallenge {
     pub date: String,
-    pub domain: String,
-    pub id: String,
-    pub slug: String,
-    pub title: Option<String>,
-    pub title_cn: Option<String>,
-    pub difficulty: Option<String>,
-    pub ac_rate: Option<f64>,
-    pub rating: Option<f64>,
-    pub contest: Option<String>,
-    pub problem_index: Option<String>,
-    #[serde(deserialize_with = "deserialize_string_array", default)]
-    pub tags: Vec<String>,
-    pub link: Option<String>,
-    pub category: Option<String>,
-    pub paid_only: Option<i32>,
-    pub content: Option<String>,
-    pub content_cn: Option<String>,
-    #[serde(deserialize_with = "deserialize_similar_question_slugs", default)]
-    pub similar_questions: Vec<String>,
+    pub source: String,
+    pub problems: Vec<Problem>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DailyChallengeRecord {
     pub date: String,
-    pub domain: String,
-    pub id: String,
-    pub slug: String,
-    pub title: Option<String>,
-    pub title_cn: Option<String>,
-    pub difficulty: Option<String>,
-    pub ac_rate: Option<f64>,
-    pub rating: Option<f64>,
-    pub contest: Option<String>,
-    pub problem_index: Option<String>,
-    #[serde(deserialize_with = "deserialize_string_array", default)]
-    pub tags: Vec<String>,
-    pub link: Option<String>,
-    pub category: Option<String>,
-    pub paid_only: Option<i32>,
-    pub content: Option<String>,
-    pub content_cn: Option<String>,
-    #[serde(deserialize_with = "deserialize_similar_question_slugs", default)]
-    pub similar_questions: Vec<String>,
+    pub source: String,
+    pub problems: Vec<ProblemRecord>,
 }
 
 impl From<DailyChallengeRecord> for DailyChallenge {
     fn from(record: DailyChallengeRecord) -> Self {
         Self {
             date: record.date,
-            domain: record.domain,
-            id: record.id,
-            slug: record.slug,
-            title: record.title,
-            title_cn: record.title_cn,
-            difficulty: record.difficulty,
-            ac_rate: record.ac_rate,
-            rating: record.rating,
-            contest: record.contest,
-            problem_index: record.problem_index,
-            tags: record.tags,
-            link: record.link,
-            category: record.category,
-            paid_only: record.paid_only,
-            content: record.content,
-            content_cn: record.content_cn,
-            similar_questions: record.similar_questions,
+            source: record.source,
+            problems: record.problems.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -272,23 +223,8 @@ impl From<DailyChallenge> for DailyChallengeRecord {
     fn from(daily: DailyChallenge) -> Self {
         Self {
             date: daily.date,
-            domain: daily.domain,
-            id: daily.id,
-            slug: daily.slug,
-            title: daily.title,
-            title_cn: daily.title_cn,
-            difficulty: daily.difficulty,
-            ac_rate: daily.ac_rate,
-            rating: daily.rating,
-            contest: daily.contest,
-            problem_index: daily.problem_index,
-            tags: daily.tags,
-            link: daily.link,
-            category: daily.category,
-            paid_only: daily.paid_only,
-            content: daily.content,
-            content_cn: daily.content_cn,
-            similar_questions: daily.similar_questions,
+            source: daily.source,
+            problems: daily.problems.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -454,8 +390,8 @@ pub fn manual_crawler_runtime_key() -> &'static str {
     MANUAL_CRAWLER_RUNTIME_KEY
 }
 
-pub fn daily_fallback_crawler_runtime_key(domain: &str, date: &str) -> String {
-    format!("daily_fallback:{domain}:{date}")
+pub fn daily_fallback_crawler_runtime_key(source: &str, date: &str) -> String {
+    format!("daily_fallback:{source}:{date}")
 }
 
 pub const JOB_ARTIFACTS_ROOT: &str = "scripts/logs";

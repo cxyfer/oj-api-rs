@@ -258,11 +258,11 @@ fn collect_running_job_keys_includes_all_running_job_types() {
     let crawler_jobs = HashMap::from([
         (manual_crawler_runtime_key().to_string(), manual_job),
         (
-            daily_fallback_crawler_runtime_key("com", "2026-03-14"),
+            daily_fallback_crawler_runtime_key("leetcode.com", "2026-03-14"),
             daily_job,
         ),
         (
-            daily_fallback_crawler_runtime_key("com", "2026-03-13"),
+            daily_fallback_crawler_runtime_key("leetcode.com", "2026-03-13"),
             completed_daily_job,
         ),
     ]);
@@ -289,7 +289,7 @@ fn manual_trigger_conflicts_only_when_manual_guard_is_present() {
 
 #[test]
 fn take_manual_crawler_pid_only_removes_manual_slot() {
-    let daily_key = daily_fallback_crawler_runtime_key("com", "2026-03-14");
+    let daily_key = daily_fallback_crawler_runtime_key("leetcode.com", "2026-03-14");
     let mut pids = HashMap::from([
         (
             manual_crawler_runtime_key().to_string(),
@@ -1503,7 +1503,7 @@ async fn embedding_progress_reports_unknown_for_malformed_progress_json() {
 async fn crawler_status_projects_manual_job_while_daily_fallback_coexists() {
     let state = test_state();
     let manual_key = manual_crawler_runtime_key().to_string();
-    let daily_key = daily_fallback_crawler_runtime_key("com", "2026-03-14");
+    let daily_key = daily_fallback_crawler_runtime_key("leetcode.com", "2026-03-14");
     let manual_job = crawler_job("manual-job", CrawlerTrigger::Admin, CrawlerStatus::Running);
     let daily_job = CrawlerJob {
         args: vec![

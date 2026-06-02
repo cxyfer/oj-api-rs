@@ -540,57 +540,54 @@ fn format_problem_detail(problem: &problems::ProblemDetailResponse) -> String {
     output
 }
 
-fn format_daily_challenge(problem: &daily::DailyChallengeResponse) -> String {
-    let title = preferred_title(
-        problem.title.as_deref(),
-        problem.title_cn.as_deref(),
-        &problem.slug,
-    );
-    let difficulty = problem.difficulty.as_deref().unwrap_or("N/A");
-    let tags = if problem.tags.is_empty() {
-        "N/A".to_string()
-    } else {
-        problem.tags.join(", ")
-    };
-    let link = problem.link.as_deref().unwrap_or("N/A");
-    let ac_rate = problem
-        .ac_rate
-        .map(|value| format!("{value:.1}%"))
-        .unwrap_or_else(|| "N/A".to_string());
-
-    let mut info = format!(
-        "# {title}\n\n- Source: leetcode | ID: {id} | Difficulty: {difficulty}\n- Domain: {domain} | Date: {date}\n- Tags: {tags}\n- Link: {link}\n- AC Rate: {ac_rate}",
-        id = problem.id,
-        domain = problem.domain,
-        date = problem.date,
+fn format_daily_challenge(daily: &daily::DailyChallengeResponse) -> String {
+    let mut output = format!(
+        "# Daily Challenge\n\n- Source: {}\n- Date: {}\n- Problems: {}",
+        daily.source,
+        daily.date,
+        daily.problems.len()
     );
 
-    if let Some(rating) = problem.rating {
-        info.push_str(&format!("\n- Rating: {:.0}", rating));
-    }
+    for problem in &daily.problems {
+        let title = preferred_title(problem.title.as_deref(), None, &problem.slug);
+        let difficulty = problem.difficulty.as_deref().unwrap_or("N/A");
+        let tags = if problem.tags.is_empty() {
+            "N/A".to_string()
+        } else {
+            problem.tags.join(", ")
+        };
+        let link = problem.link.as_deref().unwrap_or("N/A");
+        let ac_rate = problem
+            .ac_rate
+            .map(|value| format!("{value:.1}%"))
+            .unwrap_or_else(|| "N/A".to_string());
 
-    let content = html_to_markdown(
-        problem
-            .content
-            .as_deref()
-            .or(problem.content_cn.as_deref())
-            .unwrap_or(""),
-    );
+        output.push_str(&format!(
+            "\n\n---\n\n## {title}\n\n- Source: {source} | ID: {id} | Difficulty: {difficulty}\n- Tags: {tags}\n- Link: {link}\n- AC Rate: {ac_rate}",
+            source = problem.source,
+            id = problem.id,
+        ));
 
-    let mut output = format!("{}\n\n---\n\n{}", info, content);
+        if let Some(rating) = problem.rating {
+            output.push_str(&format!("\n- Rating: {:.0}", rating));
+        }
 
-    if !problem.similar_questions.is_empty() {
-        output.push_str("\n\n---\n\n### Similar Questions\n\n");
-        for item in &problem.similar_questions {
-            let item_title =
-                preferred_title(item.title.as_deref(), item.title_cn.as_deref(), &item.slug);
-            output.push_str(&format!(
-                "- **{}** ({} {}): {}\n",
-                item_title,
-                item.source,
-                item.id,
-                item.link.as_deref().unwrap_or("N/A")
-            ));
+        let content = html_to_markdown(problem.content.as_deref().unwrap_or(""));
+        output.push_str(&format!("\n\n{}", content));
+
+        if !problem.similar_questions.is_empty() {
+            output.push_str("\n\n### Similar Questions\n\n");
+            for item in &problem.similar_questions {
+                let item_title =
+                    preferred_title(item.title.as_deref(), item.title_cn.as_deref(), &item.slug);
+                output.push_str(&format!(
+                    "- **{}** ({} {}): {}\n",
+                    item_title,
+                    item.source,
+                    item.id,
+                    item.link.as_deref().unwrap_or("N/A")
+                ));
+            }
         }
     }
 

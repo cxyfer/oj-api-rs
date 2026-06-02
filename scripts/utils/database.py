@@ -1162,35 +1162,115 @@ class DailyChallengeDatabaseManager:
         logger.info(f"DailyChallenge DB manager initialized with database at {db_path}")
 
     def _init_db(self):
-        """Create daily_challenge table"""
+        """Create or migrate daily_challenge table."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
+        try:
+            schema = self._detect_schema(cursor)
+            if schema == "missing":
+                self._create_compact_table(cursor)
+            elif schema == "legacy":
+                self._migrate_legacy_table(conn)
+            elif schema != "compact":
+                raise RuntimeError("unsupported daily_challenge schema")
+            conn.commit()
+        finally:
+            conn.close()
+        logger.debug("DailyChallenge table initialized")
+
+    @staticmethod
+    def _detect_schema(cursor):
+        cursor.execute("PRAGMA table_info(daily_challenge)")
+        columns = {row[1] for row in cursor.fetchall()}
+        if not columns:
+            return "missing"
+        if {"date", "source", "problems"}.issubset(columns):
+            return "compact"
+        if {"date", "domain", "id", "slug"}.issubset(columns):
+            return "legacy"
+        return "unsupported"
+
+    @staticmethod
+    def _create_compact_table(cursor):
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS daily_challenge (
             date TEXT NOT NULL,
-            domain TEXT NOT NULL,
-            id INTEGER,
-            slug TEXT NOT NULL,
-            title TEXT,
-            title_cn TEXT,
-            difficulty TEXT,
-            ac_rate REAL,
-            rating REAL,
-            contest TEXT,
-            problem_index TEXT,
-            tags TEXT,
-            link TEXT,
-            category TEXT,
-            paid_only INTEGER,
-            content TEXT,
-            content_cn TEXT,
-            similar_questions TEXT,
-            PRIMARY KEY (date, domain)
+            source TEXT NOT NULL,
+            problems TEXT NOT NULL,
+            PRIMARY KEY (date, source)
         )
         """)
-        conn.commit()
-        conn.close()
-        logger.debug("DailyChallenge table initialized")
+
+    def _migrate_legacy_table(self, conn):
+        cursor = conn.cursor()
+        cursor.execute("DROP TABLE IF EXISTS daily_challenge_legacy_migration")
+        cursor.execute("ALTER TABLE daily_challenge RENAME TO daily_challenge_legacy_migration")
+        self._create_compact_table(cursor)
+        cursor.execute(
+            "SELECT date, domain, id, slug FROM daily_challenge_legacy_migration "
+            "ORDER BY date, domain"
+        )
+        rows = cursor.fetchall()
+        for date, domain, problem_id, slug in rows:
+            resolved_id = self._legacy_problem_id(cursor, problem_id, slug)
+            if resolved_id is None:
+                logger.warning(
+                    "Skipping unconvertible legacy daily challenge row for %s %s",
+                    date,
+                    domain,
+                )
+                continue
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO daily_challenge (date, source, problems)
+                VALUES (?, ?, ?)
+                """,
+                (
+                    date,
+                    self._daily_source_from_domain(domain),
+                    json.dumps([f"leetcode:{resolved_id}"]),
+                ),
+            )
+        cursor.execute("DROP TABLE daily_challenge_legacy_migration")
+
+    @staticmethod
+    def _legacy_problem_id(cursor, problem_id, slug):
+        if problem_id is not None and str(problem_id).strip():
+            return str(problem_id).strip()
+        if not slug or not str(slug).strip():
+            return None
+        cursor.execute(
+            "SELECT id FROM problems WHERE source = 'leetcode' AND slug = ? LIMIT 1",
+            (str(slug).strip(),),
+        )
+        row = cursor.fetchone()
+        return str(row[0]).strip() if row and str(row[0]).strip() else None
+
+    @staticmethod
+    def _daily_source_from_domain(value):
+        if value == "com":
+            return "leetcode.com"
+        if value == "cn":
+            return "leetcode.cn"
+        return value
+
+    @classmethod
+    def _normalize_problem_refs(cls, daily):
+        raw_refs = daily.get("problems")
+        if isinstance(raw_refs, str):
+            raw_refs = json.loads(raw_refs)
+        if raw_refs is None:
+            problem_id = daily.get("id") or daily.get("qid")
+            raw_refs = [f"leetcode:{problem_id}"] if problem_id is not None else []
+
+        refs = []
+        for ref in raw_refs:
+            if not isinstance(ref, str) or ":" not in ref:
+                continue
+            source, problem_id = ref.split(":", 1)
+            if source.strip() and problem_id.strip():
+                refs.append(f"{source.strip()}:{problem_id.strip()}")
+        return refs
 
     def update_daily(self, daily):
         """
@@ -1201,65 +1281,24 @@ class DailyChallengeDatabaseManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         try:
-            normalized_tags = _normalize_json_string_list(daily.get("tags"))
-            normalized_similar = _normalize_similar_questions(
-                daily.get("similar_questions")
+            date = daily.get("date")
+            source = daily.get("source") or self._daily_source_from_domain(
+                daily.get("domain")
             )
+            problem_refs = self._normalize_problem_refs(daily)
+            if not date or not source or not problem_refs:
+                raise ValueError("daily challenge requires date, source, and problem refs")
             cursor.execute(
                 """
-            INSERT INTO daily_challenge
-            (date, domain, id, slug, title, title_cn, difficulty, ac_rate, rating, contest,
-             problem_index, tags, link, category, paid_only, content, content_cn, similar_questions)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(date, domain) DO UPDATE SET
-                id = COALESCE(excluded.id, daily_challenge.id),
-                slug = COALESCE(NULLIF(excluded.slug, ''), daily_challenge.slug),
-                title = COALESCE(NULLIF(excluded.title, ''), daily_challenge.title),
-                title_cn = COALESCE(NULLIF(excluded.title_cn, ''), daily_challenge.title_cn),
-                difficulty = COALESCE(NULLIF(excluded.difficulty, ''), daily_challenge.difficulty),
-                ac_rate = COALESCE(excluded.ac_rate, daily_challenge.ac_rate),
-                rating = COALESCE(excluded.rating, daily_challenge.rating),
-                contest = COALESCE(NULLIF(excluded.contest, ''), daily_challenge.contest),
-                problem_index = COALESCE(NULLIF(excluded.problem_index, ''), daily_challenge.problem_index),
-                tags = CASE
-                    WHEN excluded.tags IS NULL OR excluded.tags = '[]' THEN daily_challenge.tags
-                    ELSE excluded.tags
-                END,
-                link = COALESCE(NULLIF(excluded.link, ''), daily_challenge.link),
-                category = COALESCE(NULLIF(excluded.category, ''), daily_challenge.category),
-                paid_only = COALESCE(excluded.paid_only, daily_challenge.paid_only),
-                content = COALESCE(NULLIF(excluded.content, ''), daily_challenge.content),
-                content_cn = COALESCE(NULLIF(excluded.content_cn, ''), daily_challenge.content_cn),
-                similar_questions = CASE
-                    WHEN excluded.similar_questions IS NULL OR excluded.similar_questions = '[]' THEN daily_challenge.similar_questions
-                    ELSE excluded.similar_questions
-                END
-            """,
-                (
-                    daily.get("date"),
-                    daily.get("domain"),
-                    daily.get("id"),
-                    daily.get("slug"),
-                    daily.get("title"),
-                    daily.get("title_cn"),
-                    daily.get("difficulty"),
-                    daily.get("ac_rate"),
-                    daily.get("rating"),
-                    daily.get("contest"),
-                    daily.get("problem_index"),
-                    json.dumps(normalized_tags),
-                    daily.get("link"),
-                    daily.get("category"),
-                    daily.get("paid_only"),
-                    daily.get("content"),
-                    daily.get("content_cn"),
-                    json.dumps(normalized_similar),
-                ),
+                INSERT INTO daily_challenge (date, source, problems)
+                VALUES (?, ?, ?)
+                ON CONFLICT(date, source) DO UPDATE SET
+                    problems = excluded.problems
+                """,
+                (date, source, json.dumps(problem_refs)),
             )
             conn.commit()
-            logger.info(
-                f"Inserted/updated daily challenge for {daily.get('date')} {daily.get('domain')}"
-            )
+            logger.info("Inserted/updated daily challenge for %s %s", date, source)
             return True
         except Exception as e:
             logger.error(f"Error inserting/updating daily challenge: {e}")
@@ -1268,43 +1307,22 @@ class DailyChallengeDatabaseManager:
             conn.close()
 
     def get_daily_by_date(self, date, domain):
+        source = self._daily_source_from_domain(domain)
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT * FROM daily_challenge WHERE date = ? AND domain = ?",
-            (date, domain),
+            "SELECT date, source, problems FROM daily_challenge WHERE date = ? AND source = ?",
+            (date, source),
         )
         row = cursor.fetchone()
         conn.close()
         if row:
-            keys = [
-                "date",
-                "domain",
-                "id",
-                "slug",
-                "title",
-                "title_cn",
-                "difficulty",
-                "ac_rate",
-                "rating",
-                "contest",
-                "problem_index",
-                "tags",
-                "link",
-                "category",
-                "paid_only",
-                "content",
-                "content_cn",
-                "similar_questions",
-            ]
-            result = dict(zip(keys, row))
-            result["tags"] = _normalize_json_string_list(
-                json.loads(result["tags"]) if result["tags"] else []
-            )
-            result["similar_questions"] = _normalize_similar_questions(
-                result["similar_questions"]
-            )
-            return result
+            return {
+                "date": row[0],
+                "source": row[1],
+                "domain": domain,
+                "problems": json.loads(row[2]),
+            }
         return None
 
 
