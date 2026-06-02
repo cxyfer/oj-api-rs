@@ -1,11 +1,22 @@
+import tempfile
 import unittest
+from unittest.mock import MagicMock, patch
 
 from codeforces import CodeforcesClient
+from utils.config import CrawlerHttpConfig
 
 
 class CodeforcesContestStandingsTests(unittest.IsolatedAsyncioTestCase):
-    async def test_fetch_contest_problems_uses_contest_id_only(self):
-        client = CodeforcesClient.__new__(CodeforcesClient)
+    @patch("codeforces.ProblemsDatabaseManager")
+    @patch("utils.base_crawler.get_config")
+    async def test_fetch_contest_problems_uses_contest_id_only(
+        self, mock_get_config, _mock_db
+    ):
+        mock_get_config.return_value.get_crawler_config.return_value = (
+            CrawlerHttpConfig()
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            client = CodeforcesClient(data_dir=tmpdir, db_path=":memory:")
         requested_urls = []
 
         async def fetch_json(_session, url):
@@ -27,7 +38,7 @@ class CodeforcesContestStandingsTests(unittest.IsolatedAsyncioTestCase):
 
         client._fetch_json = fetch_json
 
-        problems = await client.fetch_contest_problems(2214, object())
+        problems = await client.fetch_contest_problems(2214, MagicMock())
 
         self.assertEqual(
             requested_urls,

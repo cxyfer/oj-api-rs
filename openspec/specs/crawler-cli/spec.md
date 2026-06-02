@@ -1,6 +1,7 @@
 ## Purpose
 
 Define the supported crawler CLI operations and compatibility requirements for maintained crawler scripts.
+
 ## Requirements
 ### Requirement: Canonical crawler operations
 Crawler scripts SHALL expose canonical operation flags for the shared crawler workflows they support. `--sync-problemset` SHALL mean fetching initial problem metadata while skipping existing problems. `--fetch-contest` SHALL mean fetching contest/archive problems and their content. `--fill-missing-content` SHALL mean filling content for existing problems whose metadata is already stored but whose content is missing.
