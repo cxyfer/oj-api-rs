@@ -18,6 +18,7 @@ pub struct TestGuard {
 }
 
 impl TestGuard {
+    #[allow(dead_code)]
     pub fn db_path(&self) -> &std::path::Path {
         &self.db_path
     }

@@ -282,6 +282,7 @@ async fn daily_endpoint_rejects_conflicting_domain_and_source() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn seed_daily_problem(
     db_path: &std::path::Path,
     id: &str,
@@ -305,6 +306,7 @@ fn seed_daily_problem(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn seed_daily_problem_with_source(
     db_path: &std::path::Path,
     source: &str,
