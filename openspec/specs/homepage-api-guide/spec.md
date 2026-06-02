@@ -73,7 +73,8 @@ The system SHALL expose a public interactive API documentation page at `/docs` b
   - `POST /api/v1/problems/batch`
   - `GET /api/v1/problems/{source}`
   - `GET /api/v1/random`
-  - `GET /api/v1/tags/{source}`
+  - `GET /api/v1/problems/tags/{source}`
+  - `GET /api/v1/problems/difficulties/{source}`
   - `GET /api/v1/resolve/{*query}`
   - `GET /api/v1/daily`
   - `GET /api/v1/similar/{source}/{id}`

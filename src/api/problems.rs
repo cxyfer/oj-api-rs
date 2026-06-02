@@ -257,7 +257,7 @@ pub async fn list_problems(
 
 #[utoipa::path(
     get,
-    path = "/api/v1/tags/{source}",
+    path = "/api/v1/problems/tags/{source}",
     params(
         ("source" = String, Path, description = "Problem source"),
     ),
@@ -291,7 +291,7 @@ pub async fn list_tags(
 
 #[utoipa::path(
     get,
-    path = "/api/v1/difficulties/{source}",
+    path = "/api/v1/problems/difficulties/{source}",
     params(
         ("source" = String, Path, description = "Problem source"),
     ),
@@ -414,9 +414,11 @@ mod tests {
     use std::sync::atomic::AtomicBool;
     use std::sync::Arc;
 
-    use axum::body::to_bytes;
-    use axum::http::StatusCode;
+    use axum::body::{to_bytes, Body};
+    use axum::http::{Request, StatusCode};
+    use axum::Extension;
     use tokio::sync::{RwLock, Semaphore};
+    use tower::ServiceExt;
 
     use super::*;
     use crate::config::Config;
@@ -521,6 +523,69 @@ mod tests {
         let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         (status, json)
+    }
+
+    async fn call_public_route(state: &Arc<AppState>, path: &str) -> (StatusCode, Vec<u8>) {
+        let app = crate::api::public_router()
+            .layer(Extension(crate::auth::AuthRwPool(Arc::new(
+                state.rw_pool.clone(),
+            ))))
+            .layer(Extension(crate::auth::TokenAuthEnabled(Arc::new(
+                AtomicBool::new(false),
+            ))))
+            .with_state(state.clone());
+        let response = app
+            .oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let status = response.status();
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        (status, body.to_vec())
+    }
+
+    #[tokio::test]
+    async fn public_router_nested_difficulties_returns_json_array() {
+        let (state, path) = test_state();
+        let mut hard = sample_problem("3", "hard", "leetcode");
+        hard.difficulty = Some("Hard".to_string());
+        let mut easy = sample_problem("1", "easy", "leetcode");
+        easy.difficulty = Some("Easy".to_string());
+        insert_problem(&state, hard);
+        insert_problem(&state, easy);
+
+        let (status, body) =
+            call_public_route(&state, "/api/v1/problems/difficulties/leetcode").await;
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json, serde_json::json!(["Easy", "Hard"]));
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn public_router_nested_tags_returns_json_array() {
+        let (state, path) = test_state();
+        let mut graph = sample_problem("2", "graph", "leetcode");
+        graph.tags = vec!["graph".to_string(), "Array".to_string()];
+        insert_problem(&state, sample_problem("1", "array", "leetcode"));
+        insert_problem(&state, graph);
+
+        let (status, body) = call_public_route(&state, "/api/v1/problems/tags/leetcode").await;
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json, serde_json::json!(["array", "graph"]));
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn public_router_old_metadata_paths_are_not_registered() {
+        let (state, path) = test_state();
+
+        for old_path in ["/api/v1/difficulties/leetcode", "/api/v1/tags/leetcode"] {
+            let (status, _) = call_public_route(&state, old_path).await;
+            assert_eq!(status, StatusCode::NOT_FOUND);
+        }
+
+        cleanup_db_files(&path);
     }
 
     #[tokio::test]

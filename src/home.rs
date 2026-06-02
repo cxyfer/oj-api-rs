@@ -152,7 +152,7 @@ const HTTP_ROUTE_CARDS: [HttpRouteCard; 11] = [
         group: "Problems",
         fragment_id: "problem-tags",
         method: "GET",
-        path: "/api/v1/tags/{source}",
+        path: "/api/v1/problems/tags/{source}",
         title: "Tags",
         title_i18n: "docs_api.cards.problem_tags.title",
         purpose: "List tag metadata for a supported source.",
@@ -163,14 +163,14 @@ const HTTP_ROUTE_CARDS: [HttpRouteCard; 11] = [
         inputs_i18n: "docs_api.cards.problem_tags.inputs",
         success_shape: "JSON array of tag strings.",
         success_shape_i18n: "docs_api.cards.problem_tags.success_shape",
-        example: "curl -H 'Authorization: Bearer <token>' http://127.0.0.1:7856/api/v1/tags/leetcode",
+        example: "curl -H 'Authorization: Bearer <token>' http://127.0.0.1:7856/api/v1/problems/tags/leetcode",
         has_source_param: true,
     },
     HttpRouteCard {
         group: "Problems",
         fragment_id: "problem-difficulties",
         method: "GET",
-        path: "/api/v1/difficulties/{source}",
+        path: "/api/v1/problems/difficulties/{source}",
         title: "Difficulties",
         title_i18n: "docs_api.cards.problem_difficulties.title",
         purpose: "List difficulty values for a supported source.",
@@ -181,7 +181,7 @@ const HTTP_ROUTE_CARDS: [HttpRouteCard; 11] = [
         inputs_i18n: "docs_api.cards.problem_difficulties.inputs",
         success_shape: "JSON array of difficulty strings.",
         success_shape_i18n: "docs_api.cards.problem_difficulties.success_shape",
-        example: "curl -H 'Authorization: Bearer <token>' http://127.0.0.1:7856/api/v1/difficulties/leetcode",
+        example: "curl -H 'Authorization: Bearer <token>' http://127.0.0.1:7856/api/v1/problems/difficulties/leetcode",
         has_source_param: true,
     },
     HttpRouteCard {
@@ -743,8 +743,8 @@ mod tests {
         assert!(html.contains("Service"));
         assert!(html.contains("/api/v1/problems/{source}/{id}"));
         assert!(html.contains("/api/v1/problems/{source}"));
-        assert!(html.contains("/api/v1/tags/{source}"));
-        assert!(html.contains("/api/v1/difficulties/{source}"));
+        assert!(html.contains("/api/v1/problems/tags/{source}"));
+        assert!(html.contains("/api/v1/problems/difficulties/{source}"));
         assert!(html.contains("/api/v1/resolve/{*query}"));
         assert!(html.contains("/api/v1/daily"));
         assert!(html.contains("/api/v1/similar/{source}/{id}"));
@@ -828,7 +828,7 @@ mod tests {
         );
         assert!(difficulties
             .example
-            .contains("/api/v1/difficulties/leetcode"));
+            .contains("/api/v1/problems/difficulties/leetcode"));
 
         let resolve = docs
             .http_route_cards
