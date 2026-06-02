@@ -1,5 +1,8 @@
-## ADDED Requirements
+## Purpose
 
+Define the supported crawler CLI operations and compatibility requirements for maintained crawler scripts.
+
+## Requirements
 ### Requirement: Canonical crawler operations
 Crawler scripts SHALL expose canonical operation flags for the shared crawler workflows they support. `--sync-problemset` SHALL mean fetching initial problem metadata while skipping existing problems. `--fetch-contest` SHALL mean fetching contest/archive problems and their content. `--fill-missing-content` SHALL mean filling content for existing problems whose metadata is already stored but whose content is missing.
 
@@ -45,7 +48,7 @@ The system SHALL support `--sync-problemset` for LeetCode, AtCoder, Codeforces, 
 - **THEN** the crawler fetches SPOJ metadata using the same behavior as the legacy `--sync-spoj` operation
 
 ### Requirement: Contest fetching support
-The system SHALL support `--fetch-contest` for AtCoder and Codeforces. The operation SHALL fetch contest/archive problem metadata and SHALL fetch content for each problem discovered from those contests.
+The system SHALL support `--fetch-contest` for AtCoder and Codeforces. The operation SHALL fetch contest/archive problem metadata and SHALL fetch content for each problem discovered from those contests. Codeforces contest fetching SHALL request `contest.standings` with only the `contestId` query parameter.
 
 #### Scenario: AtCoder contest fetch
 - **WHEN** `atcoder.py` is invoked with `--fetch-contest`
@@ -55,6 +58,7 @@ The system SHALL support `--fetch-contest` for AtCoder and Codeforces. The opera
 #### Scenario: Codeforces contest fetch
 - **WHEN** `codeforces.py` is invoked with `--fetch-contest`
 - **THEN** the crawler fetches contest problems from Codeforces contest APIs
+- **AND** requests standings discovery without `from`, `count`, or any other pagination query parameter
 - **AND** stores fetched problem content for those contest problems
 
 #### Scenario: Unsupported contest fetch is rejected
@@ -122,3 +126,4 @@ The system SHALL retain auxiliary crawler flags for workflows outside the three 
 #### Scenario: Luogu training list remains supported
 - **WHEN** `luogu.py` is invoked with `--training-list <url-or-id>`
 - **THEN** the Luogu training list sync workflow remains available
+
