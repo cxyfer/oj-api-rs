@@ -786,6 +786,30 @@ class LeetCodeClient(BaseCrawler):
 
         return daily
 
+    async def _hydrate_cached_daily(self, daily, domain):
+        resolved = []
+        for ref in daily.get("problems", []):
+            if not isinstance(ref, str) or ":" not in ref:
+                continue
+            source, problem_id = ref.split(":", 1)
+            source = source.strip()
+            problem_id = problem_id.strip()
+            if not source or not problem_id:
+                continue
+            if source == "leetcode":
+                problem = self.problems_db.get_problem(id=problem_id, source="leetcode")
+                if not problem:
+                    problem = await self.get_problem(problem_id=problem_id, domain=domain)
+            else:
+                problem = self.problems_db.get_problem(id=problem_id, source=source)
+            if problem:
+                resolved.append(problem)
+
+        if not resolved:
+            return None
+        daily["resolved_problems"] = resolved
+        return daily
+
     async def get_daily_challenge(self, date_str=None, domain=None):
         """
         Get the daily challenge data for the specified date.
@@ -820,8 +844,15 @@ class LeetCodeClient(BaseCrawler):
         # 1. Check database
         daily = self.daily_db.get_daily_by_date(date_str, domain)
         if daily:
-            logger.info(f"Found daily challenge for {date_str} in database")
-            return daily
+            hydrated_daily = await self._hydrate_cached_daily(daily, domain)
+            if hydrated_daily:
+                logger.info(f"Found daily challenge for {date_str} in database")
+                return hydrated_daily
+            logger.warning(
+                "Daily challenge cache for %s %s has no resolvable problems; refetching",
+                date_str,
+                domain,
+            )
 
         # 2. Check file (for legacy data)
         yy, mm, _ = date_str.split("-")

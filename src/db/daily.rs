@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 use super::DbPool;
 use crate::models::{DailyChallengeRecord, ProblemRecord};
@@ -30,10 +30,7 @@ pub(crate) fn ensure_daily_challenge_table(conn: &mut Connection) -> rusqlite::R
 }
 
 fn detect_daily_challenge_schema(conn: &Connection) -> rusqlite::Result<DailyChallengeSchema> {
-    let mut stmt = conn.prepare("PRAGMA table_info(daily_challenge)")?;
-    let columns = stmt
-        .query_map([], |row| row.get::<_, String>(1))?
-        .collect::<rusqlite::Result<HashSet<_>>>()?;
+    let columns = table_columns(conn, "daily_challenge")?;
 
     if columns.is_empty() {
         return Ok(DailyChallengeSchema::Missing);
@@ -53,20 +50,59 @@ fn detect_daily_challenge_schema(conn: &Connection) -> rusqlite::Result<DailyCha
     Ok(DailyChallengeSchema::Unsupported)
 }
 
+fn table_columns(conn: &Connection, table: &str) -> rusqlite::Result<HashSet<String>> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let columns = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<rusqlite::Result<HashSet<_>>>()?;
+    Ok(columns)
+}
+
 fn create_compact_daily_challenge_table(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(COMPACT_DAILY_CHALLENGE_SCHEMA)
 }
 
 fn rebuild_legacy_daily_challenge(conn: &mut Connection) -> rusqlite::Result<()> {
-    conn.execute_batch("BEGIN IMMEDIATE")?;
-    let result = rebuild_legacy_daily_challenge_inner(conn);
-    match result {
-        Ok(()) => conn.execute_batch("COMMIT"),
-        Err(err) => {
-            let _ = conn.execute_batch("ROLLBACK");
-            Err(err)
+    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    rebuild_legacy_daily_challenge_inner(&tx)?;
+    tx.commit()
+}
+
+fn legacy_daily_select_sql(columns: &HashSet<String>) -> String {
+    const OPTIONAL_COLUMNS: &[&str] = &[
+        "title",
+        "title_cn",
+        "difficulty",
+        "ac_rate",
+        "rating",
+        "contest",
+        "problem_index",
+        "tags",
+        "link",
+        "category",
+        "paid_only",
+        "content",
+        "content_cn",
+        "similar_questions",
+    ];
+
+    let mut selected = vec![
+        "date".to_string(),
+        "domain".to_string(),
+        "id".to_string(),
+        "slug".to_string(),
+    ];
+    selected.extend(OPTIONAL_COLUMNS.iter().map(|column| {
+        if columns.contains(*column) {
+            (*column).to_string()
+        } else {
+            format!("NULL AS {column}")
         }
-    }
+    }));
+    format!(
+        "SELECT {} FROM daily_challenge_legacy_migration ORDER BY date, domain",
+        selected.join(", ")
+    )
 }
 
 fn rebuild_legacy_daily_challenge_inner(conn: &Connection) -> rusqlite::Result<()> {
@@ -76,17 +112,31 @@ fn rebuild_legacy_daily_challenge_inner(conn: &Connection) -> rusqlite::Result<(
     )?;
     create_compact_daily_challenge_table(conn)?;
 
+    let legacy_columns = table_columns(conn, "daily_challenge_legacy_migration")?;
+    let select_sql = legacy_daily_select_sql(&legacy_columns);
     let legacy_rows = {
-        let mut stmt = conn.prepare(
-            "SELECT date, domain, id, slug FROM daily_challenge_legacy_migration ORDER BY date, domain",
-        )?;
+        let mut stmt = conn.prepare(&select_sql)?;
         let rows = stmt
             .query_map([], |row| {
                 Ok(LegacyDailyRow {
-                    date: row.get(0)?,
-                    domain: row.get(1)?,
-                    id: row.get(2)?,
-                    slug: row.get(3)?,
+                    date: row.get("date")?,
+                    domain: row.get("domain")?,
+                    id: row.get("id")?,
+                    slug: row.get("slug")?,
+                    title: row.get("title")?,
+                    title_cn: row.get("title_cn")?,
+                    difficulty: row.get("difficulty")?,
+                    ac_rate: row.get("ac_rate")?,
+                    rating: row.get("rating")?,
+                    contest: row.get("contest")?,
+                    problem_index: row.get("problem_index")?,
+                    tags: row.get("tags")?,
+                    link: row.get("link")?,
+                    category: row.get("category")?,
+                    paid_only: row.get("paid_only")?,
+                    content: row.get("content")?,
+                    content_cn: row.get("content_cn")?,
+                    similar_questions: row.get("similar_questions")?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -102,6 +152,7 @@ fn rebuild_legacy_daily_challenge_inner(conn: &Connection) -> rusqlite::Result<(
             );
             continue;
         };
+        seed_legacy_problem_if_missing(conn, &problem_id, &row)?;
         let refs = serde_json::to_string(&[format!("leetcode:{problem_id}")])
             .map_err(|err| rusqlite::Error::ToSqlConversionFailure(Box::new(err)))?;
         conn.execute(
@@ -123,6 +174,59 @@ struct LegacyDailyRow {
     domain: String,
     id: Option<rusqlite::types::Value>,
     slug: Option<String>,
+    title: Option<String>,
+    title_cn: Option<String>,
+    difficulty: Option<String>,
+    ac_rate: Option<f64>,
+    rating: Option<f64>,
+    contest: Option<String>,
+    problem_index: Option<String>,
+    tags: Option<String>,
+    link: Option<String>,
+    category: Option<String>,
+    paid_only: Option<i32>,
+    content: Option<String>,
+    content_cn: Option<String>,
+    similar_questions: Option<String>,
+}
+
+fn seed_legacy_problem_if_missing(
+    conn: &Connection,
+    problem_id: &str,
+    row: &LegacyDailyRow,
+) -> rusqlite::Result<()> {
+    let Some(slug) = row.slug.as_deref().filter(|slug| !slug.trim().is_empty()) else {
+        return Ok(());
+    };
+    conn.execute(
+        "INSERT OR IGNORE INTO problems (
+            id, source, slug, title, title_cn, difficulty, ac_rate, rating,
+            contest, problem_index, tags, link, category, paid_only, content,
+            content_cn, similar_questions
+         ) VALUES (
+            ?1, 'leetcode', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9,
+            COALESCE(?10, '[]'), ?11, ?12, ?13, ?14, ?15, COALESCE(?16, '[]')
+         )",
+        params![
+            problem_id,
+            slug,
+            row.title.as_deref(),
+            row.title_cn.as_deref(),
+            row.difficulty.as_deref(),
+            row.ac_rate,
+            row.rating,
+            row.contest.as_deref(),
+            row.problem_index.as_deref(),
+            row.tags.as_deref(),
+            row.link.as_deref(),
+            row.category.as_deref(),
+            row.paid_only,
+            row.content.as_deref(),
+            row.content_cn.as_deref(),
+            row.similar_questions.as_deref(),
+        ],
+    )?;
+    Ok(())
 }
 
 fn legacy_problem_id(conn: &Connection, row: &LegacyDailyRow) -> rusqlite::Result<Option<String>> {
@@ -381,6 +485,82 @@ mod tests {
                 ),
             ]
         );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn ensure_daily_challenge_table_seeds_legacy_snapshot_when_problem_row_is_missing() {
+        crate::db::register_sqlite_vec();
+        let path = test_db_path();
+        let pool = create_rw_pool(&path, 1, 1000);
+        let mut conn = pool.get().unwrap();
+        create_minimal_problems_table(&conn);
+        conn.execute_batch(
+            "CREATE TABLE daily_challenge (
+                date TEXT NOT NULL,
+                domain TEXT NOT NULL,
+                id INTEGER,
+                slug TEXT NOT NULL,
+                title TEXT,
+                title_cn TEXT,
+                difficulty TEXT,
+                ac_rate REAL,
+                rating REAL,
+                contest TEXT,
+                problem_index TEXT,
+                tags TEXT,
+                link TEXT,
+                category TEXT,
+                paid_only INTEGER,
+                content TEXT,
+                content_cn TEXT,
+                similar_questions TEXT,
+                PRIMARY KEY (date, domain)
+            )",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO daily_challenge (
+                date, domain, id, slug, title, title_cn, difficulty, ac_rate,
+                rating, contest, problem_index, tags, link, category, paid_only,
+                content, content_cn, similar_questions
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+            params![
+                "2026-01-01",
+                "com",
+                1234,
+                "legacy-only",
+                "Legacy Only",
+                "舊快取",
+                "Easy",
+                50.0,
+                1200.0,
+                "weekly-contest-1",
+                "A",
+                "[\"Array\"]",
+                "https://leetcode.com/problems/legacy-only/",
+                "Algorithms",
+                0,
+                "legacy content",
+                "舊內容",
+                "[\"two-sum\"]",
+            ],
+        )
+        .unwrap();
+
+        ensure_daily_challenge_table(&mut conn).unwrap();
+        drop(conn);
+        let ro_pool = create_ro_pool(&path, 1, 1000);
+
+        let record = get_daily_record(&ro_pool, "leetcode.com", "2026-01-01").unwrap();
+        let problem = &record.problems[0];
+        assert_eq!(problem.id, "1234");
+        assert_eq!(problem.slug, "legacy-only");
+        assert_eq!(problem.title.as_deref(), Some("Legacy Only"));
+        assert_eq!(problem.content.as_deref(), Some("legacy content"));
+        assert_eq!(problem.tags, vec!["Array"]);
+        assert_eq!(problem.similar_questions, vec!["two-sum"]);
+
         let _ = fs::remove_file(path);
     }
 

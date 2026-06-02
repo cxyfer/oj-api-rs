@@ -1,9 +1,11 @@
+import asyncio
 import json
 import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 
+from leetcode import LeetCodeClient
 from utils.database import DailyChallengeDatabaseManager, ProblemsDatabaseManager
 
 
@@ -56,27 +58,26 @@ class DailyChallengeStorageTests(unittest.TestCase):
             json.loads(stored[2]), ["leetcode:1234", "leetcode:1", "custom:abc:123"]
         )
 
+    def test_update_daily_accepts_plain_string_problem_ref(self):
+        manager = DailyChallengeDatabaseManager(self.db_path)
+
+        self.assertTrue(
+            manager.update_daily(
+                {
+                    "date": "2026-01-01",
+                    "source": "leetcode.com",
+                    "problems": "leetcode:1234",
+                }
+            )
+        )
+
+        self.assertEqual(
+            self._daily_rows(), [("2026-01-01", "leetcode.com", '["leetcode:1234"]')]
+        )
+
     def test_legacy_migration_converts_rows_and_slug_fallback(self):
         ProblemsDatabaseManager(self.db_path).update_problem(
-            {
-                "id": "42",
-                "source": "leetcode",
-                "slug": "two-sum",
-                "title": "Two Sum",
-                "title_cn": "兩數之和",
-                "difficulty": "Easy",
-                "ac_rate": 50.0,
-                "rating": None,
-                "contest": None,
-                "problem_index": None,
-                "tags": [],
-                "link": "https://leetcode.com/problems/two-sum/",
-                "category": "Algorithms",
-                "paid_only": 0,
-                "content": None,
-                "content_cn": None,
-                "similar_questions": [],
-            },
+            self._problem(id="42", slug="two-sum"),
             force_update=True,
         )
         self._create_legacy_daily_table()
@@ -104,6 +105,78 @@ class DailyChallengeStorageTests(unittest.TestCase):
             ],
         )
 
+    def test_legacy_migration_preserves_snapshot_when_problem_row_is_missing(self):
+        ProblemsDatabaseManager(self.db_path)
+        self._create_full_legacy_daily_table()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO daily_challenge (
+                    date, domain, id, slug, title, title_cn, difficulty, ac_rate,
+                    rating, contest, problem_index, tags, link, category, paid_only,
+                    content, content_cn, similar_questions
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "2026-01-01",
+                    "com",
+                    1234,
+                    "legacy-only",
+                    "Legacy Only",
+                    "舊快取",
+                    "Easy",
+                    50.0,
+                    1200.0,
+                    "weekly-contest-1",
+                    "A",
+                    '["Array"]',
+                    "https://leetcode.com/problems/legacy-only/",
+                    "Algorithms",
+                    0,
+                    "legacy content",
+                    "舊內容",
+                    '["two-sum"]',
+                ),
+            )
+
+        DailyChallengeDatabaseManager(self.db_path)
+        stored = ProblemsDatabaseManager(self.db_path).get_problem(
+            id="1234", source="leetcode"
+        )
+
+        self.assertEqual(
+            self._daily_rows(), [("2026-01-01", "leetcode.com", '["leetcode:1234"]')]
+        )
+        self.assertEqual(stored["slug"], "legacy-only")
+        self.assertEqual(stored["title"], "Legacy Only")
+        self.assertEqual(stored["content"], "legacy content")
+        self.assertEqual(stored["tags"], ["Array"])
+        self.assertEqual(stored["similar_questions"], ["two-sum"])
+
+    def test_hydrate_cached_daily_fetches_missing_leetcode_problem(self):
+        problems_db = ProblemsDatabaseManager(self.db_path)
+        client = LeetCodeClient.__new__(LeetCodeClient)
+        client.problems_db = problems_db
+        calls = []
+
+        async def get_problem(problem_id=None, slug=None, domain=None):
+            calls.append((problem_id, slug, domain))
+            return self._problem(id=problem_id, slug="two-sum")
+
+        client.get_problem = get_problem
+        daily = {
+            "date": "2026-01-01",
+            "source": "leetcode.com",
+            "domain": "com",
+            "problems": ["leetcode:1"],
+        }
+
+        hydrated = asyncio.run(client._hydrate_cached_daily(daily, "com"))
+
+        self.assertIsNotNone(hydrated)
+        self.assertEqual(calls, [("1", None, "com")])
+        self.assertEqual(hydrated["resolved_problems"][0]["id"], "1")
+
     def _create_legacy_daily_table(self):
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("DROP TABLE IF EXISTS daily_challenge")
@@ -119,11 +192,62 @@ class DailyChallengeStorageTests(unittest.TestCase):
                 """
             )
 
+    def _create_full_legacy_daily_table(self):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DROP TABLE IF EXISTS daily_challenge")
+            conn.execute(
+                """
+                CREATE TABLE daily_challenge (
+                    date TEXT NOT NULL,
+                    domain TEXT NOT NULL,
+                    id INTEGER,
+                    slug TEXT NOT NULL,
+                    title TEXT,
+                    title_cn TEXT,
+                    difficulty TEXT,
+                    ac_rate REAL,
+                    rating REAL,
+                    contest TEXT,
+                    problem_index TEXT,
+                    tags TEXT,
+                    link TEXT,
+                    category TEXT,
+                    paid_only INTEGER,
+                    content TEXT,
+                    content_cn TEXT,
+                    similar_questions TEXT,
+                    PRIMARY KEY (date, domain)
+                )
+                """
+            )
+
     def _daily_rows(self):
         with sqlite3.connect(self.db_path) as conn:
             return conn.execute(
                 "SELECT date, source, problems FROM daily_challenge ORDER BY date, source"
             ).fetchall()
+
+    @staticmethod
+    def _problem(id, slug):
+        return {
+            "id": str(id),
+            "source": "leetcode",
+            "slug": slug,
+            "title": slug.replace("-", " ").title(),
+            "title_cn": "",
+            "difficulty": "Easy",
+            "ac_rate": 50.0,
+            "rating": None,
+            "contest": None,
+            "problem_index": None,
+            "tags": [],
+            "link": f"https://leetcode.com/problems/{slug}/",
+            "category": "Algorithms",
+            "paid_only": 0,
+            "content": None,
+            "content_cn": None,
+            "similar_questions": [],
+        }
 
 
 if __name__ == "__main__":

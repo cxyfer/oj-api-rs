@@ -1201,18 +1201,45 @@ class DailyChallengeDatabaseManager:
         )
         """)
 
+    @staticmethod
+    def _create_problems_table(cursor):
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS problems (
+            id TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT 'leetcode',
+            slug TEXT NOT NULL,
+            title TEXT,
+            title_cn TEXT,
+            difficulty TEXT,
+            ac_rate REAL,
+            rating REAL,
+            contest TEXT,
+            problem_index TEXT,
+            tags TEXT,
+            link TEXT,
+            category TEXT,
+            paid_only INTEGER,
+            content TEXT,
+            content_cn TEXT,
+            similar_questions TEXT,
+            PRIMARY KEY (source, id)
+        )
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_problems_source_slug ON problems(source, slug)"
+        )
+
     def _migrate_legacy_table(self, conn):
         cursor = conn.cursor()
+        self._create_problems_table(cursor)
         cursor.execute("DROP TABLE IF EXISTS daily_challenge_legacy_migration")
         cursor.execute("ALTER TABLE daily_challenge RENAME TO daily_challenge_legacy_migration")
         self._create_compact_table(cursor)
-        cursor.execute(
-            "SELECT date, domain, id, slug FROM daily_challenge_legacy_migration "
-            "ORDER BY date, domain"
-        )
-        rows = cursor.fetchall()
-        for date, domain, problem_id, slug in rows:
-            resolved_id = self._legacy_problem_id(cursor, problem_id, slug)
+        rows = self._legacy_daily_rows(cursor)
+        for row in rows:
+            date = row["date"]
+            domain = row["domain"]
+            resolved_id = self._legacy_problem_id(cursor, row.get("id"), row.get("slug"))
             if resolved_id is None:
                 logger.warning(
                     "Skipping unconvertible legacy daily challenge row for %s %s",
@@ -1220,6 +1247,7 @@ class DailyChallengeDatabaseManager:
                     domain,
                 )
                 continue
+            self._seed_legacy_problem_if_missing(cursor, resolved_id, row)
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO daily_challenge (date, source, problems)
@@ -1232,6 +1260,71 @@ class DailyChallengeDatabaseManager:
                 ),
             )
         cursor.execute("DROP TABLE daily_challenge_legacy_migration")
+
+    @staticmethod
+    def _legacy_daily_rows(cursor):
+        cursor.execute("PRAGMA table_info(daily_challenge_legacy_migration)")
+        columns = {row[1] for row in cursor.fetchall()}
+        optional_columns = [
+            "title",
+            "title_cn",
+            "difficulty",
+            "ac_rate",
+            "rating",
+            "contest",
+            "problem_index",
+            "tags",
+            "link",
+            "category",
+            "paid_only",
+            "content",
+            "content_cn",
+            "similar_questions",
+        ]
+        selected = ["date", "domain", "id", "slug"]
+        selected.extend(
+            column if column in columns else f"NULL AS {column}"
+            for column in optional_columns
+        )
+        cursor.execute(
+            f"SELECT {', '.join(selected)} FROM daily_challenge_legacy_migration "
+            "ORDER BY date, domain"
+        )
+        names = [description[0] for description in cursor.description]
+        return [dict(zip(names, row)) for row in cursor.fetchall()]
+
+    @staticmethod
+    def _seed_legacy_problem_if_missing(cursor, problem_id, row):
+        slug = row.get("slug")
+        if not slug or not str(slug).strip():
+            return
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO problems (
+                id, source, slug, title, title_cn, difficulty, ac_rate, rating,
+                contest, problem_index, tags, link, category, paid_only, content,
+                content_cn, similar_questions
+            ) VALUES (?, 'leetcode', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(problem_id),
+                str(slug).strip(),
+                row.get("title"),
+                row.get("title_cn"),
+                row.get("difficulty"),
+                row.get("ac_rate"),
+                row.get("rating"),
+                row.get("contest"),
+                row.get("problem_index"),
+                row.get("tags") or "[]",
+                row.get("link"),
+                row.get("category"),
+                row.get("paid_only"),
+                row.get("content"),
+                row.get("content_cn"),
+                row.get("similar_questions") or "[]",
+            ),
+        )
 
     @staticmethod
     def _legacy_problem_id(cursor, problem_id, slug):
@@ -1258,10 +1351,17 @@ class DailyChallengeDatabaseManager:
     def _normalize_problem_refs(cls, daily):
         raw_refs = daily.get("problems")
         if isinstance(raw_refs, str):
-            raw_refs = json.loads(raw_refs)
+            try:
+                raw_refs = json.loads(raw_refs)
+            except json.JSONDecodeError:
+                raw_refs = [raw_refs]
+            if isinstance(raw_refs, str):
+                raw_refs = [raw_refs]
         if raw_refs is None:
             problem_id = daily.get("id") or daily.get("qid")
             raw_refs = [f"leetcode:{problem_id}"] if problem_id is not None else []
+        elif not isinstance(raw_refs, list):
+            raw_refs = [raw_refs]
 
         refs = []
         for ref in raw_refs:

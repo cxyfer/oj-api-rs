@@ -205,6 +205,67 @@ async fn daily_endpoint_projects_cn_localization_and_aliases() {
 }
 
 #[tokio::test]
+async fn daily_endpoint_resolves_similar_questions_from_problem_source() {
+    let (app, guard) = common::build_test_app();
+    seed_daily_problem_with_source(
+        guard.db_path(),
+        "atcoder",
+        "abc001_a",
+        "abc001-a",
+        Some("ABC001 A"),
+        None,
+        None,
+        None,
+        &["abc002-a"],
+    );
+    seed_daily_problem_with_source(
+        guard.db_path(),
+        "atcoder",
+        "abc002_a",
+        "abc002-a",
+        Some("ABC002 A"),
+        None,
+        None,
+        None,
+        &[],
+    );
+    seed_daily_problem_with_source(
+        guard.db_path(),
+        "leetcode",
+        "999",
+        "abc002-a",
+        Some("Wrong Source"),
+        None,
+        None,
+        None,
+        &[],
+    );
+    seed_daily_row(
+        guard.db_path(),
+        "2026-01-01",
+        "leetcode.com",
+        &["atcoder:abc001_a"],
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/daily?source=leetcode.com&date=2026-01-01")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let similar = &json["problems"][0]["similar_questions"][0];
+    assert_eq!(similar["source"], "atcoder");
+    assert_eq!(similar["slug"], "abc002-a");
+}
+
+#[tokio::test]
 async fn daily_endpoint_rejects_conflicting_domain_and_source() {
     let (app, _guard) = common::build_test_app();
 
@@ -231,21 +292,46 @@ fn seed_daily_problem(
     content_cn: Option<&str>,
     similar_questions: &[&str],
 ) {
+    seed_daily_problem_with_source(
+        db_path,
+        "leetcode",
+        id,
+        slug,
+        title,
+        title_cn,
+        content,
+        content_cn,
+        similar_questions,
+    );
+}
+
+fn seed_daily_problem_with_source(
+    db_path: &std::path::Path,
+    source: &str,
+    id: &str,
+    slug: &str,
+    title: Option<&str>,
+    title_cn: Option<&str>,
+    content: Option<&str>,
+    content_cn: Option<&str>,
+    similar_questions: &[&str],
+) {
     let conn = rusqlite::Connection::open(db_path).unwrap();
     conn.execute(
         "INSERT INTO problems (
             id, source, slug, title, title_cn, difficulty, ac_rate, tags, link,
             category, paid_only, content, content_cn, similar_questions
          ) VALUES (
-            ?1, 'leetcode', ?2, ?3, ?4, 'Easy', 50.0, '[]', ?5,
-            'Algorithms', 0, ?6, ?7, ?8
+            ?1, ?2, ?3, ?4, ?5, 'Easy', 50.0, '[]', ?6,
+            'Algorithms', 0, ?7, ?8, ?9
          )",
         params![
             id,
+            source,
             slug,
             title,
             title_cn,
-            format!("https://leetcode.com/problems/{slug}/"),
+            format!("https://example.com/problems/{slug}/"),
             content,
             content_cn,
             serde_json::to_string(similar_questions).unwrap()

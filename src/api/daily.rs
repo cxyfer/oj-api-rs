@@ -72,7 +72,7 @@ fn project_daily_problem(
 ) -> DailyProblemResponse {
     let mut similar_questions = crate::db::problems::resolve_similar_question_summaries(
         pool,
-        "leetcode",
+        &problem.source,
         &problem.similar_questions,
     );
     for summary in &mut similar_questions {
