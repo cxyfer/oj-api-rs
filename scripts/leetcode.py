@@ -1014,14 +1014,16 @@ class LeetCodeClient(BaseCrawler):
         for item in results:
             if not item:
                 continue
+            problems = item.get("resolved_problems") or [item]
+            problem = problems[0]
             entry = {
                 "date": item.get("date"),
-                "id": item.get("id"),
-                "title": item.get("title"),
-                "difficulty": item.get("difficulty"),
-                "link": item.get("link"),
+                "id": problem.get("id"),
+                "title": problem.get("title"),
+                "difficulty": problem.get("difficulty"),
+                "link": problem.get("link"),
             }
-            rating = item.get("rating")
+            rating = problem.get("rating")
             if rating is not None:
                 entry["rating"] = rating
             history.append(entry)

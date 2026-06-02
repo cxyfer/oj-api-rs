@@ -177,6 +177,35 @@ class DailyChallengeStorageTests(unittest.TestCase):
         self.assertEqual(calls, [("1", None, "com")])
         self.assertEqual(hydrated["resolved_problems"][0]["id"], "1")
 
+    def test_daily_history_uses_hydrated_compact_problem_metadata(self):
+        client = LeetCodeClient.__new__(LeetCodeClient)
+        client.domain = "com"
+
+        async def get_daily_challenge(date_str=None, domain=None):
+            return {
+                "date": date_str,
+                "source": "leetcode.com",
+                "problems": ["leetcode:1"],
+                "resolved_problems": [self._problem(id="1", slug="two-sum")],
+            }
+
+        client.get_daily_challenge = get_daily_challenge
+
+        history = asyncio.run(client.get_daily_history("2026-01-01", years=1))
+
+        self.assertEqual(
+            history,
+            [
+                {
+                    "date": "2025-01-01",
+                    "id": "1",
+                    "title": "Two Sum",
+                    "difficulty": "Easy",
+                    "link": "https://leetcode.com/problems/two-sum/",
+                }
+            ],
+        )
+
     def _create_legacy_daily_table(self):
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("DROP TABLE IF EXISTS daily_challenge")

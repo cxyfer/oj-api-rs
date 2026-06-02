@@ -274,7 +274,7 @@ pub fn get_daily_record(pool: &DbPool, source: &str, date: &str) -> Option<Daily
         )
         .ok()?;
     let refs = parse_problem_refs(&problems_raw)?;
-    let problems = resolve_problem_refs(&conn, &refs);
+    let problems = resolve_problem_refs(&conn, &refs)?;
     if problems.is_empty() {
         return None;
     }
@@ -290,21 +290,24 @@ fn parse_problem_refs(raw: &str) -> Option<Vec<(String, String)>> {
     let mut parsed = Vec::with_capacity(refs.len());
     for reference in refs {
         let Some((source, id)) = reference.split_once(':') else {
-            tracing::warn!("skipping malformed daily problem ref '{}'", reference);
-            continue;
+            tracing::warn!("malformed daily problem ref '{}'", reference);
+            return None;
         };
         let source = source.trim();
         let id = id.trim();
         if source.is_empty() || id.is_empty() {
-            tracing::warn!("skipping malformed daily problem ref '{}'", reference);
-            continue;
+            tracing::warn!("malformed daily problem ref '{}'", reference);
+            return None;
         }
         parsed.push((source.to_string(), id.to_string()));
     }
     Some(parsed)
 }
 
-fn resolve_problem_refs(conn: &Connection, refs: &[(String, String)]) -> Vec<ProblemRecord> {
+fn resolve_problem_refs(
+    conn: &Connection,
+    refs: &[(String, String)],
+) -> Option<Vec<ProblemRecord>> {
     let mut problems = Vec::with_capacity(refs.len());
     for (source, id) in refs {
         match conn.query_row(
@@ -314,17 +317,21 @@ fn resolve_problem_refs(conn: &Connection, refs: &[(String, String)]) -> Vec<Pro
         ) {
             Ok(problem) => problems.push(problem),
             Err(rusqlite::Error::QueryReturnedNoRows) => {
-                tracing::debug!("failed to resolve daily problem ref '{}:{}'", source, id)
+                tracing::debug!("failed to resolve daily problem ref '{}:{}'", source, id);
+                return None;
             }
-            Err(err) => tracing::warn!(
-                "failed to resolve daily problem ref '{}:{}': {}",
-                source,
-                id,
-                err
-            ),
+            Err(err) => {
+                tracing::warn!(
+                    "failed to resolve daily problem ref '{}:{}': {}",
+                    source,
+                    id,
+                    err
+                );
+                return None;
+            }
         }
     }
-    problems
+    Some(problems)
 }
 
 #[cfg(test)]
@@ -648,6 +655,7 @@ mod tests {
         let (rw_pool, ro_pool, path) = setup_pools();
         {
             let conn = rw_pool.get().unwrap();
+            insert_problem(&conn, "1", "leetcode", "daily-a");
             conn.execute(
                 "INSERT INTO daily_challenge (date, source, problems) VALUES (?1, ?2, ?3)",
                 params!["2026-03-20", "leetcode.com", "not-json"],
@@ -662,10 +670,20 @@ mod tests {
                 ],
             )
             .unwrap();
+            conn.execute(
+                "INSERT INTO daily_challenge (date, source, problems) VALUES (?1, ?2, ?3)",
+                params![
+                    "2026-03-22",
+                    "leetcode.com",
+                    "[\"leetcode:1\",\"leetcode:404\"]"
+                ],
+            )
+            .unwrap();
         }
 
         assert!(get_daily_record(&ro_pool, "leetcode.com", "2026-03-20").is_none());
         assert!(get_daily_record(&ro_pool, "leetcode.com", "2026-03-21").is_none());
+        assert!(get_daily_record(&ro_pool, "leetcode.com", "2026-03-22").is_none());
 
         let _ = fs::remove_file(path);
     }
