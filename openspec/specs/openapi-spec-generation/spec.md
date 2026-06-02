@@ -3,6 +3,25 @@
 ## Purpose
 Define the runtime-generated OpenAPI 3.1 contract for `oj-api-rs`, including the public JSON spec at `/openapi.json`, the interactive docs at `/docs`, and the legacy redirect from `/docs/api`.
 
+## Requirements
+
+### Requirement: Problem metadata discovery paths in generated OpenAPI
+The generated OpenAPI document SHALL advertise problem metadata discovery under the `/api/v1/problems` namespace and SHALL NOT advertise the old top-level public metadata discovery paths.
+
+#### Scenario: OpenAPI includes nested metadata discovery paths
+- **WHEN** the OpenAPI document is generated
+- **THEN** it includes `GET /api/v1/problems/tags/{source}`
+- **AND** it includes `GET /api/v1/problems/difficulties/{source}`
+
+#### Scenario: OpenAPI excludes old metadata discovery paths
+- **WHEN** the OpenAPI document is generated
+- **THEN** it does not include `GET /api/v1/tags/{source}`
+- **AND** it does not include `GET /api/v1/difficulties/{source}`
+
+#### Scenario: OpenAPI security remains bearer protected
+- **WHEN** the OpenAPI document is generated
+- **THEN** both nested metadata discovery operations declare the existing `bearer_auth` security requirement
+
 ## Constraints
 
 ### Hard Constraints
@@ -51,7 +70,8 @@ Define the runtime-generated OpenAPI 3.1 contract for `oj-api-rs`, including the
 | POST | `/api/v1/problems/batch` | `batch_problems` |
 | GET | `/api/v1/problems/{source}` | `list_problems` |
 | GET | `/api/v1/random` | `random_problems` |
-| GET | `/api/v1/tags/{source}` | `list_tags` |
+| GET | `/api/v1/problems/tags/{source}` | `list_tags` |
+| GET | `/api/v1/problems/difficulties/{source}` | `list_difficulties` |
 | GET | `/api/v1/resolve/{*query}` | `resolve` |
 | GET | `/api/v1/daily` | `get_daily` |
 | GET | `/api/v1/similar/{source}/{id}` | `similar_by_problem` |
@@ -147,6 +167,11 @@ Define the runtime-generated OpenAPI 3.1 contract for `oj-api-rs`, including the
 
 ### Security Consistency
 - Security schemes in the spec MUST match the actual middleware behavior.
+
+### Problem Metadata Discovery Paths
+- Generated output MUST include `GET /api/v1/problems/tags/{source}` and `GET /api/v1/problems/difficulties/{source}`.
+- Generated output MUST NOT include old top-level public metadata discovery paths `GET /api/v1/tags/{source}` or `GET /api/v1/difficulties/{source}`.
+- The nested metadata discovery operations MUST declare the existing `bearer_auth` security requirement.
 
 ### Response Correctness
 - RFC 7807 routes MUST declare `application/problem+json`.

@@ -93,7 +93,7 @@ async fn tags_list_returns_empty_for_empty_db() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api/v1/tags/leetcode")
+                .uri("/api/v1/problems/tags/leetcode")
                 .body(Body::empty())
                 .unwrap(),
         )
