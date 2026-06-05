@@ -276,10 +276,28 @@ class AtCoderClient(BaseCrawler):
             return None
         if not all(ch.isascii() and (ch.isalnum() or ch == "_") for ch in problem_id):
             return None
-        contest_id = problem_id.split("_", 1)[0]
+        contest_id = AtCoderClient.contest_id_for_problem(problem_id)
         if not contest_id:
             return None
         return contest_id, problem_id
+
+    @staticmethod
+    def contest_id_for_problem(problem_id: str) -> Optional[str]:
+        parts = problem_id.split("_")
+        prefix = parts[0]
+        if not prefix:
+            return None
+        past_month = prefix.removeprefix("past")
+        if prefix.startswith("past") and len(past_month) == 6 and past_month.isdigit():
+            return f"{prefix}-open"
+        if (
+            prefix.startswith("arc")
+            and len(parts) >= 2
+            and parts[1].startswith("abc")
+            and parts[1][3:].isdigit()
+        ):
+            return parts[1]
+        return prefix
 
     @classmethod
     def problem_url_for_id(cls, problem_id: str) -> Optional[str]:

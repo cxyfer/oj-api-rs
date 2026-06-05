@@ -1,3 +1,4 @@
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::api::problems::{build_problem_detail_response, ProblemDetailResponse};
@@ -68,16 +69,14 @@ fn split_codeforces_id(id: &str) -> Option<(String, String)> {
 fn derive_atcoder_plan(id: &str) -> Option<DirectFetchPlan> {
     let id = id.trim().to_ascii_lowercase();
     if id.is_empty()
+        || !id.contains('_')
         || !id
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
     {
         return None;
     }
-    let contest_id = id.split_once('_')?.0;
-    if contest_id.is_empty() {
-        return None;
-    }
+    let contest_id = derive_atcoder_contest_id(&id)?;
     Some(DirectFetchPlan {
         db_source: "atcoder".to_string(),
         db_id: id.clone(),
@@ -85,6 +84,31 @@ fn derive_atcoder_plan(id: &str) -> Option<DirectFetchPlan> {
         problem_arg: id.clone(),
         url: format!("https://atcoder.jp/contests/{contest_id}/tasks/{id}"),
     })
+}
+
+fn derive_atcoder_contest_id(problem_id: &str) -> Option<String> {
+    let mut parts = problem_id.split('_');
+    let prefix = parts.next()?;
+    if prefix.is_empty() {
+        return None;
+    }
+    if let Some(month) = prefix.strip_prefix("past") {
+        if month.len() == 6 && month.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Some(format!("{prefix}-open"));
+        }
+    }
+    if prefix.starts_with("arc") {
+        if let Some(abc_contest) = parts.next() {
+            let abc_number = &abc_contest[3..];
+            if abc_contest.starts_with("abc")
+                && !abc_number.is_empty()
+                && abc_number.bytes().all(|byte| byte.is_ascii_digit())
+            {
+                return Some(abc_contest.to_string());
+            }
+        }
+    }
+    Some(prefix.to_string())
 }
 
 fn derive_luogu_plan(id: &str) -> Option<DirectFetchPlan> {
@@ -125,6 +149,19 @@ pub(crate) async fn fetch_problem_on_miss(
     .flatten()
 }
 
+fn absolute_path(path: &str) -> PathBuf {
+    let path = Path::new(path);
+    path.canonicalize().unwrap_or_else(|_| {
+        if path.is_relative() {
+            std::env::current_dir()
+                .map(|cwd| cwd.join(path))
+                .unwrap_or_else(|_| path.to_path_buf())
+        } else {
+            path.to_path_buf()
+        }
+    })
+}
+
 async fn run_single_problem_crawler(state: &Arc<AppState>, plan: &DirectFetchPlan) -> bool {
     #[cfg(test)]
     match state.config.database.path.as_str() {
@@ -163,11 +200,12 @@ async fn run_single_problem_crawler(state: &Arc<AppState>, plan: &DirectFetchPla
         }
     };
 
+    let db_path = absolute_path(&state.config.database.path);
     let mut cmd = tokio::process::Command::new("uv");
     cmd.args(["run", "python3", plan.crawler_source.script_name()]);
     cmd.args(args);
     cmd.arg("--db-path");
-    cmd.arg(&state.config.database.path);
+    cmd.arg(db_path);
     cmd.current_dir("scripts/");
     cmd.kill_on_drop(true);
     cmd.stdout(std::process::Stdio::null());
@@ -250,6 +288,18 @@ mod tests {
         assert_eq!(
             plan.url,
             "https://atcoder.jp/contests/abc100/tasks/abc100_arc100_a"
+        );
+
+        let plan = derive_direct_fetch_plan("atcoder", "past201912_a").unwrap();
+        assert_eq!(
+            plan.url,
+            "https://atcoder.jp/contests/past201912-open/tasks/past201912_a"
+        );
+
+        let plan = derive_direct_fetch_plan("atcoder", "arc058_abc042_a").unwrap();
+        assert_eq!(
+            plan.url,
+            "https://atcoder.jp/contests/abc042/tasks/arc058_abc042_a"
         );
     }
 

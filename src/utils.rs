@@ -1409,7 +1409,7 @@ mod tests {
     #[tokio::test]
     async fn live_output_capture_appends_logs_during_execution() {
         let paths = temp_job_paths(JobType::Crawler, "live-capture");
-        let mut cmd = tokio::process::Command::new("/bin/sh");
+        let mut cmd = tokio::process::Command::new("sh");
         cmd.arg("-c");
         cmd.arg("printf 'out-1'; sleep 0.3; printf 'err-1' >&2; sleep 0.3; printf 'out-2'");
         cmd.stdout(Stdio::piped());
@@ -1451,7 +1451,7 @@ mod tests {
         let paths = temp_job_paths(JobType::Embedding, "bounded-tail");
         let stdout_len = OUTPUT_TAIL_MAX_BYTES + 321;
         let stderr_len = OUTPUT_TAIL_MAX_BYTES + 123;
-        let mut cmd = tokio::process::Command::new("/usr/bin/python3");
+        let mut cmd = tokio::process::Command::new("python3");
         cmd.arg("-c");
         cmd.arg(format!(
             "import sys; sys.stdout.write('A' * {stdout_len}); sys.stderr.write('B' * {stderr_len})"

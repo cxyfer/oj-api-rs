@@ -798,7 +798,12 @@ class LuoguClient(BaseCrawler):
         ctx = self._extract_lentille_context(html)
         if not ctx:
             return False
-        raw_problem = ctx.get("data", {}).get("problem", {})
+        data = ctx.get("data") or {}
+        if not isinstance(data, dict):
+            return False
+        raw_problem = data.get("problem") or {}
+        if not isinstance(raw_problem, dict):
+            return False
         raw_problem = {**raw_problem, "pid": normalized_id}
         mapped = self._map_problem(raw_problem, tag_map)
         if not mapped:

@@ -175,6 +175,10 @@ pub async fn get_problem(
         return ProblemDetail::bad_request(format!("invalid source: {}", source)).into_response();
     }
 
+    if source == "gym" && crate::dynamic_problem::derive_direct_fetch_plan(&source, &id).is_none() {
+        return ProblemDetail::not_found("problem not found").into_response();
+    }
+
     let db_source = if source == "gym" {
         "codeforces".to_string()
     } else {
@@ -579,6 +583,22 @@ mod tests {
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["id"], "1988A");
         assert_eq!(json["content"], "content");
+
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn get_problem_rejects_regular_contest_hit_through_gym_alias() {
+        let (state, path) = test_state_with_database_path(Some("__dynamic_fetch_mock_fail__"));
+        insert_problem(&state, sample_problem("1988A", "1988A", "codeforces"));
+
+        let response = super::get_problem(
+            State(state.clone()),
+            Path(("gym".to_string(), "1988A".to_string())),
+        )
+        .await
+        .into_response();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
         cleanup_db_files(&path);
     }
