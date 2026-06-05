@@ -630,7 +630,8 @@ async def query_similar(
         print("Embedding index is empty. Run embedding_cli.py --build first.")
         return
 
-    rewritten = await rewriter.rewrite(query)
+    text_for_embedding = query
+    rewritten = await rewriter.rewrite(text_for_embedding)
     embedding = await generator.embed(rewritten)
     searcher = SimilaritySearcher(db, storage)
     results = await searcher.search(embedding, source, top_k, min_similarity)
