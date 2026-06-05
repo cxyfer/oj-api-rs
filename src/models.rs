@@ -632,6 +632,12 @@ pub static LEETCODE_ARGS: &[ArgSpec] = &[
 
 pub static ATCODER_ARGS: &[ArgSpec] = &[
     ArgSpec {
+        flag: "--problem",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
+    ArgSpec {
         flag: "--sync-problemset",
         arity: 0,
         value_type: ValueType::None,
@@ -725,6 +731,12 @@ pub static ATCODER_ARGS: &[ArgSpec] = &[
 
 pub static CODEFORCES_ARGS: &[ArgSpec] = &[
     ArgSpec {
+        flag: "--problem",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
+    ArgSpec {
         flag: "--sync-problemset",
         arity: 0,
         value_type: ValueType::None,
@@ -817,6 +829,12 @@ pub static CODEFORCES_ARGS: &[ArgSpec] = &[
 ];
 
 pub static LUOGU_ARGS: &[ArgSpec] = &[
+    ArgSpec {
+        flag: "--problem",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
     ArgSpec {
         flag: "--sync-problemset",
         arity: 0,
@@ -961,7 +979,7 @@ pub static DIAG_ARGS: &[ArgSpec] = &[ArgSpec {
     ui_exposed: true,
 }];
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CrawlerSource {
     LeetCode,
     AtCoder,
@@ -1265,11 +1283,13 @@ mod tests {
     #[test]
     fn validate_args_accepts_canonical_crawler_flags() {
         assert!(validate_args(&CrawlerSource::LeetCode, &args(&["--sync-problemset"])).is_ok());
+        assert!(validate_args(&CrawlerSource::AtCoder, &args(&["--problem", "abc321_a"])).is_ok());
         assert!(validate_args(
             &CrawlerSource::AtCoder,
             &args(&["--sync-problemset", "--fetch-contest", "--no-resume"])
         )
         .is_ok());
+        assert!(validate_args(&CrawlerSource::Codeforces, &args(&["--problem", "1988A"])).is_ok());
         assert!(validate_args(
             &CrawlerSource::Codeforces,
             &args(&[
@@ -1280,6 +1300,7 @@ mod tests {
             ])
         )
         .is_ok());
+        assert!(validate_args(&CrawlerSource::Luogu, &args(&["--problem", "P1083"])).is_ok());
         assert!(validate_args(&CrawlerSource::Luogu, &args(&["--sync-problemset"])).is_ok());
         assert!(validate_args(
             &CrawlerSource::Spoj,
@@ -1312,6 +1333,10 @@ mod tests {
 
     #[test]
     fn validate_args_rejects_unsupported_canonical_flags() {
+        for source in [CrawlerSource::LeetCode, CrawlerSource::Spoj] {
+            let err = validate_args(&source, &args(&["--problem", "P1083"])).unwrap_err();
+            assert_eq!(err, "unknown argument: --problem");
+        }
         for source in [
             CrawlerSource::LeetCode,
             CrawlerSource::Luogu,
