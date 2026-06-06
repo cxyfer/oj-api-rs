@@ -556,6 +556,7 @@ pub enum ValueType {
     YearMonth,
     Domain,
     Source,
+    DailySource,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -758,6 +759,24 @@ pub static CODEFORCES_ARGS: &[ArgSpec] = &[
         flag: "--contest",
         arity: 1,
         value_type: ValueType::Int,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--daily-source",
+        arity: 1,
+        value_type: ValueType::DailySource,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--date",
+        arity: 1,
+        value_type: ValueType::Date,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--daily-file",
+        arity: 1,
+        value_type: ValueType::Str,
         ui_exposed: true,
     },
     ArgSpec {
@@ -1061,7 +1080,10 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
                 if v.is_empty() {
                     return Err(format!("{}: value must not be empty", token));
                 }
-                if spec.flag == "--data-dir" || spec.flag == "--db-path" {
+                if spec.flag == "--data-dir"
+                    || spec.flag == "--db-path"
+                    || spec.flag == "--daily-file"
+                {
                     if v.starts_with('/') {
                         return Err(format!("{}: must be a relative path", token));
                     }
@@ -1084,6 +1106,15 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
                 if v != "luogu" && v != "spoj" {
                     return Err(format!(
                         "{}: invalid source '{}', expected 'luogu' or 'spoj'",
+                        token, v
+                    ));
+                }
+            }
+            ValueType::DailySource => {
+                let v = &raw_args[i + 1];
+                if v != "sheep" && v != "0x3f" {
+                    return Err(format!(
+                        "{}: invalid daily source '{}', expected 'sheep' or '0x3f'",
                         token, v
                     ));
                 }
@@ -1277,6 +1308,10 @@ mod tests {
                 "--fetch-contest",
                 "--no-resume",
                 "--include-gym",
+                "--daily-source",
+                "sheep",
+                "--date",
+                "2026-06-02",
             ])
         )
         .is_ok());
@@ -1330,6 +1365,20 @@ mod tests {
         let err =
             validate_args(&CrawlerSource::Codeforces, &args(&["--contest", "abc"])).unwrap_err();
         assert!(err.contains("invalid integer"));
+
+        let err = validate_args(
+            &CrawlerSource::Codeforces,
+            &args(&["--daily-source", "unknown"]),
+        )
+        .unwrap_err();
+        assert!(err.contains("invalid daily source"));
+
+        let err = validate_args(
+            &CrawlerSource::Codeforces,
+            &args(&["--daily-source", "0x3f", "--daily-file", "../x.csv"]),
+        )
+        .unwrap_err();
+        assert!(err.contains("'..'"));
     }
 
     #[test]
