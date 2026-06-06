@@ -5,6 +5,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from codeforces import (
+    CodeforcesClient,
+    parse_0x3f_daily_file,
+    parse_sheep_daily_markdown,
+)
 from leetcode import LeetCodeClient
 from utils.database import DailyChallengeDatabaseManager, ProblemsDatabaseManager
 
@@ -206,6 +211,70 @@ class DailyChallengeStorageTests(unittest.TestCase):
             ],
         )
 
+    def test_parse_sheep_daily_markdown_extracts_regular_and_gym_links(self):
+        markdown = """
+| Difficulty | Problems | Hints |
+| -------- | -------- | -------- |
+| *1400 | [1930A](https://codeforces.com/contest/1930/problem/A) | Sort greedily. |
+| *2100 | [GYM106539D](https://codeforces.com/gym/106539/problem/D) | Probability. |
+"""
+
+        problems = parse_sheep_daily_markdown(markdown)
+
+        self.assertEqual(
+            [problem["id"] for problem in problems], ["1930A", "GYM106539D"]
+        )
+        self.assertEqual(problems[0]["rating"], 1400)
+        self.assertEqual(problems[0]["content"], "Sort greedily.")
+        self.assertEqual(problems[1]["contest"], "GYM106539")
+        self.assertEqual(problems[1]["problem_index"], "D")
+
+    def test_store_sheep_daily_writes_problem_snapshots_and_daily_refs(self):
+        client = self._codeforces_client_no_config()
+        problems = parse_sheep_daily_markdown(
+            "| Difficulty | Problems | Hints |\n"
+            "| -------- | -------- | -------- |\n"
+            "| *1200 | [1930A](https://codeforces.com/problemset/problem/1930/A) | Hint |\n"
+        )
+
+        self.assertTrue(client._store_daily_source("2026-06-02", "sheep", problems))
+
+        stored = ProblemsDatabaseManager(self.db_path).get_problem(
+            id="1930A", source="codeforces"
+        )
+        self.assertEqual(stored["title"], "1930A")
+        self.assertEqual(stored["rating"], 1200.0)
+        self.assertEqual(
+            self._daily_rows(),
+            [("2026-06-02", "sheep", '["codeforces:1930A"]')],
+        )
+
+    def test_parse_0x3f_daily_file_extracts_requested_date_urls(self):
+        daily_file = Path(self._tmpdir.name) / "0x3f.csv"
+        daily_file.write_text(
+            "日期,難度,題目\n"
+            "2026-06-01,800,https://codeforces.com/contest/1/problem/A\n"
+            "2026-06-02,1700,https://codeforces.com/problemset/problem/1930/A\n",
+            encoding="utf-8",
+        )
+
+        problems = parse_0x3f_daily_file(daily_file, "2026-06-02")
+
+        self.assertEqual([problem["id"] for problem in problems], ["1930A"])
+        self.assertEqual(problems[0]["rating"], 1700)
+
+    def test_0x3f_import_requires_parseable_input(self):
+        client = self._codeforces_client_no_config()
+        daily_file = Path(self._tmpdir.name) / "0x3f.csv"
+        daily_file.write_text(
+            "日期,題目\n2026-06-02,not a codeforces url\n", encoding="utf-8"
+        )
+
+        self.assertFalse(client.import_0x3f_daily("2026-06-02", str(daily_file)))
+        self.assertEqual(self._daily_rows(), [])
+        with self.assertRaises(ValueError):
+            client.import_0x3f_daily("2026-06-02", None)
+
     def _create_legacy_daily_table(self):
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("DROP TABLE IF EXISTS daily_challenge")
@@ -255,6 +324,12 @@ class DailyChallengeStorageTests(unittest.TestCase):
             return conn.execute(
                 "SELECT date, source, problems FROM daily_challenge ORDER BY date, source"
             ).fetchall()
+
+    def _codeforces_client_no_config(self):
+        client = CodeforcesClient.__new__(CodeforcesClient)
+        client.problems_db = ProblemsDatabaseManager(self.db_path)
+        client.daily_db = DailyChallengeDatabaseManager(self.db_path)
+        return client
 
     @staticmethod
     def _problem(id, slug):
