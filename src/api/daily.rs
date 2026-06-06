@@ -155,7 +155,25 @@ pub struct DailyQuery {
 #[derive(Debug, Clone, Copy)]
 struct DailySourceSelection {
     source: &'static str,
-    domain: LeetCodeDomain,
+    domain: Option<LeetCodeDomain>,
+}
+
+impl DailySourceSelection {
+    fn today(&self) -> String {
+        self.domain
+            .map(|domain| domain.today())
+            .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string())
+    }
+
+    fn today_naive(&self) -> chrono::NaiveDate {
+        self.domain
+            .map(|domain| domain.today_naive())
+            .unwrap_or_else(|| chrono::Utc::now().date_naive())
+    }
+
+    fn is_leetcode(&self) -> bool {
+        self.domain.is_some()
+    }
 }
 
 fn resolve_daily_source(
@@ -165,15 +183,23 @@ fn resolve_daily_source(
     let from_source = match source {
         Some("leetcode.com") => Some(DailySourceSelection {
             source: "leetcode.com",
-            domain: LeetCodeDomain::Com,
+            domain: Some(LeetCodeDomain::Com),
         }),
         Some("leetcode.cn") => Some(DailySourceSelection {
             source: "leetcode.cn",
-            domain: LeetCodeDomain::Cn,
+            domain: Some(LeetCodeDomain::Cn),
+        }),
+        Some("sheep") => Some(DailySourceSelection {
+            source: "sheep",
+            domain: None,
+        }),
+        Some("0x3f") => Some(DailySourceSelection {
+            source: "0x3f",
+            domain: None,
         }),
         Some(s) => {
             return Err(ProblemDetail::bad_request(format!(
-                "invalid source '{}', expected 'leetcode.com' or 'leetcode.cn'",
+                "invalid source '{}', expected 'leetcode.com', 'leetcode.cn', 'sheep', or '0x3f'",
                 s
             )))
         }
@@ -187,7 +213,7 @@ fn resolve_daily_source(
                 .map_err(|_| ProblemDetail::bad_request("domain must be 'com' or 'cn'"))?;
             Some(DailySourceSelection {
                 source: canonical_daily_source(domain),
-                domain,
+                domain: Some(domain),
             })
         }
         None => None,
@@ -201,7 +227,7 @@ fn resolve_daily_source(
         (None, Some(s)) => Ok(s),
         (None, None) => Ok(DailySourceSelection {
             source: "leetcode.com",
-            domain: LeetCodeDomain::Com,
+            domain: Some(LeetCodeDomain::Com),
         }),
     }
 }
@@ -358,9 +384,7 @@ pub async fn get_daily(
         Ok(selection) => selection,
         Err(e) => return e.into_response(),
     };
-    let domain = selection.domain;
-
-    let today = domain.today();
+    let today = selection.today();
     let date = query.date.as_deref().unwrap_or(&today);
     let should_wait = !query.r#async.unwrap_or(false);
 
@@ -379,7 +403,7 @@ pub async fn get_daily(
     };
 
     let lower = chrono::NaiveDate::from_ymd_opt(2020, 4, 1).unwrap();
-    let upper = domain.today_naive();
+    let upper = selection.today_naive();
 
     if parsed < lower {
         return ProblemDetail::bad_request("date must be >= 2020-04-01").into_response();
@@ -400,6 +424,14 @@ pub async fn get_daily(
 
     if let Some(daily) = result {
         return Json(daily).into_response();
+    }
+
+    if !selection.is_leetcode() {
+        return (
+            axum::http::StatusCode::ACCEPTED,
+            Json(serde_json::json!({"status": "fetching", "retry_after": 30})),
+        )
+            .into_response();
     }
 
     // Fallback: spawn crawler
@@ -468,6 +500,7 @@ pub async fn get_daily(
     };
 
     // Determine args
+    let domain = selection.domain.expect("LeetCode fallback has domain");
     let today_str = domain.today();
     let domain_arg = domain.to_string();
     let started_at = chrono::Utc::now().to_rfc3339();

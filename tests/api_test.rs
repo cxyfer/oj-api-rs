@@ -282,6 +282,82 @@ async fn daily_endpoint_rejects_conflicting_domain_and_source() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
+#[tokio::test]
+async fn daily_endpoint_returns_codeforces_source_records() {
+    let (app, guard) = common::build_test_app();
+    seed_daily_problem_with_source(
+        guard.db_path(),
+        "codeforces",
+        "1930A",
+        "1930A",
+        Some("Maximise The Score"),
+        Some("ignored localized title"),
+        Some("Codeforces hint"),
+        Some("ignored localized content"),
+        &[],
+    );
+    seed_daily_row(
+        guard.db_path(),
+        "2026-06-02",
+        "sheep",
+        &["codeforces:1930A"],
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/daily?source=sheep&date=2026-06-02")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let problem = &json["problems"][0];
+    assert_eq!(json["source"], "sheep");
+    assert_eq!(problem["source"], "codeforces");
+    assert_eq!(problem["title"], "Maximise The Score");
+    assert_eq!(problem["content"], "Codeforces hint");
+    assert_eq!(problem["link"], "https://example.com/problems/1930A/");
+}
+
+#[tokio::test]
+async fn daily_endpoint_rejects_domain_with_codeforces_source() {
+    let (app, _guard) = common::build_test_app();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/daily?domain=com&source=sheep")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn daily_endpoint_missing_codeforces_source_returns_fetching_without_job() {
+    let (app, _guard) = common::build_test_app();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/daily?source=0x3f&date=2026-06-02")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+}
+
 #[allow(clippy::too_many_arguments)]
 fn seed_daily_problem(
     db_path: &std::path::Path,
