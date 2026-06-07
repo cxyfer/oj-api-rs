@@ -6,7 +6,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import date as Date, datetime, timezone
 from pathlib import Path
 from typing import Optional, Union
 
@@ -46,6 +46,13 @@ CF_URL_RE = re.compile(
     r"(?:gym/(\d+)/problem/([A-Za-z0-9]+)))"
 )
 DATE_HEADERS = {"date", "日期", "時間", "时间", "day"}
+DAILY_DATE_FORMATS = (
+    "%Y-%m-%d",
+    "%Y/%m/%d",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y/%m/%d %H:%M:%S",
+    "%Y-%m-%dT%H:%M:%S",
+)
 RATING_HEADERS = {"rating", "difficulty", "難度", "难度", "分數", "分数"}
 
 
@@ -69,15 +76,26 @@ def _problem_id_from_url(url: str) -> Optional[tuple[str, str, str, bool]]:
 
 
 def _codeforces_links(text: str) -> list[tuple[str, str]]:
-    links = [
-        (label.strip(), url.strip()) for label, url in MD_LINK_RE.findall(text or "")
-    ]
-    seen = {url for _, url in links}
+    links: list[tuple[str, str]] = []
+    seen_ids: set[str] = set()
+    for label, url in MD_LINK_RE.findall(text or ""):
+        parsed = _problem_id_from_url(url)
+        if not parsed:
+            continue
+        problem_id = parsed[0]
+        if problem_id in seen_ids:
+            continue
+        links.append((label.strip(), url.strip()))
+        seen_ids.add(problem_id)
     for match in CF_URL_RE.finditer(text or ""):
         url = match.group(0)
-        if url not in seen:
+        parsed = _problem_id_from_url(url)
+        if not parsed:
+            continue
+        problem_id = parsed[0]
+        if problem_id not in seen_ids:
             links.append(("", url))
-            seen.add(url)
+            seen_ids.add(problem_id)
     return links
 
 
@@ -145,16 +163,31 @@ def _read_daily_table(path: Path) -> list[dict[str, str]]:
     return list(csv.DictReader(text.splitlines(), dialect=dialect))
 
 
+def _parse_daily_date(value: str) -> Optional[Date]:
+    value = (value or "").strip()
+    if not value:
+        return None
+    for fmt in DAILY_DATE_FORMATS:
+        try:
+            return datetime.strptime(value, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
 def _row_date_matches(row: dict[str, str], date: str) -> bool:
-    normalized_date = date.replace("-", "/")
-    for key, value in row.items():
-        key_normalized = (key or "").strip().lower()
-        value = (value or "").strip()
-        if key_normalized in DATE_HEADERS:
-            return value in {date, normalized_date}
-    return any(
-        (value or "").strip() in {date, normalized_date} for value in row.values()
-    )
+    target_date = _parse_daily_date(date)
+    if target_date is None:
+        return False
+
+    date_values = [
+        value or ""
+        for key, value in row.items()
+        if (key or "").strip().lower() in DATE_HEADERS
+    ]
+    if date_values:
+        return any(_parse_daily_date(value) == target_date for value in date_values)
+    return any(_parse_daily_date(value or "") == target_date for value in row.values())
 
 
 def _row_rating(row: dict[str, str]) -> Optional[int]:
@@ -735,7 +768,7 @@ class CodeforcesClient(BaseCrawler):
         if not refs:
             logger.warning("No parseable %s daily problems for %s", daily_source, date)
             return False
-        self.problems_db.update_problems(problems, force_update=True)
+        self.problems_db.update_problems(problems)
         return self.daily_db.update_daily(
             {"date": date, "source": daily_source, "problems": refs}
         )
@@ -762,7 +795,11 @@ class CodeforcesClient(BaseCrawler):
     def import_0x3f_daily(self, date: str, daily_file: str | None) -> bool:
         if not daily_file:
             raise ValueError("--daily-file is required for --daily-source 0x3f")
-        problems = parse_0x3f_daily_file(Path(daily_file), date)
+        try:
+            problems = parse_0x3f_daily_file(Path(daily_file), date)
+        except FileNotFoundError:
+            logger.error("0x3f daily file not found: %s", daily_file)
+            return False
         return self._store_daily_source(date, "0x3f", problems)
 
     async def fetch_daily_source(

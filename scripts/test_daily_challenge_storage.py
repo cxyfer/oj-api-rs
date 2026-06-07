@@ -229,6 +229,19 @@ class DailyChallengeStorageTests(unittest.TestCase):
         self.assertEqual(problems[1]["contest"], "GYM106539")
         self.assertEqual(problems[1]["problem_index"], "D")
 
+    def test_parse_sheep_daily_markdown_dedupes_links_by_problem_id(self):
+        markdown = (
+            "| Difficulty | Problems | Hints |\n"
+            "| -------- | -------- | -------- |\n"
+            "| *1200 | [Maximise The Score](https://codeforces.com/contest/1930/problem/A/) | Hint |\n"
+        )
+
+        problems = parse_sheep_daily_markdown(markdown)
+
+        self.assertEqual(len(problems), 1)
+        self.assertEqual(problems[0]["id"], "1930A")
+        self.assertEqual(problems[0]["title"], "Maximise The Score")
+
     def test_store_sheep_daily_writes_problem_snapshots_and_daily_refs(self):
         client = self._codeforces_client_no_config()
         problems = parse_sheep_daily_markdown(
@@ -249,19 +262,64 @@ class DailyChallengeStorageTests(unittest.TestCase):
             [("2026-06-02", "sheep", '["codeforces:1930A"]')],
         )
 
+    def test_store_daily_source_preserves_existing_codeforces_metadata(self):
+        client = self._codeforces_client_no_config()
+        existing = {
+            "id": "1930A",
+            "source": "codeforces",
+            "slug": "1930A",
+            "title": "Full Metadata Title",
+            "title_cn": "",
+            "difficulty": "hard",
+            "ac_rate": 65.5,
+            "rating": 2200,
+            "contest": "1930",
+            "problem_index": "A",
+            "tags": ["math"],
+            "link": "https://codeforces.com/contest/1930/problem/A",
+            "category": "Algorithms",
+            "paid_only": 0,
+            "content": "Full statement",
+            "content_cn": None,
+            "similar_questions": [],
+        }
+        self.assertTrue(client.problems_db.update_problem(existing, force_update=True))
+        problems = parse_sheep_daily_markdown(
+            "| Difficulty | Problems | Hints |\n"
+            "| -------- | -------- | -------- |\n"
+            "| *1200 | [Daily Title](https://codeforces.com/problemset/problem/1930/A) | Daily hint |\n"
+        )
+
+        self.assertTrue(client._store_daily_source("2026-06-02", "sheep", problems))
+
+        stored = ProblemsDatabaseManager(self.db_path).get_problem(
+            id="1930A", source="codeforces"
+        )
+        self.assertEqual(stored["title"], "Full Metadata Title")
+        self.assertEqual(stored["difficulty"], "hard")
+        self.assertEqual(stored["ac_rate"], 65.5)
+        self.assertEqual(stored["rating"], 2200.0)
+        self.assertEqual(stored["tags"], ["math"])
+        self.assertEqual(stored["content"], "Full statement")
+        self.assertEqual(
+            self._daily_rows(),
+            [("2026-06-02", "sheep", '["codeforces:1930A"]')],
+        )
+
     def test_parse_0x3f_daily_file_extracts_requested_date_urls(self):
         daily_file = Path(self._tmpdir.name) / "0x3f.csv"
         daily_file.write_text(
             "日期,難度,題目\n"
             "2026-06-01,800,https://codeforces.com/contest/1/problem/A\n"
-            "2026-06-02,1700,https://codeforces.com/problemset/problem/1930/A\n",
+            "2026/6/2,1700,https://codeforces.com/problemset/problem/1930/A\n"
+            "2026-06-02 00:00:00,1800,https://codeforces.com/contest/1930/problem/B\n",
             encoding="utf-8",
         )
 
         problems = parse_0x3f_daily_file(daily_file, "2026-06-02")
 
-        self.assertEqual([problem["id"] for problem in problems], ["1930A"])
-        self.assertEqual(problems[0]["rating"], 1700)
+        self.assertEqual([problem["id"] for problem in problems], ["1930A", "1930B"])
+        self.assertEqual([problem["rating"] for problem in problems], [1700, 1800])
 
     def test_0x3f_import_requires_parseable_input(self):
         client = self._codeforces_client_no_config()
@@ -271,6 +329,11 @@ class DailyChallengeStorageTests(unittest.TestCase):
         )
 
         self.assertFalse(client.import_0x3f_daily("2026-06-02", str(daily_file)))
+        self.assertFalse(
+            client.import_0x3f_daily(
+                "2026-06-02", str(daily_file.with_name("missing.csv"))
+            )
+        )
         self.assertEqual(self._daily_rows(), [])
         with self.assertRaises(ValueError):
             client.import_0x3f_daily("2026-06-02", None)
