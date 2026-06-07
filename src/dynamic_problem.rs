@@ -99,12 +99,10 @@ fn derive_atcoder_contest_id(problem_id: &str) -> Option<String> {
     }
     if prefix.starts_with("arc") {
         if let Some(abc_contest) = parts.next() {
-            let abc_number = &abc_contest[3..];
-            if abc_contest.starts_with("abc")
-                && !abc_number.is_empty()
-                && abc_number.bytes().all(|byte| byte.is_ascii_digit())
-            {
-                return Some(abc_contest.to_string());
+            if let Some(abc_number) = abc_contest.strip_prefix("abc") {
+                if !abc_number.is_empty() && abc_number.bytes().all(|byte| byte.is_ascii_digit()) {
+                    return Some(abc_contest.to_string());
+                }
             }
         }
     }
@@ -300,6 +298,12 @@ mod tests {
         assert_eq!(
             plan.url,
             "https://atcoder.jp/contests/abc042/tasks/arc058_abc042_a"
+        );
+
+        let plan = derive_direct_fetch_plan("atcoder", "arc001_1").unwrap();
+        assert_eq!(
+            plan.url,
+            "https://atcoder.jp/contests/arc001/tasks/arc001_1"
         );
     }
 

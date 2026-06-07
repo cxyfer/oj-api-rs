@@ -39,6 +39,10 @@ class SingleProblemDerivationTests(unittest.TestCase):
             AtCoderClient.problem_url_for_id("arc058_abc042_a"),
             "https://atcoder.jp/contests/abc042/tasks/arc058_abc042_a",
         )
+        self.assertEqual(
+            AtCoderClient.problem_url_for_id("arc001_1"),
+            "https://atcoder.jp/contests/arc001/tasks/arc001_1",
+        )
 
     def test_atcoder_rejects_malformed_id(self):
         self.assertIsNone(AtCoderClient.problem_url_for_id("abc321"))
