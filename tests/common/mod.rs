@@ -35,6 +35,12 @@ impl Drop for TestGuard {
 /// Build a test app with a temporary SQLite database file.
 /// Returns a `(Router, TestGuard)` — hold the guard to ensure cleanup on drop.
 pub fn build_test_app() -> (Router, TestGuard) {
+    let (app, guard, _) = build_test_app_with_state();
+    (app, guard)
+}
+
+/// Build a test app and return shared state for assertions.
+pub fn build_test_app_with_state() -> (Router, TestGuard, Arc<AppState>) {
     REGISTER_VEC.call_once(|| {
         db::register_sqlite_vec();
     });
@@ -99,5 +105,5 @@ pub fn build_test_app() -> (Router, TestGuard) {
 
     let guard = TestGuard { db_path };
 
-    (app, guard)
+    (app, guard, state)
 }

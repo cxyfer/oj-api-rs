@@ -41,10 +41,52 @@ pub(crate) struct DailyProblemResponse {
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub(crate) struct DailyFetchingResponse {
-    /// Always `"fetching"`.
+    /// Fetch state for clients.
     pub(crate) status: String,
     /// Seconds to wait before retrying.
     pub(crate) retry_after: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) job_started: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) message: Option<String>,
+}
+
+impl DailyFetchingResponse {
+    fn fetching(retry_after: u64) -> Self {
+        Self {
+            status: "fetching".to_string(),
+            retry_after,
+            job_started: None,
+            message: None,
+        }
+    }
+
+    fn ingestion_required() -> Self {
+        Self {
+            status: "ingestion_required".to_string(),
+            retry_after: 30,
+            job_started: Some(false),
+            message: Some(
+                "additional daily source requires scheduled or manual ingestion".to_string(),
+            ),
+        }
+    }
+}
+
+fn daily_fetching_response(retry_after: u64) -> axum::response::Response {
+    (
+        axum::http::StatusCode::ACCEPTED,
+        Json(DailyFetchingResponse::fetching(retry_after)),
+    )
+        .into_response()
+}
+
+fn daily_ingestion_required_response() -> axum::response::Response {
+    (
+        axum::http::StatusCode::ACCEPTED,
+        Json(DailyFetchingResponse::ingestion_required()),
+    )
+        .into_response()
 }
 
 fn build_daily_response(
@@ -427,11 +469,7 @@ pub async fn get_daily(
     }
 
     if !selection.is_leetcode() {
-        return (
-            axum::http::StatusCode::ACCEPTED,
-            Json(serde_json::json!({"status": "fetching", "retry_after": 30})),
-        )
-            .into_response();
+        return daily_ingestion_required_response();
     }
 
     // Fallback: spawn crawler
@@ -460,20 +498,12 @@ pub async fn get_daily(
                         return Json(d).into_response();
                     }
                 }
-                return (
-                    axum::http::StatusCode::ACCEPTED,
-                    Json(serde_json::json!({"status": "fetching", "retry_after": 30})),
-                )
-                    .into_response();
+                return daily_fetching_response(30);
             }
             if let Some(until) = entry.cooldown_until {
                 if now < until {
                     let remaining = (until - now).as_secs();
-                    return (
-                        axum::http::StatusCode::ACCEPTED,
-                        Json(serde_json::json!({"status": "fetching", "retry_after": remaining})),
-                    )
-                        .into_response();
+                    return daily_fetching_response(remaining);
                 }
             }
         }
@@ -567,11 +597,7 @@ pub async fn get_daily(
             handle_daily_fallback_terminal_failure(&state, &key, &job_id, now, &artifact_paths)
                 .await;
             if should_wait {
-                return (
-                    axum::http::StatusCode::ACCEPTED,
-                    Json(serde_json::json!({"status": "fetching", "retry_after": 30})),
-                )
-                    .into_response();
+                return daily_fetching_response(30);
             }
             return ProblemDetail::internal("failed to spawn crawler").into_response();
         }
@@ -587,11 +613,7 @@ pub async fn get_daily(
             handle_daily_fallback_terminal_failure(&state, &key, &job_id, now, &artifact_paths)
                 .await;
             if should_wait {
-                return (
-                    axum::http::StatusCode::ACCEPTED,
-                    Json(serde_json::json!({"status": "fetching", "retry_after": 30})),
-                )
-                    .into_response();
+                return daily_fetching_response(30);
             }
             return ProblemDetail::internal("failed to capture crawler output").into_response();
         }
@@ -750,11 +772,7 @@ pub async fn get_daily(
         {
             return Json(d).into_response();
         }
-        return (
-            axum::http::StatusCode::ACCEPTED,
-            Json(serde_json::json!({"status": "fetching", "retry_after": 30})),
-        )
-            .into_response();
+        return daily_fetching_response(30);
     }
 
     (

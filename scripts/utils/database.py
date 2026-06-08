@@ -1131,6 +1131,7 @@ class LLMInspireDatabaseManager:
     def _row_to_dict(self, row):
         keys = [
             "id",
+            "source",
             "slug",
             "title",
             "title_cn",
@@ -1376,6 +1377,117 @@ class DailyChallengeDatabaseManager:
                 refs.append(f"{source.strip()}:{problem_id.strip()}")
         return refs
 
+    @staticmethod
+    def _problem_values(problem, default_source="leetcode"):
+        problem_id = problem.get("id")
+        problem_source = problem.get("source") or default_source
+        return (
+            str(problem_id) if problem_id is not None else None,
+            problem_source,
+            problem.get("slug"),
+            problem.get("title"),
+            problem.get("title_cn"),
+            problem.get("difficulty"),
+            problem.get("ac_rate"),
+            problem.get("rating"),
+            problem.get("contest"),
+            problem.get("problem_index"),
+            json.dumps(_normalize_json_string_list(problem.get("tags"))),
+            problem.get("link"),
+            problem.get("category"),
+            problem.get("paid_only"),
+            problem.get("content"),
+            problem.get("content_cn"),
+            json.dumps(_normalize_similar_questions(problem.get("similar_questions"))),
+        )
+
+    @staticmethod
+    def _merge_problem_snapshots(cursor, problems, default_source="leetcode"):
+        values = [
+            DailyChallengeDatabaseManager._problem_values(problem, default_source)
+            for problem in problems
+            if problem.get("id") is not None and str(problem.get("id")).strip()
+        ]
+        if not values:
+            return 0
+        cursor.executemany(
+            """
+            INSERT INTO problems (
+                id, source, slug, title, title_cn, difficulty, ac_rate,
+                rating, contest, problem_index, tags, link,
+                category, paid_only, content, content_cn, similar_questions
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(source, id) DO UPDATE SET
+                slug=COALESCE(NULLIF(problems.slug, ''), excluded.slug),
+                title=COALESCE(NULLIF(problems.title, ''), excluded.title),
+                title_cn=COALESCE(NULLIF(problems.title_cn, ''), excluded.title_cn),
+                difficulty=COALESCE(NULLIF(problems.difficulty, ''), excluded.difficulty),
+                ac_rate=COALESCE(problems.ac_rate, excluded.ac_rate),
+                rating=CASE
+                    WHEN problems.rating IS NOT NULL AND problems.rating > 0 THEN problems.rating
+                    WHEN excluded.rating IS NOT NULL AND excluded.rating > 0 THEN excluded.rating
+                    ELSE COALESCE(problems.rating, excluded.rating)
+                END,
+                contest=COALESCE(NULLIF(problems.contest, ''), excluded.contest),
+                problem_index=COALESCE(NULLIF(problems.problem_index, ''), excluded.problem_index),
+                tags=CASE
+                    WHEN problems.tags IS NOT NULL AND problems.tags != '[]' THEN problems.tags
+                    ELSE excluded.tags
+                END,
+                link=COALESCE(NULLIF(problems.link, ''), excluded.link),
+                category=COALESCE(NULLIF(problems.category, ''), excluded.category),
+                paid_only=COALESCE(problems.paid_only, excluded.paid_only),
+                content=COALESCE(NULLIF(problems.content, ''), excluded.content),
+                content_cn=COALESCE(NULLIF(problems.content_cn, ''), excluded.content_cn),
+                similar_questions=CASE
+                    WHEN problems.similar_questions IS NOT NULL AND problems.similar_questions != '[]'
+                        THEN problems.similar_questions
+                    ELSE excluded.similar_questions
+                END
+            """,
+            values,
+        )
+        return cursor.rowcount
+
+    @staticmethod
+    def _write_daily(cursor, date, source, problem_refs):
+        cursor.execute(
+            """
+            INSERT INTO daily_challenge (date, source, problems)
+            VALUES (?, ?, ?)
+            ON CONFLICT(date, source) DO UPDATE SET
+                problems = excluded.problems
+            """,
+            (date, source, json.dumps(problem_refs)),
+        )
+
+    def update_daily_source(self, date, source, problems, problem_refs):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            if not date or not source or not problem_refs:
+                raise ValueError(
+                    "daily challenge requires date, source, and problem refs"
+                )
+            cursor.execute("BEGIN")
+            self._create_problems_table(cursor)
+            affected = self._merge_problem_snapshots(cursor, problems, "codeforces")
+            self._write_daily(cursor, date, source, problem_refs)
+            conn.commit()
+            logger.info(
+                "Inserted/updated %s problem snapshots and daily challenge for %s %s",
+                affected,
+                date,
+                source,
+            )
+            return True
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Error inserting/updating daily source: {e}")
+            return False
+        finally:
+            conn.close()
+
     def update_daily(self, daily):
         """
         Insert or update daily challenge data
@@ -1394,15 +1506,7 @@ class DailyChallengeDatabaseManager:
                 raise ValueError(
                     "daily challenge requires date, source, and problem refs"
                 )
-            cursor.execute(
-                """
-                INSERT INTO daily_challenge (date, source, problems)
-                VALUES (?, ?, ?)
-                ON CONFLICT(date, source) DO UPDATE SET
-                    problems = excluded.problems
-                """,
-                (date, source, json.dumps(problem_refs)),
-            )
+            self._write_daily(cursor, date, source, problem_refs)
             conn.commit()
             logger.info("Inserted/updated daily challenge for %s %s", date, source)
             return True

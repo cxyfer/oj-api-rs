@@ -1373,12 +1373,32 @@ mod tests {
         .unwrap_err();
         assert!(err.contains("invalid daily source"));
 
+        assert!(validate_args(
+            &CrawlerSource::Codeforces,
+            &args(&[
+                "--daily-source",
+                "0x3f",
+                "--date",
+                "2026-06-02",
+                "--daily-file",
+                "data/0x3f.csv",
+            ])
+        )
+        .is_ok());
+
         let err = validate_args(
             &CrawlerSource::Codeforces,
             &args(&["--daily-source", "0x3f", "--daily-file", "../x.csv"]),
         )
         .unwrap_err();
         assert!(err.contains("'..'"));
+
+        let err = validate_args(
+            &CrawlerSource::Codeforces,
+            &args(&["--daily-source", "0x3f", "--daily-file", "/tmp/0x3f.csv"]),
+        )
+        .unwrap_err();
+        assert!(err.contains("relative path"));
     }
 
     #[test]

@@ -768,10 +768,7 @@ class CodeforcesClient(BaseCrawler):
         if not refs:
             logger.warning("No parseable %s daily problems for %s", daily_source, date)
             return False
-        self.problems_db.update_problems(problems)
-        return self.daily_db.update_daily(
-            {"date": date, "source": daily_source, "problems": refs}
-        )
+        return self.daily_db.update_daily_source(date, daily_source, problems, refs)
 
     @staticmethod
     def _sheep_daily_url(date: str) -> str:

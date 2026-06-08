@@ -262,6 +262,75 @@ class DailyChallengeStorageTests(unittest.TestCase):
             [("2026-06-02", "sheep", '["codeforces:1930A"]')],
         )
 
+    def test_store_daily_source_rolls_back_problem_snapshots_when_daily_write_fails(
+        self,
+    ):
+        client = self._codeforces_client_no_config()
+        problems = parse_sheep_daily_markdown(
+            "| Difficulty | Problems | Hints |\n"
+            "| -------- | -------- | -------- |\n"
+            "| *1200 | [1930A](https://codeforces.com/problemset/problem/1930/A) | Hint |\n"
+        )
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DROP TABLE daily_challenge")
+            conn.execute(
+                "CREATE TABLE daily_challenge (date TEXT PRIMARY KEY, source TEXT NOT NULL)"
+            )
+
+        self.assertFalse(client._store_daily_source("2026-06-02", "sheep", problems))
+
+        self.assertIsNone(
+            ProblemsDatabaseManager(self.db_path).get_problem(
+                id="1930A", source="codeforces"
+            )
+        )
+
+    def test_store_daily_source_fills_sparse_codeforces_metadata(self):
+        client = self._codeforces_client_no_config()
+        sparse = {
+            "id": "1930A",
+            "source": "codeforces",
+            "slug": "1930A",
+            "title": "",
+            "title_cn": "",
+            "difficulty": None,
+            "ac_rate": None,
+            "rating": None,
+            "contest": None,
+            "problem_index": None,
+            "tags": [],
+            "link": "",
+            "category": None,
+            "paid_only": 0,
+            "content": None,
+            "content_cn": None,
+            "similar_questions": [],
+        }
+        self.assertTrue(client.problems_db.update_problem(sparse, force_update=True))
+        problems = parse_sheep_daily_markdown(
+            "| Difficulty | Problems | Hints |\n"
+            "| -------- | -------- | -------- |\n"
+            "| *1200 | [Daily Title](https://codeforces.com/problemset/problem/1930/A) | Daily hint |\n"
+        )
+
+        self.assertTrue(client._store_daily_source("2026-06-02", "sheep", problems))
+
+        stored = ProblemsDatabaseManager(self.db_path).get_problem(
+            id="1930A", source="codeforces"
+        )
+        self.assertEqual(stored["title"], "Daily Title")
+        self.assertEqual(stored["rating"], 1200.0)
+        self.assertEqual(stored["contest"], "1930")
+        self.assertEqual(stored["problem_index"], "A")
+        self.assertEqual(
+            stored["link"], "https://codeforces.com/problemset/problem/1930/A"
+        )
+        self.assertEqual(stored["content"], "Daily hint")
+        self.assertEqual(
+            self._daily_rows(),
+            [("2026-06-02", "sheep", '["codeforces:1930A"]')],
+        )
+
     def test_store_daily_source_preserves_existing_codeforces_metadata(self):
         client = self._codeforces_client_no_config()
         existing = {
