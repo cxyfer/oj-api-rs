@@ -54,7 +54,7 @@ The system SHALL derive a canonical problem URL for supported source and ID pair
 - **THEN** it returns no dynamic fetch plan
 
 ### Requirement: Dynamic single-problem fetch on database miss
-The system SHALL fetch a supported missing problem through a single-problem crawler operation, persist the crawler result, and return the persisted problem detail if the row becomes available. The system SHALL NOT perform broad sync, contest scan, or batch operations during this fallback. AtCoder explicit API paths SHALL support `/api/v1/problems/atcoder/{contest}/{problem_id}` and `/api/v1/problems/atcoder/{contest}/tasks/{problem_id}`. For explicit AtCoder paths, the database lookup ID SHALL be the normalized `problem_id` segment, while the crawler argument SHALL preserve the explicit contest path.
+The system SHALL fetch a supported missing problem through a single-problem crawler operation, persist the crawler result, and return the persisted problem detail if the row becomes available. The system SHALL NOT perform broad sync, contest scan, or batch operations during this fallback. AtCoder explicit API paths SHALL support `/api/v1/problems/atcoder/{contest}/{problem_id}` and `/api/v1/problems/atcoder/{contest}/tasks/{problem_id}`. For explicit AtCoder paths, the database lookup ID SHALL be the normalized `problem_id` segment, while the crawler argument SHALL preserve the explicit contest path. The dynamic crawler operation SHALL be bounded by the configured crawler timeout and SHALL terminate the spawned crawler process group before returning a timeout failure.
 
 #### Scenario: Supported miss is fetched and returned
 - **WHEN** `GET /api/v1/problems/codeforces/1988A` has no matching database row
@@ -84,3 +84,9 @@ The system SHALL fetch a supported missing problem through a single-problem craw
 - **WHEN** a supported missing problem triggers a dynamic crawler
 - **AND** the crawler fails, times out, or does not persist a matching row
 - **THEN** the API returns the existing RFC 7807 HTTP 404 response
+
+#### Scenario: Timed-out crawler process group is terminated
+- **WHEN** a supported missing problem triggers a dynamic crawler
+- **AND** the crawler exceeds the configured timeout
+- **THEN** the system terminates the spawned crawler process group
+- **AND** the API returns the existing RFC 7807 HTTP 404 response

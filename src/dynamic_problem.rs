@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::api::problems::{build_problem_detail_response, ProblemDetailResponse};
 use crate::models::CrawlerSource;
@@ -258,27 +259,54 @@ async fn run_single_problem_crawler(state: &Arc<AppState>, plan: &DirectFetchPla
         .copied()
         .unwrap_or(state.config.crawler.timeout_secs);
 
-    match tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), cmd.output()).await {
-        Ok(Ok(output)) if output.status.success() => true,
-        Ok(Ok(output)) => {
+    run_dynamic_crawler_command(
+        cmd,
+        Duration::from_secs(timeout_secs),
+        &plan.db_source,
+        &plan.db_id,
+    )
+    .await
+}
+
+async fn run_dynamic_crawler_command(
+    cmd: tokio::process::Command,
+    timeout: Duration,
+    db_source: &str,
+    db_id: &str,
+) -> bool {
+    let child = match crate::utils::spawn_with_pgid(cmd) {
+        Ok(child) => child,
+        Err(err) => {
+            tracing::warn!("failed to run dynamic crawler: {}", err);
+            return false;
+        }
+    };
+    let pid = child.id().expect("child should have a pid");
+    let mut wait_task = tokio::spawn(async move { child.wait_with_output().await });
+
+    match tokio::time::timeout(timeout, &mut wait_task).await {
+        Ok(Ok(Ok(output))) if output.status.success() => true,
+        Ok(Ok(Ok(output))) => {
             tracing::warn!(
                 "dynamic crawler failed for {}:{}: {}",
-                plan.db_source,
-                plan.db_id,
+                db_source,
+                db_id,
                 String::from_utf8_lossy(&output.stderr)
             );
             false
         }
-        Ok(Err(err)) => {
+        Ok(Ok(Err(err))) => {
             tracing::warn!("failed to run dynamic crawler: {}", err);
             false
         }
+        Ok(Err(err)) => {
+            tracing::warn!("dynamic crawler wait task failed: {}", err);
+            false
+        }
         Err(_) => {
-            tracing::warn!(
-                "dynamic crawler timed out for {}:{}",
-                plan.db_source,
-                plan.db_id
-            );
+            tracing::warn!("dynamic crawler timed out for {}:{}", db_source, db_id);
+            crate::utils::kill_pgid(pid);
+            let _ = wait_task.await;
             false
         }
     }
@@ -287,6 +315,42 @@ async fn run_single_problem_crawler(state: &Arc<AppState>, plan: &DirectFetchPla
 #[cfg(test)]
 mod tests {
     use super::derive_direct_fetch_plan;
+    #[cfg(unix)]
+    use super::run_dynamic_crawler_command;
+    #[cfg(unix)]
+    use std::fs;
+    #[cfg(unix)]
+    use std::process::Stdio;
+    #[cfg(unix)]
+    use std::time::Duration;
+    #[cfg(unix)]
+    use tokio::process::Command;
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn dynamic_crawler_timeout_kills_process_group() {
+        let marker = std::env::temp_dir().join(format!(
+            "oj-api-rs-dynamic-timeout-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c")
+            .arg("(sleep 1; touch \"$1\") & sleep 5")
+            .arg("dynamic-timeout-test")
+            .arg(&marker);
+        cmd.kill_on_drop(true);
+        cmd.stdout(Stdio::null());
+        cmd.stderr(Stdio::piped());
+
+        let result =
+            run_dynamic_crawler_command(cmd, Duration::from_millis(100), "codeforces", "1988A")
+                .await;
+
+        assert!(!result);
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        assert!(!marker.exists(), "timeout left crawler process group alive");
+        let _ = fs::remove_file(marker);
+    }
 
     #[test]
     fn derives_codeforces_contest_problem_url() {
