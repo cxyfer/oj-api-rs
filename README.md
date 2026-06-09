@@ -91,7 +91,10 @@ workers = 8
 [crawler]
 timeout_secs = 300
 # user_agent = "Mozilla/5.0 (compatible; OJ-API-Bot/1.0)"
+# Supported proxy schemes: http://, https://, socks5://, socks5h://
+# socks5h:// resolves DNS through the proxy.
 # proxy = "http://127.0.0.1:7890"
+# socks5_proxy = "socks5h://127.0.0.1:7890"
 
 [embedding]
 timeout_secs = 30               # per-query embed-text timeout (similar search)
