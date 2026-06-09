@@ -1,5 +1,7 @@
-## ADDED Requirements
+## Purpose
 
+Define crawler HTTP configuration fields, merge precedence, proxy validation, and Rust config compatibility.
+## Requirements
 ### Requirement: Crawler HTTP config fields in config.toml
 The `[crawler]` section in `config.toml` SHALL support the following optional fields: `user_agent` (string), `proxy` (string), `http_proxy` (string), `https_proxy` (string), `socks5_proxy` (string). All fields default to unset when omitted.
 
@@ -54,7 +56,7 @@ The system SHALL support per-crawler override sections `[crawler.<name>]` (where
 - **THEN** `resolve_proxy("https")` returns `"http://a:1"` (scheme-specific wins)
 
 ### Requirement: Proxy URL validation at config load
-The system SHALL validate all proxy URL fields at config load time. Valid schemes are `http`, `https`, `socks5`, `socks5h`. URLs MUST have a non-empty host. Invalid URLs SHALL cause immediate failure with a descriptive error message.
+The system SHALL validate all proxy URL fields at config load time. Valid schemes are `http`, `https`, `socks5`, `socks5h`. URLs MUST have a non-empty host. SOCKS proxy URLs MUST include a valid port. Invalid URLs SHALL cause immediate failure with a descriptive error message.
 
 #### Scenario: Malformed proxy URL
 - **WHEN** `[crawler]` sets `proxy = "not-a-url"`
@@ -68,9 +70,18 @@ The system SHALL validate all proxy URL fields at config load time. Valid scheme
 - **WHEN** `[crawler]` sets `socks5_proxy = "socks5://user:pass@127.0.0.1:1080"`
 - **THEN** `ConfigManager` initialization SHALL succeed
 
+#### Scenario: Valid SOCKS5H URL accepted
+- **WHEN** `[crawler]` sets `socks5_proxy = "socks5h://user:pass@127.0.0.1:1080"`
+- **THEN** `ConfigManager` initialization SHALL succeed
+
+#### Scenario: SOCKS proxy without port rejected
+- **WHEN** `[crawler]` sets `socks5_proxy = "socks5h://127.0.0.1"`
+- **THEN** `ConfigManager` initialization SHALL raise an error indicating the missing proxy port
+
 ### Requirement: Rust config compatibility
 New TOML fields and sub-tables (`[crawler.<name>]`) SHALL be silently ignored by Rust's `CrawlerConfig` serde deserialization. Zero Rust code changes are required.
 
 #### Scenario: Rust build unaffected
 - **WHEN** `config.toml` contains new `[crawler]` fields and `[crawler.leetcode]` sub-table
 - **THEN** `cargo build --release` SHALL succeed without any Rust code modifications
+
