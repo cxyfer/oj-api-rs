@@ -272,9 +272,11 @@ class AtCoderClient(BaseCrawler):
     @staticmethod
     def parse_problem_id(problem_id: str) -> Optional[tuple[str, str]]:
         problem_id = problem_id.strip().lower()
-        if not problem_id or "_" not in problem_id:
+        if not problem_id:
             return None
-        if not all(ch.isascii() and (ch.isalnum() or ch == "_") for ch in problem_id):
+        if "/" in problem_id:
+            return AtCoderClient.parse_explicit_problem_id(problem_id)
+        if not AtCoderClient.is_problem_id(problem_id):
             return None
         contest_id = AtCoderClient.contest_id_for_problem(problem_id)
         if not contest_id:
@@ -282,21 +284,42 @@ class AtCoderClient(BaseCrawler):
         return contest_id, problem_id
 
     @staticmethod
+    def parse_explicit_problem_id(problem_id: str) -> Optional[tuple[str, str]]:
+        parts = problem_id.split("/")
+        if len(parts) == 2:
+            contest_id, task_id = parts
+        elif len(parts) == 3 and parts[1] == "tasks":
+            contest_id, _, task_id = parts
+        else:
+            return None
+        if not AtCoderClient.is_contest_id(contest_id):
+            return None
+        if not AtCoderClient.is_problem_id(task_id):
+            return None
+        return contest_id, task_id
+
+    @staticmethod
+    def is_contest_id(value: str) -> bool:
+        return bool(value) and all(
+            ch.isascii() and (ch.isalnum() or ch == "-") for ch in value
+        )
+
+    @staticmethod
+    def is_problem_id(value: str) -> bool:
+        return (
+            bool(value)
+            and "_" in value
+            and all(ch.isascii() and (ch.isalnum() or ch == "_") for ch in value)
+        )
+
+    @staticmethod
     def contest_id_for_problem(problem_id: str) -> Optional[str]:
-        parts = problem_id.split("_")
-        prefix = parts[0]
+        prefix = problem_id.split("_", 1)[0]
         if not prefix:
             return None
         past_month = prefix.removeprefix("past")
         if prefix.startswith("past") and len(past_month) == 6 and past_month.isdigit():
             return f"{prefix}-open"
-        if (
-            prefix.startswith("arc")
-            and len(parts) >= 2
-            and parts[1].startswith("abc")
-            and parts[1][3:].isdigit()
-        ):
-            return parts[1]
         return prefix
 
     @classmethod
@@ -470,7 +493,9 @@ class AtCoderClient(BaseCrawler):
             logger.error("Invalid AtCoder problem id: %s", problem_id)
             return False
         contest_id, normalized_id = parsed
-        link = self.problem_url_for_id(normalized_id)
+        link = self.PROBLEM_URL_TEMPLATE.format(
+            contest_id=contest_id, problem_id=normalized_id
+        )
         async with self._create_aiohttp_session() as session:
             content = await self.fetch_content_by_url(session, link)
         if not content:

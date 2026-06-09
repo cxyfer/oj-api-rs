@@ -1087,6 +1087,14 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
                         return Err(format!("{}: must not contain '..'", token));
                     }
                 }
+                if spec.flag == "--problem" {
+                    if v.starts_with('/') {
+                        return Err(format!("{}: must not start with '/'", token));
+                    }
+                    if v.contains("..") {
+                        return Err(format!("{}: must not contain '..'", token));
+                    }
+                }
             }
             ValueType::Domain => {
                 let v = &raw_args[i + 1];
@@ -1286,6 +1294,21 @@ mod tests {
         assert!(validate_args(&CrawlerSource::AtCoder, &args(&["--problem", "abc321_a"])).is_ok());
         assert!(validate_args(
             &CrawlerSource::AtCoder,
+            &args(&["--problem", "ndpc/ndpc2026_m"])
+        )
+        .is_ok());
+        assert!(validate_args(
+            &CrawlerSource::AtCoder,
+            &args(&["--problem", "abc042/aaabbb_aaabbb_ccc"])
+        )
+        .is_ok());
+        assert!(validate_args(
+            &CrawlerSource::AtCoder,
+            &args(&["--problem", "abc042/tasks/aaabbb_aaabbb_ccc"])
+        )
+        .is_ok());
+        assert!(validate_args(
+            &CrawlerSource::AtCoder,
             &args(&["--sync-problemset", "--fetch-contest", "--no-resume"])
         )
         .is_ok());
@@ -1351,6 +1374,22 @@ mod tests {
     fn validate_args_rejects_invalid_crawler_values() {
         let err = validate_args(&CrawlerSource::LeetCode, &args(&["--domain", "tw"])).unwrap_err();
         assert!(err.contains("invalid domain"));
+
+        let err =
+            validate_args(&CrawlerSource::AtCoder, &args(&["--problem", "/abc321_a"])).unwrap_err();
+        assert_eq!(err, "--problem: must not start with '/'");
+        let err = validate_args(
+            &CrawlerSource::AtCoder,
+            &args(&["--problem", "../abc321_a"]),
+        )
+        .unwrap_err();
+        assert_eq!(err, "--problem: must not contain '..'");
+        let err = validate_args(
+            &CrawlerSource::AtCoder,
+            &args(&["--problem", "ndpc/tasks/../ndpc2026_m"]),
+        )
+        .unwrap_err();
+        assert_eq!(err, "--problem: must not contain '..'");
 
         let err =
             validate_args(&CrawlerSource::Codeforces, &args(&["--contest", "abc"])).unwrap_err();

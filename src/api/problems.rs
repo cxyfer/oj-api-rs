@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
@@ -168,7 +168,62 @@ pub(crate) fn validate_list_query(query: &ListQuery) -> Result<(), String> {
 pub async fn get_problem(
     State(state): State<Arc<AppState>>,
     Path((source, id)): Path<(String, String)>,
-) -> impl IntoResponse {
+) -> Response {
+    get_problem_by_source_and_id(state, source, id).await
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/problems/atcoder/{contest}/{problem}",
+    params(
+        ("contest" = String, Path, description = "AtCoder contest ID"),
+        ("problem" = String, Path, description = "AtCoder problem ID"),
+    ),
+    responses(
+        (status = 200, description = "Problem detail", body = ProblemDetailResponse),
+        (status = 404, description = "Problem not found", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Problems"
+)]
+pub async fn get_atcoder_problem_with_contest(
+    State(state): State<Arc<AppState>>,
+    Path((contest, problem)): Path<(String, String)>,
+) -> Response {
+    get_problem_by_source_and_id(state, "atcoder".to_string(), format!("{contest}/{problem}")).await
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/problems/atcoder/{contest}/tasks/{problem}",
+    params(
+        ("contest" = String, Path, description = "AtCoder contest ID"),
+        ("problem" = String, Path, description = "AtCoder problem ID"),
+    ),
+    responses(
+        (status = 200, description = "Problem detail", body = ProblemDetailResponse),
+        (status = 404, description = "Problem not found", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Problems"
+)]
+pub async fn get_atcoder_problem_with_tasks_path(
+    State(state): State<Arc<AppState>>,
+    Path((contest, problem)): Path<(String, String)>,
+) -> Response {
+    get_problem_by_source_and_id(
+        state,
+        "atcoder".to_string(),
+        format!("{contest}/tasks/{problem}"),
+    )
+    .await
+}
+
+async fn get_problem_by_source_and_id(
+    state: Arc<AppState>,
+    source: String,
+    id: String,
+) -> Response {
     if !VALID_SOURCES.contains(&source.as_str())
         && !PROBLEM_DETAIL_SOURCE_ALIASES.contains(&source.as_str())
     {
@@ -635,6 +690,46 @@ mod tests {
         .await
         .into_response();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn get_atcoder_explicit_path_uses_normalized_database_id() {
+        let (state, path) = test_state_with_database_path(Some("__dynamic_fetch_mock_fail__"));
+        insert_problem(
+            &state,
+            sample_problem("aaabbb_aaabbb_ccc", "aaabbb_aaabbb_ccc", "atcoder"),
+        );
+
+        for request_path in [
+            "/api/v1/problems/atcoder/abc042/aaabbb_aaabbb_ccc",
+            "/api/v1/problems/atcoder/abc042/tasks/aaabbb_aaabbb_ccc",
+        ] {
+            let (status, body) = call_public_route(&state, request_path).await;
+            let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(json["id"], "aaabbb_aaabbb_ccc");
+            assert_eq!(json["source"], "atcoder");
+            assert_eq!(json["content"], "content");
+        }
+
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn get_atcoder_explicit_path_fetches_with_normalized_database_id() {
+        let (state, path) = test_state_with_database_path(Some("__dynamic_fetch_mock_success__"));
+
+        let (status, body) =
+            call_public_route(&state, "/api/v1/problems/atcoder/abc042/aaabbb_aaabbb_ccc").await;
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json["id"], "aaabbb_aaabbb_ccc");
+        assert_eq!(
+            json["link"],
+            "https://atcoder.jp/contests/abc042/tasks/aaabbb_aaabbb_ccc"
+        );
 
         cleanup_db_files(&path);
     }

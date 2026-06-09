@@ -67,43 +67,71 @@ fn split_codeforces_id(id: &str) -> Option<(String, String)> {
 }
 
 fn derive_atcoder_plan(id: &str) -> Option<DirectFetchPlan> {
-    let id = id.trim().to_ascii_lowercase();
-    if id.is_empty()
-        || !id.contains('_')
-        || !id
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
-    {
-        return None;
-    }
-    let contest_id = derive_atcoder_contest_id(&id)?;
+    let input = id.trim().to_ascii_lowercase();
+    let (contest_id, problem_id, problem_arg) = parse_atcoder_problem_id(&input)?;
     Some(DirectFetchPlan {
         db_source: "atcoder".to_string(),
-        db_id: id.clone(),
+        db_id: problem_id.clone(),
         crawler_source: CrawlerSource::AtCoder,
-        problem_arg: id.clone(),
-        url: format!("https://atcoder.jp/contests/{contest_id}/tasks/{id}"),
+        problem_arg,
+        url: format!("https://atcoder.jp/contests/{contest_id}/tasks/{problem_id}"),
     })
 }
 
+fn parse_atcoder_problem_id(input: &str) -> Option<(String, String, String)> {
+    if input.is_empty() {
+        return None;
+    }
+    if input.contains('/') {
+        return parse_explicit_atcoder_problem_id(input);
+    }
+    if !is_atcoder_problem_id(input) {
+        return None;
+    }
+    let contest_id = derive_atcoder_contest_id(input)?;
+    Some((contest_id, input.to_string(), input.to_string()))
+}
+
+fn parse_explicit_atcoder_problem_id(input: &str) -> Option<(String, String, String)> {
+    let parts = input.split('/').collect::<Vec<_>>();
+    let (contest_id, problem_id) = match parts.as_slice() {
+        [contest_id, problem_id] => (*contest_id, *problem_id),
+        [contest_id, "tasks", problem_id] => (*contest_id, *problem_id),
+        _ => return None,
+    };
+    if !is_atcoder_contest_id(contest_id) || !is_atcoder_problem_id(problem_id) {
+        return None;
+    }
+    Some((
+        contest_id.to_string(),
+        problem_id.to_string(),
+        input.to_string(),
+    ))
+}
+
+fn is_atcoder_contest_id(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+}
+
+fn is_atcoder_problem_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.contains('_')
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+}
+
 fn derive_atcoder_contest_id(problem_id: &str) -> Option<String> {
-    let mut parts = problem_id.split('_');
-    let prefix = parts.next()?;
+    let prefix = problem_id.split_once('_')?.0;
     if prefix.is_empty() {
         return None;
     }
     if let Some(month) = prefix.strip_prefix("past") {
         if month.len() == 6 && month.bytes().all(|byte| byte.is_ascii_digit()) {
             return Some(format!("{prefix}-open"));
-        }
-    }
-    if prefix.starts_with("arc") {
-        if let Some(abc_contest) = parts.next() {
-            if let Some(abc_number) = abc_contest.strip_prefix("abc") {
-                if !abc_number.is_empty() && abc_number.bytes().all(|byte| byte.is_ascii_digit()) {
-                    return Some(abc_contest.to_string());
-                }
-            }
         }
     }
     Some(prefix.to_string())
@@ -131,13 +159,23 @@ pub(crate) async fn fetch_problem_on_miss(
     id: &str,
 ) -> Option<ProblemDetailResponse> {
     let plan = derive_direct_fetch_plan(source, id)?;
+    if let Some(problem) = get_problem_from_plan(&state, &plan).await {
+        return Some(problem);
+    }
     if !run_single_problem_crawler(&state, &plan).await {
         return None;
     }
 
+    get_problem_from_plan(&state, &plan).await
+}
+
+async fn get_problem_from_plan(
+    state: &Arc<AppState>,
+    plan: &DirectFetchPlan,
+) -> Option<ProblemDetailResponse> {
     let pool = state.ro_pool.clone();
-    let db_source = plan.db_source;
-    let db_id = plan.db_id;
+    let db_source = plan.db_source.clone();
+    let db_id = plan.db_id.clone();
     tokio::task::spawn_blocking(move || {
         crate::db::problems::get_problem_record(&pool, &db_source, &db_id)
             .map(|record| build_problem_detail_response(&pool, record))
@@ -274,36 +312,76 @@ mod tests {
 
     #[test]
     fn derives_atcoder_problem_url() {
-        let plan = derive_direct_fetch_plan("atcoder", "abc321_a").unwrap();
-        assert_eq!(plan.db_id, "abc321_a");
+        let plan = derive_direct_fetch_plan("atcoder", "abc042_a").unwrap();
+        assert_eq!(plan.db_id, "abc042_a");
+        assert_eq!(plan.problem_arg, "abc042_a");
         assert_eq!(
             plan.url,
-            "https://atcoder.jp/contests/abc321/tasks/abc321_a"
+            "https://atcoder.jp/contests/abc042/tasks/abc042_a"
         );
 
-        let plan = derive_direct_fetch_plan("atcoder", "abc100_arc100_a").unwrap();
-        assert_eq!(plan.db_id, "abc100_arc100_a");
+        let plan = derive_direct_fetch_plan("atcoder", "arc001_1").unwrap();
+        assert_eq!(plan.db_id, "arc001_1");
+        assert_eq!(plan.problem_arg, "arc001_1");
         assert_eq!(
             plan.url,
-            "https://atcoder.jp/contests/abc100/tasks/abc100_arc100_a"
+            "https://atcoder.jp/contests/arc001/tasks/arc001_1"
         );
 
         let plan = derive_direct_fetch_plan("atcoder", "past201912_a").unwrap();
+        assert_eq!(plan.db_id, "past201912_a");
+        assert_eq!(plan.problem_arg, "past201912_a");
         assert_eq!(
             plan.url,
             "https://atcoder.jp/contests/past201912-open/tasks/past201912_a"
         );
 
+        let plan = derive_direct_fetch_plan("atcoder", "ndpc/ndpc2026_m").unwrap();
+        assert_eq!(plan.db_id, "ndpc2026_m");
+        assert_eq!(plan.problem_arg, "ndpc/ndpc2026_m");
+        assert_eq!(
+            plan.url,
+            "https://atcoder.jp/contests/ndpc/tasks/ndpc2026_m"
+        );
+
+        let plan = derive_direct_fetch_plan("atcoder", "ndpc/tasks/ndpc2026_m").unwrap();
+        assert_eq!(plan.db_id, "ndpc2026_m");
+        assert_eq!(plan.problem_arg, "ndpc/tasks/ndpc2026_m");
+        assert_eq!(
+            plan.url,
+            "https://atcoder.jp/contests/ndpc/tasks/ndpc2026_m"
+        );
+
         let plan = derive_direct_fetch_plan("atcoder", "arc058_abc042_a").unwrap();
+        assert_eq!(plan.db_id, "arc058_abc042_a");
+        assert_eq!(plan.problem_arg, "arc058_abc042_a");
+        assert_eq!(
+            plan.url,
+            "https://atcoder.jp/contests/arc058/tasks/arc058_abc042_a"
+        );
+
+        let plan = derive_direct_fetch_plan("atcoder", "abc042/arc058_abc042_a").unwrap();
+        assert_eq!(plan.db_id, "arc058_abc042_a");
+        assert_eq!(plan.problem_arg, "abc042/arc058_abc042_a");
         assert_eq!(
             plan.url,
             "https://atcoder.jp/contests/abc042/tasks/arc058_abc042_a"
         );
 
-        let plan = derive_direct_fetch_plan("atcoder", "arc001_1").unwrap();
+        let plan = derive_direct_fetch_plan("atcoder", "abc042/aaabbb_aaabbb_ccc").unwrap();
+        assert_eq!(plan.db_id, "aaabbb_aaabbb_ccc");
+        assert_eq!(plan.problem_arg, "abc042/aaabbb_aaabbb_ccc");
         assert_eq!(
             plan.url,
-            "https://atcoder.jp/contests/arc001/tasks/arc001_1"
+            "https://atcoder.jp/contests/abc042/tasks/aaabbb_aaabbb_ccc"
+        );
+
+        let plan = derive_direct_fetch_plan("atcoder", "abc042/tasks/aaabbb_aaabbb_ccc").unwrap();
+        assert_eq!(plan.db_id, "aaabbb_aaabbb_ccc");
+        assert_eq!(plan.problem_arg, "abc042/tasks/aaabbb_aaabbb_ccc");
+        assert_eq!(
+            plan.url,
+            "https://atcoder.jp/contests/abc042/tasks/aaabbb_aaabbb_ccc"
         );
     }
 
@@ -321,6 +399,12 @@ mod tests {
         assert!(derive_direct_fetch_plan("codeforces", "ABC").is_none());
         assert!(derive_direct_fetch_plan("gym", "1988A").is_none());
         assert!(derive_direct_fetch_plan("atcoder", "abc321").is_none());
+        assert!(derive_direct_fetch_plan("atcoder", "abc321/a").is_none());
+        assert!(derive_direct_fetch_plan("atcoder", "/abc321_a").is_none());
+        assert!(derive_direct_fetch_plan("atcoder", "../abc321_a").is_none());
+        assert!(derive_direct_fetch_plan("atcoder", "ndpc/problems/ndpc2026_m").is_none());
+        assert!(derive_direct_fetch_plan("atcoder", "ndpc/tasks/../ndpc2026_m").is_none());
+        assert!(derive_direct_fetch_plan("atcoder", "abc042/problems/aaabbb_aaabbb_ccc").is_none());
         assert!(derive_direct_fetch_plan("luogu", "1083").is_none());
     }
 }
