@@ -230,17 +230,23 @@ async fn get_problem_by_source_and_id(
         return ProblemDetail::bad_request(format!("invalid source: {}", source)).into_response();
     }
 
-    if source == "gym" && crate::dynamic_problem::derive_direct_fetch_plan(&source, &id).is_none() {
+    let direct_plan = crate::dynamic_problem::derive_direct_fetch_plan(&source, &id);
+    if source == "gym" && direct_plan.is_none() {
         return ProblemDetail::not_found("problem not found").into_response();
     }
 
-    let db_source = if source == "gym" {
-        "codeforces".to_string()
-    } else {
-        source.clone()
-    };
+    let (db_source, id_for_db) = direct_plan
+        .as_ref()
+        .map(|plan| (plan.db_source.clone(), plan.db_id.clone()))
+        .unwrap_or_else(|| {
+            if source == "gym" {
+                ("codeforces".to_string(), id.clone())
+            } else {
+                (source.clone(), id.clone())
+            }
+        });
+
     let pool = state.ro_pool.clone();
-    let id_for_db = id.clone();
     let result = tokio::task::spawn_blocking(move || {
         let record = crate::db::problems::get_problem_record(&pool, &db_source, &id_for_db)?;
         Some(build_problem_detail_response(&pool, record))
