@@ -269,6 +269,69 @@ class AtCoderClient(BaseCrawler):
         )
         return any(marker in lowered for marker in deny_markers)
 
+    @staticmethod
+    def parse_problem_id(problem_id: str) -> Optional[tuple[str, str]]:
+        problem_id = problem_id.strip().lower()
+        if not problem_id:
+            return None
+        if "/" in problem_id:
+            return AtCoderClient.parse_explicit_problem_id(problem_id)
+        if not AtCoderClient.is_problem_id(problem_id):
+            return None
+        contest_id = AtCoderClient.contest_id_for_problem(problem_id)
+        if not contest_id:
+            return None
+        return contest_id, problem_id
+
+    @staticmethod
+    def parse_explicit_problem_id(problem_id: str) -> Optional[tuple[str, str]]:
+        parts = problem_id.split("/")
+        if len(parts) == 2:
+            contest_id, task_id = parts
+        elif len(parts) == 3 and parts[1] == "tasks":
+            contest_id, _, task_id = parts
+        else:
+            return None
+        if not AtCoderClient.is_contest_id(contest_id):
+            return None
+        if not AtCoderClient.is_problem_id(task_id):
+            return None
+        return contest_id, task_id
+
+    @staticmethod
+    def is_contest_id(value: str) -> bool:
+        return bool(value) and all(
+            ch.isascii() and (ch.isalnum() or ch == "-") for ch in value
+        )
+
+    @staticmethod
+    def is_problem_id(value: str) -> bool:
+        return (
+            bool(value)
+            and "_" in value
+            and all(ch.isascii() and (ch.isalnum() or ch == "_") for ch in value)
+        )
+
+    @staticmethod
+    def contest_id_for_problem(problem_id: str) -> Optional[str]:
+        prefix = problem_id.split("_", 1)[0]
+        if not prefix:
+            return None
+        past_month = prefix.removeprefix("past")
+        if prefix.startswith("past") and len(past_month) == 6 and past_month.isdigit():
+            return f"{prefix}-open"
+        return prefix
+
+    @classmethod
+    def problem_url_for_id(cls, problem_id: str) -> Optional[str]:
+        parsed = cls.parse_problem_id(problem_id)
+        if not parsed:
+            return None
+        contest_id, normalized_id = parsed
+        return cls.PROBLEM_URL_TEMPLATE.format(
+            contest_id=contest_id, problem_id=normalized_id
+        )
+
     def _build_problem_from_kenkoooo(self, item: dict) -> Optional[dict]:
         problem_id = item.get("id") or item.get("problem_id")
         if not problem_id:
@@ -424,6 +487,42 @@ class AtCoderClient(BaseCrawler):
             json.dump(progress, f, indent=2, sort_keys=True)
         append_crawler_progress(f"Fetched contest {contest_id}")
 
+    async def fetch_single_problem(self, problem_id: str) -> bool:
+        parsed = self.parse_problem_id(problem_id)
+        if not parsed:
+            logger.error("Invalid AtCoder problem id: %s", problem_id)
+            return False
+        contest_id, normalized_id = parsed
+        link = self.PROBLEM_URL_TEMPLATE.format(
+            contest_id=contest_id, problem_id=normalized_id
+        )
+        async with self._create_aiohttp_session() as session:
+            content = await self.fetch_content_by_url(session, link)
+        if not content:
+            return False
+        problem_index = normalized_id.rsplit("_", 1)[1].upper()
+        return self.problems_db.update_problem(
+            {
+                "id": normalized_id,
+                "source": "atcoder",
+                "slug": normalized_id,
+                "title": normalized_id,
+                "title_cn": "",
+                "difficulty": None,
+                "ac_rate": None,
+                "rating": None,
+                "contest": contest_id,
+                "problem_index": problem_index,
+                "tags": None,
+                "link": link,
+                "category": "Algorithms",
+                "paid_only": 0,
+                "content": content,
+                "content_cn": None,
+                "similar_questions": None,
+            }
+        )
+
     async def fetch_single_contest(self, contest_id: str) -> int:
         async with self._create_aiohttp_session() as session:
             problems = await self.fetch_contest_problems(contest_id, session)
@@ -549,6 +648,11 @@ class AtCoderClient(BaseCrawler):
 async def main() -> None:
     parser = argparse.ArgumentParser(description="AtCoder CLI tool")
     parser.add_argument(
+        "--problem",
+        type=str,
+        help="Fetch one problem by derived AtCoder ID, e.g. abc321_a",
+    )
+    parser.add_argument(
         "--sync-problemset",
         action="store_true",
         help="Sync problem metadata from Kenkoooo",
@@ -614,7 +718,8 @@ async def main() -> None:
     )
 
     if not (
-        args.sync_problemset
+        args.problem
+        or args.sync_problemset
         or args.sync_kenkoooo
         or args.sync_history
         or args.fetch_contest
@@ -630,6 +735,10 @@ async def main() -> None:
 
     if args.status:
         client.show_status()
+
+    if args.problem:
+        if not await client.fetch_single_problem(args.problem):
+            raise SystemExit(1)
 
     if args.sync_problemset or args.sync_kenkoooo or args.sync_history:
         await client.fetch_from_kenkoooo()

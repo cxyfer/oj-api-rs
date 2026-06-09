@@ -103,6 +103,23 @@ class LuoguClient(BaseCrawler):
             return True
         return False
 
+    @staticmethod
+    def parse_problem_id(problem_id: str) -> Optional[str]:
+        problem_id = problem_id.strip().upper()
+        if not problem_id.startswith("P"):
+            return None
+        digits = problem_id[1:]
+        if not digits or not digits.isdigit():
+            return None
+        return f"P{digits}"
+
+    @classmethod
+    def problem_url_for_id(cls, problem_id: str) -> Optional[str]:
+        normalized_id = cls.parse_problem_id(problem_id)
+        if not normalized_id:
+            return None
+        return cls.PROBLEM_URL_TEMPLATE.format(pid=normalized_id)
+
     async def _fetch_text(
         self, session, url: str, referer: Optional[str] = None
     ) -> Optional[str]:
@@ -765,6 +782,41 @@ class LuoguClient(BaseCrawler):
         samples = problem.get("samples", [])
         return self._compose_content_markdown(content, samples)
 
+    async def fetch_single_problem(self, problem_id: str) -> bool:
+        normalized_id = self.parse_problem_id(problem_id)
+        if not normalized_id:
+            logger.error("Invalid Luogu problem id: %s", problem_id)
+            return False
+        link = self.problem_url_for_id(normalized_id)
+        async with self._create_curl_session(impersonate=CURL_IMPERSONATE) as session:
+            tag_map = await self._fetch_tags_map(session)
+            html = await self._fetch_text(
+                session, link, referer="https://www.luogu.com.cn/problem/list"
+            )
+        if not html:
+            return False
+        ctx = self._extract_lentille_context(html)
+        if not ctx:
+            return False
+        data = ctx.get("data") or {}
+        if not isinstance(data, dict):
+            return False
+        raw_problem = data.get("problem") or {}
+        if not isinstance(raw_problem, dict):
+            return False
+        raw_problem = {**raw_problem, "pid": normalized_id}
+        mapped = self._map_problem(raw_problem, tag_map)
+        if not mapped:
+            return False
+        content = raw_problem.get("content")
+        if content:
+            mapped["content"] = self._compose_content_markdown(
+                content, raw_problem.get("samples", [])
+            )
+        if not mapped.get("content"):
+            return False
+        return self.problems_db.update_problem(mapped)
+
     async def sync_content(self, source: str = "luogu") -> None:
         missing = self.problems_db.get_problem_ids_missing_content(source=source)
         if not missing:
@@ -829,6 +881,11 @@ class LuoguClient(BaseCrawler):
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Luogu crawler")
     parser.add_argument(
+        "--problem",
+        type=str,
+        help="Fetch one Luogu problem by ID, e.g. P1083",
+    )
+    parser.add_argument(
         "--sync-problemset",
         action="store_true",
         help="Sync problem metadata for the source selected by --source (luogu or spoj)",
@@ -888,7 +945,8 @@ async def main() -> None:
     source = args.source or "luogu"
 
     if not (
-        args.sync_problemset
+        args.problem
+        or args.sync_problemset
         or args.sync
         or do_sync_content
         or args.missing_content_stats
@@ -912,6 +970,9 @@ async def main() -> None:
 
     if args.status:
         client.show_status()
+    if args.problem:
+        if source != "luogu" or not await client.fetch_single_problem(args.problem):
+            raise SystemExit(1)
     if (args.sync_problemset and source == "luogu") or args.sync:
         await client.sync(overwrite=args.overwrite)
     if args.training_list:

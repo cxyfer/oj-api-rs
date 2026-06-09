@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
@@ -90,6 +90,7 @@ pub(crate) struct ListResponse<T: Serialize + utoipa::ToSchema> {
 }
 
 pub(crate) const VALID_SOURCES: &[&str] = &["atcoder", "leetcode", "codeforces", "luogu", "spoj"];
+const PROBLEM_DETAIL_SOURCE_ALIASES: &[&str] = &["gym"];
 
 const MAX_BATCH_SIZE: usize = 50;
 
@@ -167,14 +168,87 @@ pub(crate) fn validate_list_query(query: &ListQuery) -> Result<(), String> {
 pub async fn get_problem(
     State(state): State<Arc<AppState>>,
     Path((source, id)): Path<(String, String)>,
-) -> impl IntoResponse {
-    if !VALID_SOURCES.contains(&source.as_str()) {
+) -> Response {
+    get_problem_by_source_and_id(state, source, id).await
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/problems/atcoder/{contest}/{problem}",
+    params(
+        ("contest" = String, Path, description = "AtCoder contest ID"),
+        ("problem" = String, Path, description = "AtCoder problem ID"),
+    ),
+    responses(
+        (status = 200, description = "Problem detail", body = ProblemDetailResponse),
+        (status = 404, description = "Problem not found", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Problems"
+)]
+pub async fn get_atcoder_problem_with_contest(
+    State(state): State<Arc<AppState>>,
+    Path((contest, problem)): Path<(String, String)>,
+) -> Response {
+    get_problem_by_source_and_id(state, "atcoder".to_string(), format!("{contest}/{problem}")).await
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/problems/atcoder/{contest}/tasks/{problem}",
+    params(
+        ("contest" = String, Path, description = "AtCoder contest ID"),
+        ("problem" = String, Path, description = "AtCoder problem ID"),
+    ),
+    responses(
+        (status = 200, description = "Problem detail", body = ProblemDetailResponse),
+        (status = 404, description = "Problem not found", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Problems"
+)]
+pub async fn get_atcoder_problem_with_tasks_path(
+    State(state): State<Arc<AppState>>,
+    Path((contest, problem)): Path<(String, String)>,
+) -> Response {
+    get_problem_by_source_and_id(
+        state,
+        "atcoder".to_string(),
+        format!("{contest}/tasks/{problem}"),
+    )
+    .await
+}
+
+async fn get_problem_by_source_and_id(
+    state: Arc<AppState>,
+    source: String,
+    id: String,
+) -> Response {
+    if !VALID_SOURCES.contains(&source.as_str())
+        && !PROBLEM_DETAIL_SOURCE_ALIASES.contains(&source.as_str())
+    {
         return ProblemDetail::bad_request(format!("invalid source: {}", source)).into_response();
     }
 
+    let direct_plan = crate::dynamic_problem::derive_direct_fetch_plan(&source, &id);
+    if source == "gym" && direct_plan.is_none() {
+        return ProblemDetail::not_found("problem not found").into_response();
+    }
+
+    let (db_source, id_for_db) = direct_plan
+        .as_ref()
+        .map(|plan| (plan.db_source.clone(), plan.db_id.clone()))
+        .unwrap_or_else(|| {
+            if source == "gym" {
+                ("codeforces".to_string(), id.clone())
+            } else {
+                (source.clone(), id.clone())
+            }
+        });
+
     let pool = state.ro_pool.clone();
     let result = tokio::task::spawn_blocking(move || {
-        let record = crate::db::problems::get_problem_record(&pool, &source, &id)?;
+        let record = crate::db::problems::get_problem_record(&pool, &db_source, &id_for_db)?;
         Some(build_problem_detail_response(&pool, record))
     })
     .await
@@ -182,7 +256,10 @@ pub async fn get_problem(
 
     match result {
         Some(problem) => Json(problem).into_response(),
-        None => ProblemDetail::not_found("problem not found").into_response(),
+        None => match crate::dynamic_problem::fetch_problem_on_miss(state, &source, &id).await {
+            Some(problem) => Json(problem).into_response(),
+            None => ProblemDetail::not_found("problem not found").into_response(),
+        },
     }
 }
 
@@ -441,8 +518,15 @@ mod tests {
     }
 
     fn test_state() -> (Arc<AppState>, String) {
+        test_state_with_database_path(None)
+    }
+
+    fn test_state_with_database_path(database_path: Option<&str>) -> (Arc<AppState>, String) {
         crate::db::register_sqlite_vec();
-        let config = Config::default();
+        let mut config = Config::default();
+        if let Some(database_path) = database_path {
+            config.database.path = database_path.to_string();
+        }
         let path = test_db_path();
         let rw_pool = crate::db::create_rw_pool(&path, 1, config.database.busy_timeout_ms);
         crate::db::ensure_data_tables(&rw_pool);
@@ -541,6 +625,119 @@ mod tests {
         let status = response.status();
         let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         (status, body.to_vec())
+    }
+
+    #[tokio::test]
+    async fn get_problem_returns_database_hit_without_dynamic_fetch() {
+        let (state, path) = test_state_with_database_path(Some("__dynamic_fetch_mock_fail__"));
+        insert_problem(&state, sample_problem("1988A", "1988A", "codeforces"));
+
+        let response = super::get_problem(
+            State(state.clone()),
+            Path(("codeforces".to_string(), "1988A".to_string())),
+        )
+        .await
+        .into_response();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["id"], "1988A");
+        assert_eq!(json["content"], "content");
+
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn get_problem_rejects_regular_contest_hit_through_gym_alias() {
+        let (state, path) = test_state_with_database_path(Some("__dynamic_fetch_mock_fail__"));
+        insert_problem(&state, sample_problem("1988A", "1988A", "codeforces"));
+
+        let response = super::get_problem(
+            State(state.clone()),
+            Path(("gym".to_string(), "1988A".to_string())),
+        )
+        .await
+        .into_response();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn get_problem_fetches_supported_database_miss() {
+        let (state, path) = test_state_with_database_path(Some("__dynamic_fetch_mock_success__"));
+
+        let response = super::get_problem(
+            State(state.clone()),
+            Path(("luogu".to_string(), "P1083".to_string())),
+        )
+        .await
+        .into_response();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["id"], "P1083");
+        assert_eq!(json["content"], "mock fetched content");
+        assert_eq!(json["link"], "https://www.luogu.com.cn/problem/P1083");
+
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn get_problem_keeps_404_when_dynamic_fetch_fails() {
+        let (state, path) = test_state_with_database_path(Some("__dynamic_fetch_mock_fail__"));
+
+        let response = super::get_problem(
+            State(state.clone()),
+            Path(("codeforces".to_string(), "1988A".to_string())),
+        )
+        .await
+        .into_response();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn get_atcoder_explicit_path_uses_normalized_database_id() {
+        let (state, path) = test_state_with_database_path(Some("__dynamic_fetch_mock_fail__"));
+        insert_problem(
+            &state,
+            sample_problem("aaabbb_aaabbb_ccc", "aaabbb_aaabbb_ccc", "atcoder"),
+        );
+
+        for request_path in [
+            "/api/v1/problems/atcoder/abc042/aaabbb_aaabbb_ccc",
+            "/api/v1/problems/atcoder/abc042/tasks/aaabbb_aaabbb_ccc",
+        ] {
+            let (status, body) = call_public_route(&state, request_path).await;
+            let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(json["id"], "aaabbb_aaabbb_ccc");
+            assert_eq!(json["source"], "atcoder");
+            assert_eq!(json["content"], "content");
+        }
+
+        cleanup_db_files(&path);
+    }
+
+    #[tokio::test]
+    async fn get_atcoder_explicit_path_fetches_with_normalized_database_id() {
+        let (state, path) = test_state_with_database_path(Some("__dynamic_fetch_mock_success__"));
+
+        let (status, body) =
+            call_public_route(&state, "/api/v1/problems/atcoder/abc042/aaabbb_aaabbb_ccc").await;
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json["id"], "aaabbb_aaabbb_ccc");
+        assert_eq!(
+            json["link"],
+            "https://atcoder.jp/contests/abc042/tasks/aaabbb_aaabbb_ccc"
+        );
+
+        cleanup_db_files(&path);
     }
 
     #[tokio::test]

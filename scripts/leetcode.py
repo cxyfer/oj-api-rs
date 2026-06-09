@@ -1778,7 +1778,8 @@ async def main():
         logger.info(f"Fetching daily challenge for {args.date}...")
         daily = await client.get_daily_challenge(date_str=args.date)
         if daily is None:
-            sys.stderr.write(f"Error: no daily challenge found for {args.date}\n")
+            missing_date = args.date
+            sys.stderr.write(f"Error: no daily challenge found for {missing_date}\n")
             sys.exit(2)
         print(json.dumps(daily, indent=4))
 
