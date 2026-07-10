@@ -1,17 +1,21 @@
 {
   "schemaVersion": "aegis.schema.v0",
   "taskId": "2026-07-10-algorithmic-observatory",
-  "currentTodo": "Build the semantic Algorithmic Observatory homepage.",
+  "currentTodo": "Retire lingering presentation references and perform live browser verification.",
   "completedTodos": [
     "Verified clean baseline.",
-    "Task 1 asset ownership split passes 206 tests."
+    "Split public page asset owners.",
+    "Built and localized the semantic homepage.",
+    "Added the MIT-licensed guided Three.js scene.",
+    "Redesigned the MCP reference work surface."
   ],
-  "activeSlice": "Task 2: semantic homepage structure and CSS.",
+  "activeSlice": "Tasks 6-7: negative retirement scan and runtime visual/performance evidence.",
   "evidenceRefs": [
     "docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-baseline-tests.json",
-    "docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-task-1-assets.json"
+    "docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-task-1-assets.json",
+    "docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-tasks-2-to-5.json"
   ],
   "blockedOn": null,
-  "nextStep": "Commit Task 1, then add the failing observatory homepage render test.",
+  "nextStep": "Commit MCP slice, add retirement negative test, then start the local server for Playwright.",
   "updatedAt": "2026-07-10"
 }

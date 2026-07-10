@@ -877,7 +877,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_mcp_docs_with_transport_tools_and_examples() {
+    fn renders_mcp_work_surface_with_tools_and_examples() {
         let html = McpDocsTemplate {
             docs: docs_registry(),
             version: "0.3.2-test",
@@ -889,6 +889,9 @@ mod tests {
         .expect("mcp docs template should render");
 
         assert!(html.contains("MCP Reference"));
+        assert!(html.contains("mcp-layout"));
+        assert!(html.contains("mcp-toc"));
+        assert!(html.contains("transport-flow"));
         assert!(html.contains("0.3.2-test"));
         assert!(html.contains("/mcp"));
         assert!(html.contains("resolve_problem"));
@@ -899,7 +902,13 @@ mod tests {
         assert!(html.contains("streamable-http"));
         assert!(html.contains("tools/call"));
         assert!(html.contains("mcpServers.oj-api"));
-        assert_eq!(html.matches("class=\"panel reference-card\"").count(), 9);
+        assert_eq!(html.matches("class=\"mcp-reference-row").count(), 7);
+        assert_eq!(html.matches("class=\"reference-details\"").count(), 7);
+        assert_eq!(html.matches("data-copy-target=").count(), 2);
+        assert!(html.contains("aria-live=\"polite\""));
+        assert!(html.contains("/static/mcp.js"));
+        assert!(!html.contains("panel reference-card"));
+        assert!(!html.contains("home-scene.js"));
         assert!(!html.contains("/admin/"));
     }
 

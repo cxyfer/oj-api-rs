@@ -437,6 +437,11 @@
       "examples": "範例",
       "examples_lead": "先用一個連線設定範例與一個 JSON-RPC 請求，確認驗證、transport 與 tool name 是否正確。"
     },
+    "flow": {
+      "client": "Agent 客戶端",
+      "server": "Streamable HTTP",
+      "tools": "OJ API 工具"
+    },
     "labels": {
       "auth": "驗證",
       "example": "範例",
@@ -448,6 +453,11 @@
     },
     "details": {
       "summary": "展開詳情"
+    },
+    "copy": {
+      "copy": "複製",
+      "copied": "已複製",
+      "failed": "複製失敗"
     },
     "transport_cards": {
       "mcp_post": {

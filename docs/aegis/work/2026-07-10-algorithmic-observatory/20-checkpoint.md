@@ -38,3 +38,29 @@
 - docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-task-1-assets.json
 - Blocked on: none
 - Next step: Commit Task 1, then add the failing observatory homepage render test.
+
+## DriftCheckDraft
+
+- Scope status: Tasks 2-5 stayed within homepage, MCP, public assets, locales, and render tests.
+- Compatibility status: Rust registry, auth rows, fragments, redirect, and full tests remain green; live Scalar and browser interaction still need verification.
+- Retirement status: Bento homepage and inline MCP owner retired; final negative scan and browser evidence pending.
+- New risk signals:
+- WebGL scene and responsive composition require live Playwright evidence before completion.
+- Advisory decision: needs-verification
+
+## Checkpoint Update
+
+- Current todo: Retire lingering presentation references and perform live browser verification.
+- Active slice: Tasks 6-7: negative retirement scan and runtime visual/performance evidence.
+- Completed todos:
+- Verified clean baseline.
+- Split public page asset owners.
+- Built and localized the semantic homepage.
+- Added the MIT-licensed guided Three.js scene.
+- Redesigned the MCP reference work surface.
+- Evidence refs:
+- docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-baseline-tests.json
+- docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-task-1-assets.json
+- docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-tasks-2-to-5.json
+- Blocked on: none
+- Next step: Commit MCP slice, add retirement negative test, then start the local server for Playwright.

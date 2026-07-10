@@ -3,11 +3,13 @@
   "taskId": "2026-07-10-algorithmic-observatory",
   "taskIntentRef": "docs/aegis/work/2026-07-10-algorithmic-observatory/task-intent-draft.json",
   "baselineRefs": [
-    "docs/aegis/plans/2026-07-10-algorithmic-observatory-implementation.md"
+    "docs/aegis/specs/2026-07-10-algorithmic-observatory-design.md"
   ],
-  "scopeStatus": "Task 1 stayed within public asset ownership and render tests.",
-  "compatStatus": "Scalar redirect, public routes, templates, and full test suite remain green.",
-  "retirementStatus": "No Bento retirement yet; rules moved intact to homepage owner for Task 2 deletion.",
-  "newRiskSignals": [],
-  "decision": "continue"
+  "scopeStatus": "Tasks 2-5 stayed within homepage, MCP, public assets, locales, and render tests.",
+  "compatStatus": "Rust registry, auth rows, fragments, redirect, and full tests remain green; live Scalar and browser interaction still need verification.",
+  "retirementStatus": "Bento homepage and inline MCP owner retired; final negative scan and browser evidence pending.",
+  "newRiskSignals": [
+    "WebGL scene and responsive composition require live Playwright evidence before completion."
+  ],
+  "decision": "needs-verification"
 }

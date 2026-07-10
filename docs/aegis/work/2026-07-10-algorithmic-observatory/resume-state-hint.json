@@ -2,10 +2,13 @@
   "schemaVersion": "aegis.schema.v0",
   "taskId": "2026-07-10-algorithmic-observatory",
   "lastCheckpointRef": "docs/aegis/work/2026-07-10-algorithmic-observatory/todo-checkpoint-draft.json",
-  "resumeInstruction": "Read Task 2 in the implementation plan; Task 1 is green and ready to commit.",
+  "resumeInstruction": "Read Tasks 6-7 and latest drift check; implementation tests are green but visual evidence is still pending.",
   "knownPartialWork": [
     "Verified clean baseline.",
-    "Task 1 asset ownership split passes 206 tests."
+    "Split public page asset owners.",
+    "Built and localized the semantic homepage.",
+    "Added the MIT-licensed guided Three.js scene.",
+    "Redesigned the MCP reference work surface."
   ],
   "mustReadBeforeContinuing": [
     "docs/aegis/work/2026-07-10-algorithmic-observatory/10-intent.md",
@@ -13,6 +16,6 @@
     "docs/aegis/work/2026-07-10-algorithmic-observatory/todo-checkpoint-draft.json"
   ],
   "unsafeToAssume": [
-    "Do not add WebGL behavior before the HTML-first homepage is verified."
+    "Do not claim the canvas is nonblank or layouts are responsive until browser screenshots and pixel checks pass."
   ]
 }

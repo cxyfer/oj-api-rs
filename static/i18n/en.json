@@ -437,6 +437,11 @@
       "examples": "Examples",
       "examples_lead": "Start with one connection snippet and one JSON-RPC request to verify auth, transport, and tool naming."
     },
+    "flow": {
+      "client": "Agent client",
+      "server": "Streamable HTTP",
+      "tools": "OJ API tools"
+    },
     "labels": {
       "auth": "Auth",
       "example": "Example",
@@ -448,6 +453,11 @@
     },
     "details": {
       "summary": "Expand details"
+    },
+    "copy": {
+      "copy": "Copy",
+      "copied": "Copied",
+      "failed": "Copy failed"
     },
     "transport_cards": {
       "mcp_post": {
