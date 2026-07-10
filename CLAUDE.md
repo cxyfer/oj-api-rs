@@ -22,6 +22,9 @@ cargo fmt
 # Tests (inline unit tests across source files, ~100+ tests)
 cargo test
 
+# Python tests (runs both unittest-style and pytest-style tests)
+uv --directory scripts run --frozen pytest
+
 # Python crawler environment
 cd scripts && uv sync
 

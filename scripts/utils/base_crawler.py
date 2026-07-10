@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from typing import Any, Optional
+from urllib.parse import unquote, urlparse
 
 import aiohttp
-from aiohttp_socks import ProxyConnector
+from aiohttp_socks import ProxyConnector, ProxyType
 
 from .config import CrawlerHttpConfig, get_config
 
@@ -24,16 +25,33 @@ class BaseCrawler:
             headers["Referer"] = referer
         return headers
 
+    def _create_socks_connector(self, proxy_url: str) -> ProxyConnector:
+        parsed = urlparse(proxy_url)
+        if parsed.scheme == "socks5h":
+            if not parsed.hostname:
+                raise ValueError(f"Proxy URL missing host: '{proxy_url}'")
+            if parsed.port is None:
+                raise ValueError(f"Proxy URL missing port: '{proxy_url}'")
+            return ProxyConnector(
+                proxy_type=ProxyType.SOCKS5,
+                host=parsed.hostname,
+                port=parsed.port,
+                username=unquote(parsed.username or ""),
+                password=unquote(parsed.password or ""),
+                rdns=True,
+            )
+        return ProxyConnector.from_url(proxy_url)
+
     def _create_aiohttp_session(self, **kwargs: Any) -> aiohttp.ClientSession:
         kwargs.setdefault("trust_env", False)
         proxy_url = self._http_config.resolve_proxy("https")
-        if proxy_url and proxy_url.startswith(("socks5://", "socks5h://")):
-            kwargs["connector"] = ProxyConnector.from_url(proxy_url)
+        if proxy_url and proxy_url.lower().startswith(("socks5://", "socks5h://")):
+            kwargs["connector"] = self._create_socks_connector(proxy_url)
         return aiohttp.ClientSession(**kwargs)
 
     def _get_aiohttp_request_proxy(self, scheme: str = "https") -> Optional[str]:
         proxy_url = self._http_config.resolve_proxy(scheme)
-        if proxy_url and proxy_url.startswith(("socks5://", "socks5h://")):
+        if proxy_url and proxy_url.lower().startswith(("socks5://", "socks5h://")):
             return None
         return proxy_url
 
