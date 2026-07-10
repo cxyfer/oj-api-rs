@@ -1159,6 +1159,22 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
         i += 1 + arity;
     }
 
+    if matches!(source, CrawlerSource::DailySource) {
+        let daily_source = raw_args
+            .windows(2)
+            .find(|args| args[0] == "--daily-source")
+            .map(|args| args[1].as_str())
+            .ok_or_else(|| "daily source crawler requires --daily-source".to_string())?;
+
+        if !seen.contains("--date") {
+            return Err("daily source crawler requires --date".to_string());
+        }
+
+        if seen.contains("--daily-file") && daily_source != "0x3f" {
+            return Err("--daily-file is only supported for --daily-source 0x3f".to_string());
+        }
+    }
+
     let mut result = raw_args.to_vec();
 
     // SPOJ runs through luogu.py, which defaults to source="luogu". The admin
@@ -1393,6 +1409,34 @@ mod tests {
             &args(&["--daily-source", "sheep", "--date", "2026-06-02"])
         )
         .is_ok());
+    }
+
+    #[test]
+    fn validate_args_enforces_daily_source_argument_dependencies() {
+        let source = CrawlerSource::DailySource;
+
+        let err = validate_args(&source, &args(&["--date", "2026-06-02"])).unwrap_err();
+        assert_eq!(err, "daily source crawler requires --daily-source");
+
+        let err = validate_args(&source, &args(&["--daily-source", "sheep"])).unwrap_err();
+        assert_eq!(err, "daily source crawler requires --date");
+
+        let err = validate_args(
+            &source,
+            &args(&[
+                "--daily-source",
+                "sheep",
+                "--date",
+                "2026-06-02",
+                "--daily-file",
+                "data/sheep.csv",
+            ]),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            "--daily-file is only supported for --daily-source 0x3f"
+        );
     }
 
     #[test]
