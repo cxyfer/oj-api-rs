@@ -55,9 +55,13 @@ Silently normalizing `GYM106539D` to `106539D` was rejected because it would cre
 
 Public Codeforces pages normally include a navigation link to `/enter` even when the complete problem statement is present. The detail path therefore relies on the existing response-status, challenge-page, and statement checks instead of treating any `/enter` occurrence as an authentication failure.
 
+The Codeforces detail parser extracts the official title from `.problem-statement .header .title` before the header is removed from the Markdown body. The single-problem owner removes an exact `<problem_index>.` display prefix, such as `C.` or `A1.`, because `problem_index` is stored separately. Daily enrichment gives both this normalized non-empty title and the statement content precedence over snapshot fields. A Codeforces row whose stored title still equals its problem ID is eligible for a retry even if content was already enriched, allowing previously written Gym rows to repair their placeholder titles.
+
+Codeforces tags are not present in the problem statement HTML. The single-problem owner therefore reuses `fetch_contest_problems()` in the same session and selects metadata with the same `problem_index`. Non-empty API tags receive source precedence, while an unavailable or empty metadata response preserves stored tags. Codeforces rows with empty tags remain enrichment candidates so previously written title/content rows can be repaired; rows with source details and non-empty tags are skipped.
+
 ### Prefer fetched source details without clearing curated metadata
 
-Daily enrichment explicitly marks non-empty source-fetched detail fields as preferred during the existing database merge. Codeforces replaces fetched `content`; AtCoder and Luogu replace fetched `title` and `content`; LeetCode retains its existing blank-text replacement behavior. Other fields still use the normal non-empty merge, so a source response that omits rating, difficulty, or tags does not erase values supplied by Sheep or 0x3f.
+Daily enrichment explicitly marks non-empty source-fetched detail fields as preferred during the existing database merge. Codeforces replaces fetched `title`, `content`, and non-empty API `tags`; AtCoder and Luogu replace fetched `title` and `content`; LeetCode retains its existing blank-text replacement behavior. Other fields still use the normal non-empty merge, so a source response that omits rating, difficulty, or tags does not erase values supplied by Sheep or 0x3f.
 
 AtCoder obtains the official title from its existing contest task-list parser when daily enrichment requests source precedence, then fetches the statement from the explicit contest/task path. Direct single-problem CLI calls keep their prior merge behavior unless the coordinator opts into source precedence.
 

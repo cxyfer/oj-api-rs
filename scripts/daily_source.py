@@ -453,6 +453,12 @@ class DailySourceClient(BaseCrawler):
             existing_content = str((existing or {}).get("content") or "").strip()
             snapshot_title = str(problem.get("title") or "").strip()
             snapshot_content = str(problem.get("content") or "").strip()
+            has_codeforces_placeholder_title = (
+                source == "codeforces" and existing_title == str(problem_id).strip()
+            )
+            has_missing_codeforces_tags = source == "codeforces" and not (
+                (existing or {}).get("tags") or []
+            )
             if (
                 existing is None
                 or (not existing_title and not existing_content)
@@ -460,6 +466,8 @@ class DailySourceClient(BaseCrawler):
                     existing_title == snapshot_title
                     and existing_content == snapshot_content
                 )
+                or has_codeforces_placeholder_title
+                or has_missing_codeforces_tags
             ):
                 candidates.append(problem)
         return candidates

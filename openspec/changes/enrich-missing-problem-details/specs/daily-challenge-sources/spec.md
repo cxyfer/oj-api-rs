@@ -54,6 +54,28 @@ After parsing Sheep or 0x3f daily problems, the dedicated daily-source crawler S
 - **AND** does not create a second `codeforces:106539D` problem row
 - **AND** does not broaden the ordinary one-argument Codeforces crawler input grammar
 
+#### Scenario: Codeforces placeholder title is replaced
+- **WHEN** a Codeforces or Gym enrichment response contains an official title in the problem statement header
+- **THEN** the official title without its redundant `<problem_index>.` prefix replaces the stored problem-ID placeholder
+- **AND** the problem index remains available in the separate `problem_index` field
+- **AND** the statement body remains stored as content without duplicating the header metadata
+
+#### Scenario: Existing Gym placeholder title retries enrichment
+- **WHEN** a stored Gym problem already has source content but its title still equals its `GYM...` problem ID
+- **THEN** a later daily ingestion selects it for enrichment again
+- **AND** stores the official title while preserving the existing Gym key and curated metadata
+
+#### Scenario: Codeforces tags come from contest metadata
+- **WHEN** Codeforces single-problem enrichment finds matching contest API metadata for the same problem index
+- **AND** that metadata contains non-empty tags
+- **THEN** the crawler stores those tags with the fetched title and content
+- **AND** preserves curated rating and other metadata omitted by the source response
+
+#### Scenario: Existing Codeforces row with empty tags retries enrichment
+- **WHEN** a stored Codeforces problem has source title and content but its tags are empty
+- **THEN** a later daily ingestion selects it for enrichment again
+- **AND** a Codeforces row with non-empty tags and source details is not selected solely for tag enrichment
+
 #### Scenario: Public Gym page contains a sign-in navigation link
 - **WHEN** a public Codeforces Gym response contains both a problem statement and a normal `/enter` navigation link
 - **THEN** the crawler parses and stores the problem statement

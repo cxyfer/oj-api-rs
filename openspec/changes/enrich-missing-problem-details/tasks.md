@@ -12,9 +12,11 @@
 - [x] 2.4 Treat whitespace-only LeetCode text as missing and replace it only with non-blank fetched detail
 - [x] 2.5 Prefer non-empty source-fetched title and content without clearing curated metadata omitted by the detail response
 - [x] 2.6 Parse public Codeforces Gym statements even when page navigation contains a normal sign-in link
+- [x] 2.7 Parse Codeforces statement titles, remove redundant index prefixes, replace ID placeholders, and retry existing Gym placeholder rows
+- [x] 2.8 Populate Codeforces tags from contest metadata and retry existing rows whose tags remain empty
 
 ## 3. Verification
 
-- [x] 3.1 Add focused tests for candidate selection, post-commit ordering, source dispatch, failure isolation, source-detail precedence, Gym parsing and identity, and LeetCode whitespace replacement
+- [x] 3.1 Add focused tests for candidate selection, post-commit ordering, source dispatch, failure isolation, source-detail precedence, Codeforces tags, Gym title/content parsing and identity, and LeetCode whitespace replacement
 - [x] 3.2 Run the focused Python test suite and full Rust test suite
 - [x] 3.3 Run formatting, lint, OpenSpec strict validation, and diff whitespace checks

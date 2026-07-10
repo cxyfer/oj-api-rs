@@ -10,6 +10,8 @@ Sheep and 0x3f ingestion can leave referenced problems as permanently sparse sna
 - Prefer non-empty source-fetched title and content for enrichment candidates while preserving curated metadata that the source detail response does not provide.
 - Preserve AtCoder contest paths, Codeforces Gym daily keys, and LeetCode domain and whitespace-detail semantics.
 - Allow public Codeforces Gym statements to be parsed even when the page navigation contains a normal sign-in link.
+- Replace Codeforces ID placeholder titles with the official title parsed from the problem statement header, excluding the redundant problem-index prefix, including retries for previously enriched Gym rows that retained the placeholder.
+- Populate Codeforces tags from the existing contest metadata API and retry previously enriched Codeforces rows whose tags are still empty.
 - Keep failed enrichment isolated so it does not remove the daily row or prevent later candidates from being attempted.
 - Preserve the existing database schema, Rust API, scheduler, configuration, and crawler CLI flags.
 

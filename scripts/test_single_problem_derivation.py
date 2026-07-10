@@ -50,6 +50,26 @@ class SingleProblemDerivationTests(unittest.TestCase):
 
         self.assertEqual(content, "Official statement")
 
+    def test_codeforces_extracts_title_and_content_from_statement(self):
+        client = object.__new__(CodeforcesClient)
+
+        detail = client._extract_problem_detail(
+            """
+            <div class="problem-statement">
+              <div class="header">
+                <div class="title">C. Circularly</div>
+                <div class="time-limit">time limit per test 1.5 seconds</div>
+              </div>
+              <div>Official statement</div>
+            </div>
+            """
+        )
+
+        self.assertEqual(
+            client._normalize_problem_title(detail["title"], "C"), "Circularly"
+        )
+        self.assertEqual(detail["content"], "Official statement")
+
     def test_codeforces_fetch_single_problem_preserves_gym_key(self):
         client = object.__new__(CodeforcesClient)
         captured = {}
@@ -66,12 +86,22 @@ class SingleProblemDerivationTests(unittest.TestCase):
                 captured.setdefault("problems", []).append(problem)
                 return True
 
-        async def fake_fetch_content_by_url(session, url):
+        async def fake_fetch_detail_by_url(session, url):
             captured["url"] = url
-            return "statement"
+            return {"title": "D. Gym Title", "content": "statement"}
+
+        async def fake_fetch_contest_problems(contest_id, session):
+            return [
+                {
+                    "id": "106539D",
+                    "problem_index": "D",
+                    "tags": ["graphs"],
+                }
+            ]
 
         client._create_curl_session = lambda **kwargs: FakeSession()
-        client.fetch_content_by_url = fake_fetch_content_by_url
+        client.fetch_detail_by_url = fake_fetch_detail_by_url
+        client.fetch_contest_problems = fake_fetch_contest_problems
         client.problems_db = FakeDb()
 
         self.assertTrue(
@@ -88,6 +118,7 @@ class SingleProblemDerivationTests(unittest.TestCase):
         )
         self.assertEqual(captured["problems"][0]["slug"], "GYM106539D")
         self.assertEqual(captured["problems"][0]["contest"], "GYM106539")
+        self.assertEqual(captured["problems"][0]["tags"], ["graphs"])
 
     def test_codeforces_fetch_single_problem_updates_gym_snapshot_in_sqlite(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -124,12 +155,23 @@ class SingleProblemDerivationTests(unittest.TestCase):
                 async def __aexit__(self, exc_type, exc, traceback):
                     return False
 
-            async def fake_fetch_content_by_url(session, url):
+            async def fake_fetch_detail_by_url(session, url):
                 self.assertEqual(url, "https://codeforces.com/gym/106539/problem/D")
-                return "statement"
+                return {"title": "D. Official Gym Title", "content": "statement"}
+
+            async def fake_fetch_contest_problems(contest_id, session):
+                self.assertEqual(contest_id, 106539)
+                return [
+                    {
+                        "id": "106539D",
+                        "problem_index": "D",
+                        "tags": ["data structures", "greedy"],
+                    }
+                ]
 
             client._create_curl_session = lambda **kwargs: FakeSession()
-            client.fetch_content_by_url = fake_fetch_content_by_url
+            client.fetch_detail_by_url = fake_fetch_detail_by_url
+            client.fetch_contest_problems = fake_fetch_contest_problems
             client.problems_db = problems_db
 
             self.assertTrue(
@@ -144,11 +186,78 @@ class SingleProblemDerivationTests(unittest.TestCase):
 
             stored = problems_db.get_problem(id="GYM106539D", source="codeforces")
             self.assertIsNotNone(stored)
+            self.assertEqual(stored["title"], "Official Gym Title")
             self.assertEqual(stored["content"], "statement")
             self.assertEqual(stored["rating"], 2100.0)
+            self.assertEqual(stored["tags"], ["data structures", "greedy"])
             self.assertIsNone(
                 problems_db.get_problem(id="106539D", source="codeforces")
             )
+
+    def test_codeforces_single_problem_merges_contest_api_tags(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            problems_db = ProblemsDatabaseManager(str(Path(tmpdir) / "data.db"))
+            self.assertTrue(
+                problems_db.update_problem(
+                    {
+                        "id": "343C",
+                        "source": "codeforces",
+                        "slug": "343C",
+                        "title": "Read Time",
+                        "title_cn": "",
+                        "difficulty": None,
+                        "ac_rate": None,
+                        "rating": 1900.0,
+                        "contest": "343",
+                        "problem_index": "C",
+                        "tags": [],
+                        "link": "https://codeforces.com/contest/343/problem/C",
+                        "category": "Algorithms",
+                        "paid_only": 0,
+                        "content": "Existing statement",
+                        "content_cn": None,
+                        "similar_questions": [],
+                    }
+                )
+            )
+            client = object.__new__(CodeforcesClient)
+
+            class FakeSession:
+                async def __aenter__(self):
+                    return object()
+
+                async def __aexit__(self, exc_type, exc, traceback):
+                    return False
+
+            async def fake_fetch_detail_by_url(session, url):
+                return {"title": "C. Read Time", "content": "Official statement"}
+
+            async def fake_fetch_contest_problems(contest_id, session):
+                self.assertEqual(contest_id, 343)
+                return [
+                    {
+                        "id": "343C",
+                        "problem_index": "C",
+                        "tags": ["binary search", "greedy", "two pointers"],
+                    }
+                ]
+
+            client._create_curl_session = lambda **kwargs: FakeSession()
+            client.fetch_detail_by_url = fake_fetch_detail_by_url
+            client.fetch_contest_problems = fake_fetch_contest_problems
+            client.problems_db = problems_db
+
+            self.assertTrue(
+                asyncio.run(
+                    client.fetch_single_problem("343C", prefer_source_details=True)
+                )
+            )
+
+            stored = problems_db.get_problem(id="343C", source="codeforces")
+            self.assertEqual(
+                stored["tags"], ["binary search", "greedy", "two pointers"]
+            )
+            self.assertEqual(stored["rating"], 1900.0)
 
     def test_codeforces_fetch_single_problem_rejects_prefixed_gym_id(self):
         client = object.__new__(CodeforcesClient)

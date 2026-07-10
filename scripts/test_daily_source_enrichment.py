@@ -28,12 +28,35 @@ class DailySourceEnrichmentTests(unittest.TestCase):
         title_only = self._problem("codeforces", "title-only")
         content_only = self._problem("codeforces", "content-only")
         complete = self._problem("codeforces", "complete")
+        complete_with_tags = self._problem(
+            "codeforces",
+            "complete-with-tags",
+            title="Complete Title",
+            content="Daily summary",
+            tags=["implementation"],
+        )
         unchanged_snapshot = self._problem(
             "codeforces",
             "unchanged-snapshot",
             title="Daily title",
             content="Daily summary",
         )
+        gym_placeholder = self._problem(
+            "codeforces",
+            "GYM106054C",
+            title="GYM106054C",
+            content="Daily summary",
+        )
+        stored_gym_placeholder = gym_placeholder.copy()
+        stored_gym_placeholder["content"] = "Official statement already stored"
+        missing_tags = self._problem(
+            "codeforces",
+            "343C",
+            title="Read Time",
+            content="Daily summary",
+        )
+        stored_missing_tags = missing_tags.copy()
+        stored_missing_tags["content"] = "Official statement already stored"
 
         self._store_existing(
             client, self._problem("codeforces", "blank", title=" \t", content="\n")
@@ -44,6 +67,9 @@ class DailySourceEnrichmentTests(unittest.TestCase):
                 "codeforces", "title-only", title="Existing title", content=" "
             ),
         )
+        stored_complete_with_tags = complete_with_tags.copy()
+        stored_complete_with_tags["content"] = "Official statement"
+        self._store_existing(client, stored_complete_with_tags)
         self._store_existing(
             client,
             self._problem(
@@ -60,12 +86,36 @@ class DailySourceEnrichmentTests(unittest.TestCase):
             ),
         )
         self._store_existing(client, unchanged_snapshot.copy())
+        self._store_existing(client, stored_gym_placeholder)
+        self._store_existing(client, stored_missing_tags)
 
         candidates = client._enrichment_candidates(
-            [absent, blank, title_only, content_only, complete, unchanged_snapshot]
+            [
+                absent,
+                blank,
+                title_only,
+                content_only,
+                complete,
+                complete_with_tags,
+                unchanged_snapshot,
+                gym_placeholder,
+                missing_tags,
+            ]
         )
 
-        self.assertEqual(candidates, [absent, blank, unchanged_snapshot])
+        self.assertEqual(
+            candidates,
+            [
+                absent,
+                blank,
+                title_only,
+                content_only,
+                complete,
+                unchanged_snapshot,
+                gym_placeholder,
+                missing_tags,
+            ],
+        )
 
     def test_enrich_problem_dispatches_codeforces_regular_and_gym(self):
         client = self._client()
@@ -347,6 +397,7 @@ class DailySourceEnrichmentTests(unittest.TestCase):
         content=None,
         contest=None,
         link=None,
+        tags=None,
     ):
         slug = slug or problem_id
         return {
@@ -360,7 +411,7 @@ class DailySourceEnrichmentTests(unittest.TestCase):
             "rating": None,
             "contest": contest,
             "problem_index": None,
-            "tags": [],
+            "tags": tags or [],
             "link": link or f"https://example.test/{source}/{slug}",
             "category": "Algorithms",
             "paid_only": 0,
