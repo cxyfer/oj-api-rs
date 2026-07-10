@@ -26,7 +26,7 @@ The enrichment decision must observe the database before the curated snapshot is
 
 ### Determine candidates before snapshot storage
 
-The daily-source coordinator reads each parsed `(source, id)` before calling the existing atomic storage operation. A problem is a candidate when no row exists, or when both stored `title` and `content` are blank after whitespace trimming. Parsed metadata and tags do not change this decision.
+The daily-source coordinator reads each parsed `(source, id)` before calling the existing atomic storage operation. A problem is a candidate when no row exists, when both stored `title` and `content` are blank after whitespace trimming, or when both stored fields still match the current curated daily snapshot after trimming. The equality case lets a later ingestion retry rows left with only daily-source data after a previous source crawler failure. Once source details differ from the snapshot, later runs skip enrichment. Parsed metadata and tags do not otherwise change this decision.
 
 This keeps the rule tied to pre-ingestion database state. Checking after storage was rejected because newly inserted rows and curated placeholder metadata would erase the distinction the requirement depends on.
 
@@ -53,6 +53,16 @@ Codeforces detail retrieval accepts an optional stored Gym ID that must match th
 
 Silently normalizing `GYM106539D` to `106539D` was rejected because it would create a second row and break the daily reference.
 
+Public Codeforces pages normally include a navigation link to `/enter` even when the complete problem statement is present. The detail path therefore relies on the existing response-status, challenge-page, and statement checks instead of treating any `/enter` occurrence as an authentication failure.
+
+### Prefer fetched source details without clearing curated metadata
+
+Daily enrichment explicitly marks non-empty source-fetched detail fields as preferred during the existing database merge. Codeforces replaces fetched `content`; AtCoder and Luogu replace fetched `title` and `content`; LeetCode retains its existing blank-text replacement behavior. Other fields still use the normal non-empty merge, so a source response that omits rating, difficulty, or tags does not erase values supplied by Sheep or 0x3f.
+
+AtCoder obtains the official title from its existing contest task-list parser when daily enrichment requests source precedence, then fetches the statement from the explicit contest/task path. Direct single-problem CLI calls keep their prior merge behavior unless the coordinator opts into source precedence.
+
+Forcing the entire fetched problem row to overwrite the snapshot was rejected because Codeforces and AtCoder single-problem responses do not populate every metadata field and would clear useful curated values.
+
 ### Treat whitespace-only LeetCode details as missing
 
 LeetCode detail retrieval treats whitespace-only text fields as missing, fetches detail when content is blank even if tags are present, and replaces only blank text values with non-blank fetched values. This lets eligible sparse rows become usable without overwriting richer stored text.
@@ -67,6 +77,7 @@ Candidates are attempted one at a time in parsed order. False results and except
 - [Sequential requests increase total ingestion latency] -> Limit work to newly seen or fully blank rows and preserve the simpler source crawler rate behavior.
 - [Source-specific signatures can diverge over time] -> Cover every dispatch path with focused tests and keep dispatch code adjacent in the daily-source coordinator.
 - [Gym fetch IDs and storage IDs can be confused] -> Validate that the explicit stored ID is Gym-prefixed and matches the normalized contest/index before persistence.
+- [Source precedence could erase metadata absent from a detail response] -> Restrict precedence to selected non-empty title/content fields and retain the existing merge for all other fields.
 
 ## Migration Plan
 

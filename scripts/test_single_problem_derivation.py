@@ -26,6 +26,30 @@ class SingleProblemDerivationTests(unittest.TestCase):
         self.assertIsNone(CodeforcesClient.problem_url_for_id("1988"))
         self.assertIsNone(CodeforcesClient.problem_url_for_id("ABC"))
 
+    def test_codeforces_content_url_allows_navigation_enter_link(self):
+        client = object.__new__(CodeforcesClient)
+
+        async def fake_fetch_text(session, url, referer=None):
+            return """
+                <html>
+                  <a href="/enter">Enter</a>
+                  <div class="problem-statement">
+                    <div class="header">Header</div>
+                    <div>Official statement</div>
+                  </div>
+                </html>
+            """
+
+        client._fetch_text = fake_fetch_text
+
+        content = asyncio.run(
+            client.fetch_content_by_url(
+                object(), "https://codeforces.com/gym/106054/problem/C"
+            )
+        )
+
+        self.assertEqual(content, "Official statement")
+
     def test_codeforces_fetch_single_problem_preserves_gym_key(self):
         client = object.__new__(CodeforcesClient)
         captured = {}
@@ -78,14 +102,14 @@ class SingleProblemDerivationTests(unittest.TestCase):
                         "title_cn": "",
                         "difficulty": None,
                         "ac_rate": None,
-                        "rating": None,
+                        "rating": 2100.0,
                         "contest": "GYM106539",
                         "problem_index": "D",
                         "tags": [],
                         "link": "https://codeforces.com/gym/106539/problem/D",
                         "category": "Algorithms",
                         "paid_only": 0,
-                        "content": None,
+                        "content": "Sheep summary",
                         "content_cn": None,
                         "similar_questions": [],
                     }
@@ -111,7 +135,9 @@ class SingleProblemDerivationTests(unittest.TestCase):
             self.assertTrue(
                 asyncio.run(
                     client.fetch_single_problem(
-                        "106539D", stored_problem_id="GYM106539D"
+                        "106539D",
+                        stored_problem_id="GYM106539D",
+                        prefer_source_details=True,
                     )
                 )
             )
@@ -119,6 +145,7 @@ class SingleProblemDerivationTests(unittest.TestCase):
             stored = problems_db.get_problem(id="GYM106539D", source="codeforces")
             self.assertIsNotNone(stored)
             self.assertEqual(stored["content"], "statement")
+            self.assertEqual(stored["rating"], 2100.0)
             self.assertIsNone(
                 problems_db.get_problem(id="106539D", source="codeforces")
             )
@@ -204,6 +231,89 @@ class SingleProblemDerivationTests(unittest.TestCase):
             captured["problem"]["link"],
             "https://atcoder.jp/contests/abc042/tasks/aaabbb_aaabbb_ccc",
         )
+
+    def test_atcoder_source_details_replace_daily_snapshot_fields(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            problems_db = ProblemsDatabaseManager(str(Path(tmpdir) / "data.db"))
+            self.assertTrue(
+                problems_db.update_problem(
+                    {
+                        "id": "abc042_a",
+                        "source": "atcoder",
+                        "slug": "abc042_a",
+                        "title": "Daily title",
+                        "title_cn": "",
+                        "difficulty": None,
+                        "ac_rate": None,
+                        "rating": 1800.0,
+                        "contest": "abc042",
+                        "problem_index": "A",
+                        "tags": ["math"],
+                        "link": "https://atcoder.jp/contests/abc042/tasks/abc042_a",
+                        "category": "Algorithms",
+                        "paid_only": 0,
+                        "content": "Daily summary",
+                        "content_cn": None,
+                        "similar_questions": [],
+                    }
+                )
+            )
+            client = object.__new__(AtCoderClient)
+
+            class FakeSession:
+                async def __aenter__(self):
+                    return object()
+
+                async def __aexit__(self, exc_type, exc, traceback):
+                    return False
+
+            async def fake_fetch_contest_problems(contest_id, session):
+                self.assertEqual(contest_id, "abc042")
+                return [
+                    {
+                        "id": "abc042_a",
+                        "source": "atcoder",
+                        "slug": "abc042_a",
+                        "title": "Official AtCoder Title",
+                        "title_cn": "",
+                        "difficulty": None,
+                        "ac_rate": None,
+                        "rating": None,
+                        "contest": "abc042",
+                        "problem_index": "A",
+                        "tags": None,
+                        "link": "https://atcoder.jp/contests/abc042/tasks/abc042_a",
+                        "category": "Algorithms",
+                        "paid_only": 0,
+                        "content": None,
+                        "content_cn": None,
+                        "similar_questions": None,
+                    }
+                ]
+
+            async def fake_fetch_problem_content(session, contest_id, problem_id):
+                self.assertEqual((contest_id, problem_id), ("abc042", "abc042_a"))
+                return "Official AtCoder statement"
+
+            client._create_aiohttp_session = FakeSession
+            client.fetch_contest_problems = fake_fetch_contest_problems
+            client.fetch_problem_content = fake_fetch_problem_content
+            client.problems_db = problems_db
+
+            self.assertTrue(
+                asyncio.run(
+                    client.fetch_single_problem(
+                        "abc042/abc042_a", prefer_source_details=True
+                    )
+                )
+            )
+
+            stored = problems_db.get_problem(id="abc042_a", source="atcoder")
+            self.assertIsNotNone(stored)
+            self.assertEqual(stored["title"], "Official AtCoder Title")
+            self.assertEqual(stored["content"], "Official AtCoder statement")
+            self.assertEqual(stored["rating"], 1800.0)
+            self.assertEqual(stored["tags"], ["math"])
 
     def test_atcoder_rejects_malformed_id(self):
         self.assertIsNone(AtCoderClient.problem_url_for_id("abc321"))

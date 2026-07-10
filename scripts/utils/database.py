@@ -554,7 +554,7 @@ class ProblemsDatabaseManager:
         finally:
             conn.close()
 
-    def update_problem(self, problem, force_update=False):
+    def update_problem(self, problem, force_update=False, prefer_incoming_fields=None):
         """
         Insert or update single problem data.
 
@@ -562,6 +562,9 @@ class ProblemsDatabaseManager:
             problem (dict): problem data, must contain id or slug field for identification
             force_update (bool, optional): force update all fields. If False, empty values will not overwrite
                                        existing data. Default is False.
+            prefer_incoming_fields (iterable, optional): non-empty incoming fields
+                                      that should replace existing values while
+                                      preserving the default merge for other fields.
 
         Returns:
             bool: True if update succeeded, False otherwise
@@ -582,6 +585,7 @@ class ProblemsDatabaseManager:
         problem["similar_questions"] = _normalize_similar_questions(
             problem.get("similar_questions")
         )
+        preferred_fields = set(prefer_incoming_fields or ())
 
         # If not force update, get existing data and merge
         if not force_update:
@@ -590,8 +594,11 @@ class ProblemsDatabaseManager:
                 for key in existing_problem:
                     if key == "id":
                         continue
+                    incoming_value = problem.get(key)
+                    if key in preferred_fields and incoming_value not in (None, ""):
+                        continue
                     problem[key] = _prefer_non_empty(
-                        problem.get(key), existing_problem.get(key)
+                        incoming_value, existing_problem.get(key)
                     )
 
                 problem["tags"] = _normalize_json_string_list(problem.get("tags"))

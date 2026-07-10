@@ -449,9 +449,17 @@ class DailySourceClient(BaseCrawler):
             if not problem_id or not source:
                 continue
             existing = self.problems_db.get_problem(id=problem_id, source=source)
-            if existing is None or (
-                not str(existing.get("title") or "").strip()
-                and not str(existing.get("content") or "").strip()
+            existing_title = str((existing or {}).get("title") or "").strip()
+            existing_content = str((existing or {}).get("content") or "").strip()
+            snapshot_title = str(problem.get("title") or "").strip()
+            snapshot_content = str(problem.get("content") or "").strip()
+            if (
+                existing is None
+                or (not existing_title and not existing_content)
+                or (
+                    existing_title == snapshot_title
+                    and existing_content == snapshot_content
+                )
             ):
                 candidates.append(problem)
         return candidates
@@ -467,21 +475,29 @@ class DailySourceClient(BaseCrawler):
             if problem_id.upper().startswith("GYM"):
                 return bool(
                     await CodeforcesClient(**client_args).fetch_single_problem(
-                        problem_id[3:], stored_problem_id=problem_id
+                        problem_id[3:],
+                        stored_problem_id=problem_id,
+                        prefer_source_details=True,
                     )
                 )
             return bool(
-                await CodeforcesClient(**client_args).fetch_single_problem(problem_id)
+                await CodeforcesClient(**client_args).fetch_single_problem(
+                    problem_id, prefer_source_details=True
+                )
             )
         if source == "atcoder":
             contest = problem.get("contest")
             target_id = f"{contest}/{problem_id}" if contest else problem_id
             return bool(
-                await AtCoderClient(**client_args).fetch_single_problem(target_id)
+                await AtCoderClient(**client_args).fetch_single_problem(
+                    target_id, prefer_source_details=True
+                )
             )
         if source == "luogu":
             return bool(
-                await LuoguClient(**client_args).fetch_single_problem(problem_id)
+                await LuoguClient(**client_args).fetch_single_problem(
+                    problem_id, prefer_source_details=True
+                )
             )
         if source == "leetcode":
             domain = (

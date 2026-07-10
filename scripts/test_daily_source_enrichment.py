@@ -28,6 +28,12 @@ class DailySourceEnrichmentTests(unittest.TestCase):
         title_only = self._problem("codeforces", "title-only")
         content_only = self._problem("codeforces", "content-only")
         complete = self._problem("codeforces", "complete")
+        unchanged_snapshot = self._problem(
+            "codeforces",
+            "unchanged-snapshot",
+            title="Daily title",
+            content="Daily summary",
+        )
 
         self._store_existing(
             client, self._problem("codeforces", "blank", title=" \t", content="\n")
@@ -53,12 +59,13 @@ class DailySourceEnrichmentTests(unittest.TestCase):
                 content="Existing content",
             ),
         )
+        self._store_existing(client, unchanged_snapshot.copy())
 
         candidates = client._enrichment_candidates(
-            [absent, blank, title_only, content_only, complete]
+            [absent, blank, title_only, content_only, complete, unchanged_snapshot]
         )
 
-        self.assertEqual(candidates, [absent, blank])
+        self.assertEqual(candidates, [absent, blank, unchanged_snapshot])
 
     def test_enrich_problem_dispatches_codeforces_regular_and_gym(self):
         client = self._client()
@@ -79,7 +86,14 @@ class DailySourceEnrichmentTests(unittest.TestCase):
 
         self.assertEqual(
             fetch_single_problem.await_args_list,
-            [call("1930A"), call("106539D", stored_problem_id="GYM106539D")],
+            [
+                call("1930A", prefer_source_details=True),
+                call(
+                    "106539D",
+                    stored_problem_id="GYM106539D",
+                    prefer_source_details=True,
+                ),
+            ],
         )
 
     def test_enrich_problem_dispatches_atcoder_and_luogu(self):
@@ -99,8 +113,10 @@ class DailySourceEnrichmentTests(unittest.TestCase):
             self.assertTrue(asyncio.run(client._enrich_problem(atcoder_problem)))
             self.assertTrue(asyncio.run(client._enrich_problem(luogu_problem)))
 
-        atcoder_fetch.assert_awaited_once_with("abc001/abc001_1")
-        luogu_fetch.assert_awaited_once_with("P1001")
+        atcoder_fetch.assert_awaited_once_with(
+            "abc001/abc001_1", prefer_source_details=True
+        )
+        luogu_fetch.assert_awaited_once_with("P1001", prefer_source_details=True)
 
     def test_store_and_enrich_dispatches_leetcode_cn_after_snapshot_storage(self):
         client = self._client()

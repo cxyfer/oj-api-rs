@@ -459,16 +459,17 @@ class CodeforcesClient(BaseCrawler):
         )
         if not html:
             return None
-        if "/enter" in html.lower():
-            logger.warning("Login required while fetching %s", url)
-            return None
         content = self._extract_problem_statement(html)
         if not content:
             logger.warning("Problem statement missing for %s", url)
         return content
 
     async def fetch_single_problem(
-        self, problem_id: str, *, stored_problem_id: Optional[str] = None
+        self,
+        problem_id: str,
+        *,
+        stored_problem_id: Optional[str] = None,
+        prefer_source_details: bool = False,
     ) -> bool:
         normalized_problem_id = problem_id.strip()
         if normalized_problem_id.upper().startswith("GYM"):
@@ -526,7 +527,10 @@ class CodeforcesClient(BaseCrawler):
         if not content:
             return False
         problem["content"] = content
-        return self.problems_db.update_problem(problem)
+        update_kwargs = {}
+        if prefer_source_details:
+            update_kwargs["prefer_incoming_fields"] = ("content",)
+        return self.problems_db.update_problem(problem, **update_kwargs)
 
     async def fetch_single_contest(self, contest_id: int) -> int:
         async with self._create_curl_session(impersonate="chrome124") as session:

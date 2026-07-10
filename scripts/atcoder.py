@@ -487,7 +487,9 @@ class AtCoderClient(BaseCrawler):
             json.dump(progress, f, indent=2, sort_keys=True)
         append_crawler_progress(f"Fetched contest {contest_id}")
 
-    async def fetch_single_problem(self, problem_id: str) -> bool:
+    async def fetch_single_problem(
+        self, problem_id: str, *, prefer_source_details: bool = False
+    ) -> bool:
         parsed = self.parse_problem_id(problem_id)
         if not parsed:
             logger.error("Invalid AtCoder problem id: %s", problem_id)
@@ -496,32 +498,56 @@ class AtCoderClient(BaseCrawler):
         link = self.PROBLEM_URL_TEMPLATE.format(
             contest_id=contest_id, problem_id=normalized_id
         )
+        source_problem = None
         async with self._create_aiohttp_session() as session:
-            content = await self.fetch_content_by_url(session, link)
+            if prefer_source_details:
+                contest_problems = await self.fetch_contest_problems(
+                    contest_id, session
+                )
+                source_problem = next(
+                    (
+                        problem
+                        for problem in contest_problems
+                        if problem.get("id") == normalized_id
+                    ),
+                    None,
+                )
+                content = await self.fetch_problem_content(
+                    session, contest_id, normalized_id
+                )
+            else:
+                content = await self.fetch_content_by_url(session, link)
         if not content:
             return False
         problem_index = normalized_id.rsplit("_", 1)[1].upper()
-        return self.problems_db.update_problem(
-            {
-                "id": normalized_id,
-                "source": "atcoder",
-                "slug": normalized_id,
-                "title": normalized_id,
-                "title_cn": "",
-                "difficulty": None,
-                "ac_rate": None,
-                "rating": None,
-                "contest": contest_id,
-                "problem_index": problem_index,
-                "tags": None,
-                "link": link,
-                "category": "Algorithms",
-                "paid_only": 0,
-                "content": content,
-                "content_cn": None,
-                "similar_questions": None,
-            }
-        )
+        problem = source_problem or {
+            "id": normalized_id,
+            "source": "atcoder",
+            "slug": normalized_id,
+            "title": normalized_id,
+            "title_cn": "",
+            "difficulty": None,
+            "ac_rate": None,
+            "rating": None,
+            "contest": contest_id,
+            "problem_index": problem_index,
+            "tags": None,
+            "link": link,
+            "category": "Algorithms",
+            "paid_only": 0,
+            "content": content,
+            "content_cn": None,
+            "similar_questions": None,
+        }
+        problem = dict(problem)
+        problem["content"] = content
+        preferred_fields = ["content"]
+        if source_problem and str(source_problem.get("title") or "").strip():
+            preferred_fields.append("title")
+        update_kwargs = {}
+        if prefer_source_details:
+            update_kwargs["prefer_incoming_fields"] = preferred_fields
+        return self.problems_db.update_problem(problem, **update_kwargs)
 
     async def fetch_single_contest(self, contest_id: str) -> int:
         async with self._create_aiohttp_session() as session:

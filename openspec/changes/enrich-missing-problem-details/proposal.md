@@ -4,10 +4,12 @@ Sheep and 0x3f ingestion can leave referenced problems as permanently sparse sna
 
 ## What Changes
 
-- Select parsed problems for enrichment when they did not exist before ingestion, or when their existing `title` and `content` are both empty or whitespace-only.
+- Select parsed problems for enrichment when they did not exist before ingestion, when their existing `title` and `content` are both empty or whitespace-only, or when both fields still exactly match the current curated daily snapshot.
 - Commit the existing atomic problem-snapshot and daily-reference transaction before running sequential, best-effort detail retrieval.
 - Reuse the maintained Codeforces, AtCoder, Luogu, and LeetCode single-problem/detail paths.
+- Prefer non-empty source-fetched title and content for enrichment candidates while preserving curated metadata that the source detail response does not provide.
 - Preserve AtCoder contest paths, Codeforces Gym daily keys, and LeetCode domain and whitespace-detail semantics.
+- Allow public Codeforces Gym statements to be parsed even when the page navigation contains a normal sign-in link.
 - Keep failed enrichment isolated so it does not remove the daily row or prevent later candidates from being attempted.
 - Preserve the existing database schema, Rust API, scheduler, configuration, and crawler CLI flags.
 
