@@ -160,6 +160,10 @@ class LeetCodeClient(BaseCrawler):
             return str(int(normalized))
         return normalized
 
+    @staticmethod
+    def _is_missing_text(value):
+        return value is None or (isinstance(value, str) and not value.strip())
+
     async def _fetch_problemset_ratings(self):
         try:
             ratings = await self.fetch_ratings()
@@ -513,7 +517,9 @@ class LeetCodeClient(BaseCrawler):
         logger.debug(
             f"Problem {problem_id_for_log} found in database: {problem['rating']}"
         )
-        if problem["slug"] and (not problem.get("tags") or not problem.get("content")):
+        if problem["slug"] and (
+            not problem.get("tags") or self._is_missing_text(problem.get("content"))
+        ):
             logger.debug(
                 f"Problem {problem_id_for_log} still not have detail information, "
                 "fetching problem detail from LeetCode API..."
@@ -523,7 +529,14 @@ class LeetCodeClient(BaseCrawler):
             )
             if problem_detail:
                 for key, value in problem_detail.items():
-                    problem[key] = problem.get(key, value) or value
+                    if (
+                        key in ("title", "title_cn", "content", "content_cn")
+                        and self._is_missing_text(problem.get(key))
+                        and not self._is_missing_text(value)
+                    ):
+                        problem[key] = value
+                    else:
+                        problem[key] = problem.get(key, value) or value
                 self.problems_db.update_problem(problem)
 
         if not problem["rating"]:

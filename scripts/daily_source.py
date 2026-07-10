@@ -9,6 +9,10 @@ from datetime import date as Date, datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from atcoder import AtCoderClient
+from codeforces import CodeforcesClient
+from leetcode import LeetCodeClient
+from luogu import LuoguClient
 from utils.base_crawler import BaseCrawler
 from utils.config import get_config
 from utils.database import DailyChallengeDatabaseManager, ProblemsDatabaseManager
@@ -410,6 +414,7 @@ class DailySourceClient(BaseCrawler):
         super().__init__(crawler_name="daily_source")
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.db_path = db_path
         self.problems_db = ProblemsDatabaseManager(db_path)
         self.daily_db = DailyChallengeDatabaseManager(db_path)
 
@@ -436,6 +441,90 @@ class DailySourceClient(BaseCrawler):
             return False
         return self.daily_db.update_daily_source(date, daily_source, problems, refs)
 
+    def _enrichment_candidates(self, problems: list[dict]) -> list[dict]:
+        candidates: list[dict] = []
+        for problem in problems:
+            problem_id = problem.get("id")
+            source = problem.get("source")
+            if not problem_id or not source:
+                continue
+            existing = self.problems_db.get_problem(id=problem_id, source=source)
+            if existing is None or (
+                not str(existing.get("title") or "").strip()
+                and not str(existing.get("content") or "").strip()
+            ):
+                candidates.append(problem)
+        return candidates
+
+    async def _enrich_problem(self, problem: dict) -> bool:
+        source = problem.get("source")
+        problem_id = problem.get("id")
+        if not source or not problem_id:
+            return False
+
+        client_args = {"data_dir": str(self.data_dir), "db_path": self.db_path}
+        if source == "codeforces":
+            if problem_id.upper().startswith("GYM"):
+                return bool(
+                    await CodeforcesClient(**client_args).fetch_single_problem(
+                        problem_id[3:], stored_problem_id=problem_id
+                    )
+                )
+            return bool(
+                await CodeforcesClient(**client_args).fetch_single_problem(problem_id)
+            )
+        if source == "atcoder":
+            contest = problem.get("contest")
+            target_id = f"{contest}/{problem_id}" if contest else problem_id
+            return bool(
+                await AtCoderClient(**client_args).fetch_single_problem(target_id)
+            )
+        if source == "luogu":
+            return bool(
+                await LuoguClient(**client_args).fetch_single_problem(problem_id)
+            )
+        if source == "leetcode":
+            domain = (
+                "cn"
+                if re.match(
+                    r"https?://(?:www\.)?leetcode\.cn(?:/|$)",
+                    problem.get("link") or "",
+                    re.IGNORECASE,
+                )
+                else "com"
+            )
+            result = await LeetCodeClient(domain=domain, **client_args).get_problem(
+                slug=problem.get("slug"), domain=domain
+            )
+            return bool(result)
+        return False
+
+    async def _store_and_enrich_daily_source(
+        self, date: str, daily_source: str, problems: list[dict]
+    ) -> bool:
+        candidates = self._enrichment_candidates(problems)
+        stored = self._store_daily_source(date, daily_source, problems)
+        if not stored:
+            return False
+
+        for problem in candidates:
+            source = problem.get("source")
+            problem_id = problem.get("id")
+            try:
+                if not await self._enrich_problem(problem):
+                    logger.warning(
+                        "Failed to enrich daily source problem source=%s id=%s",
+                        source,
+                        problem_id,
+                    )
+            except Exception:
+                logger.exception(
+                    "Error enriching daily source problem source=%s id=%s",
+                    source,
+                    problem_id,
+                )
+        return stored
+
     @staticmethod
     def _sheep_daily_url(date: str) -> str:
         parsed = datetime.strptime(date, "%Y-%m-%d")
@@ -457,7 +546,7 @@ class DailySourceClient(BaseCrawler):
             logger.warning("No Sheep daily markdown for %s", date)
             return False
         problems = parse_sheep_daily_markdown(markdown)
-        return self._store_daily_source(date, "sheep", problems)
+        return await self._store_and_enrich_daily_source(date, "sheep", problems)
 
     async def fetch_0x3f_daily_online(self, date: str) -> bool:
         config = get_config()
@@ -478,7 +567,7 @@ class DailySourceClient(BaseCrawler):
                 col_count=sheet.get("col_count") if sheet else None,
             )
         problems = parse_0x3f_daily_csv(csv_text, date)
-        return self._store_daily_source(date, "0x3f", problems)
+        return await self._store_and_enrich_daily_source(date, "0x3f", problems)
 
     @staticmethod
     def _find_0x3f_sheet(info: dict[str, Any]) -> Optional[dict[str, Any]]:
@@ -496,7 +585,7 @@ class DailySourceClient(BaseCrawler):
             except FileNotFoundError:
                 logger.error("0x3f daily file not found: %s", daily_file)
                 return False
-            return self._store_daily_source(date, "0x3f", problems)
+            return await self._store_and_enrich_daily_source(date, "0x3f", problems)
         return await self.fetch_0x3f_daily_online(date)
 
     async def fetch_daily_source(

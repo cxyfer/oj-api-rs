@@ -675,6 +675,11 @@ class DailyChallengeStorageTests(unittest.TestCase):
                 return False
 
         client._create_curl_session = lambda **kwargs: FakeSession()
+
+        async def no_op_enrich(_problem):
+            return True
+
+        client._enrich_problem = no_op_enrich
         with patch.object(daily_source, "TencentDocsMcpClient", FakeMcp):
             self.assertTrue(asyncio.run(client.import_0x3f_daily("2026-06-02", None)))
 
@@ -696,6 +701,10 @@ class DailyChallengeStorageTests(unittest.TestCase):
                     "online fetch must not run when --daily-file is set"
                 )
 
+        async def no_op_enrich(_problem):
+            return True
+
+        client._enrich_problem = no_op_enrich
         with patch.object(daily_source, "TencentDocsMcpClient", ExplodingMcp):
             self.assertTrue(
                 asyncio.run(client.import_0x3f_daily("2026-06-02", str(daily_file)))
@@ -789,6 +798,8 @@ class DailyChallengeStorageTests(unittest.TestCase):
 
     def _codeforces_client_no_config(self):
         client = DailySourceClient.__new__(DailySourceClient)
+        client.data_dir = Path(self._tmpdir.name)
+        client.db_path = self.db_path
         client.problems_db = ProblemsDatabaseManager(self.db_path)
         client.daily_db = DailyChallengeDatabaseManager(self.db_path)
         return client

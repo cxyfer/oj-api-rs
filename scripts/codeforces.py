@@ -467,25 +467,54 @@ class CodeforcesClient(BaseCrawler):
             logger.warning("Problem statement missing for %s", url)
         return content
 
-    async def fetch_single_problem(self, problem_id: str) -> bool:
-        parsed = self.parse_problem_id(problem_id)
+    async def fetch_single_problem(
+        self, problem_id: str, *, stored_problem_id: Optional[str] = None
+    ) -> bool:
+        normalized_problem_id = problem_id.strip()
+        if normalized_problem_id.upper().startswith("GYM"):
+            logger.error("Invalid Codeforces problem id: %s", problem_id)
+            return False
+
+        parsed = self.parse_problem_id(normalized_problem_id)
         if not parsed:
             logger.error("Invalid Codeforces problem id: %s", problem_id)
             return False
         contest_id, index, _ = parsed
+        if stored_problem_id is None:
+            storage_id = f"{contest_id}{index}"
+            contest = str(contest_id)
+            link = self.problem_url_for_id(storage_id)
+        else:
+            normalized_stored_id = stored_problem_id.strip()
+            if not normalized_stored_id.upper().startswith("GYM"):
+                logger.error(
+                    "Invalid stored Codeforces problem id: %s", stored_problem_id
+                )
+                return False
+            stored_parsed = self.parse_problem_id(normalized_stored_id[3:])
+            if not stored_parsed or stored_parsed[:2] != (contest_id, index):
+                logger.error(
+                    "Stored Codeforces problem id does not match %s: %s",
+                    problem_id,
+                    stored_problem_id,
+                )
+                return False
+            storage_id = f"GYM{contest_id}{index}"
+            contest = f"GYM{contest_id}"
+            link = f"https://codeforces.com/gym/{contest_id}/problem/{index}"
         problem = {
-            "id": f"{contest_id}{index}",
+            "id": storage_id,
             "source": "codeforces",
-            "slug": f"{contest_id}{index}",
-            "title": f"{contest_id}{index}",
+            "slug": storage_id,
+            "title": storage_id,
             "title_cn": "",
             "difficulty": None,
             "ac_rate": None,
             "rating": None,
-            "contest": str(contest_id),
+            "contest": contest,
             "problem_index": index,
             "tags": [],
-            "link": self.problem_url_for_id(f"{contest_id}{index}"),
+            "link": link,
             "category": "Algorithms",
             "paid_only": 0,
             "content": None,
