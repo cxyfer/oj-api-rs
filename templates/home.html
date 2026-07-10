@@ -1,123 +1,216 @@
 {% extends "docs_base.html" %}
 
+{% block title %}OJ API - Problem Intelligence Infrastructure{% endblock %}
+
 {% block page_styles %}
 <link rel="stylesheet" href="/static/home.css">
 {% endblock %}
 
 {% block nav %}
-<a href="#overview" data-i18n="home.nav.overview">Overview</a>
+<a href="#capabilities" data-i18n="home.nav.overview">Overview</a>
 <a href="{{ docs_path }}" data-i18n="home.nav.api_docs">API Docs</a>
 <a href="{{ mcp_docs_path }}" data-i18n="home.nav.mcp_docs">MCP Docs</a>
 {% endblock %}
 
 {% block content %}
-<section class="bento-grid" id="overview">
-    <section class="bento-item bento-hero panel">
-        <div class="section-kicker" data-i18n="home.hero.eyebrow">Public API documentation</div>
-        <h1 data-i18n="home.hero.title">Access coding problem data through one unified API.</h1>
-        <p class="hero-lead" data-i18n="home.hero.lead">Query problem records, fetch daily challenges, search similar problems, and connect tool clients through MCP without switching between fragmented data sources.</p>
-        <dl class="hero-stats" aria-label="Homepage summary stats">
-            <div class="stat-card">
-                <dt data-i18n="home.stats.problems_label">Indexed problems</dt>
-                <dd>{{ total_problems }}</dd>
-            </div>
-            <div class="stat-card">
-                <dt data-i18n="home.stats.sources_label">Core sources</dt>
-                <dd>{{ docs.supported_sources.len() }}</dd>
-            </div>
-            <div class="stat-card">
-                <dt data-i18n="home.stats.version_label">Version</dt>
-                <dd>v{{ version }}</dd>
-            </div>
-        </dl>
-    </section>
+<section class="observatory-hero" id="overview" aria-labelledby="hero-title">
+    <div class="scene-shell" aria-hidden="true">
+        <div class="scene-fallback"></div>
+        <canvas class="scene-canvas" data-observatory-scene></canvas>
+    </div>
 
-    <section class="bento-item bento-auth panel" aria-labelledby="auth-matrix-title">
-        <div class="section-kicker" data-i18n="home.auth.kicker">Authentication</div>
-        <h2 id="auth-matrix-title" data-i18n="home.auth.title">Dual-state access rules</h2>
-        <p class="section-lead" data-i18n="home.auth.lead">The docs pages stay public. API, status, and MCP access depend on whether token auth is enabled for this deployment.</p>
-        <div class="auth-table-wrapper">
-            <table class="auth-matrix">
-                <thead>
-                    <tr>
-                        <th data-i18n="home.auth.route">Route</th>
-                        <th data-i18n="home.auth.mode_disabled">Auth Disabled</th>
-                        <th data-i18n="home.auth.mode_enabled">Auth Enabled</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><code>/</code></td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                    </tr>
-                    <tr>
-                        <td><code>/health</code></td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                    </tr>
-                    <tr>
-                        <td><code>/api/v1/*</code></td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                        <td class="status-protected" data-i18n="home.auth.protected">Protected</td>
-                    </tr>
-                    <tr>
-                        <td><code>/status</code></td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                        <td class="status-protected" data-i18n="home.auth.protected">Protected</td>
-                    </tr>
-                    <tr>
-                        <td><code>/mcp</code></td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                        <td class="status-protected" data-i18n="home.auth.protected">Protected</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        <div class="auth-status-footer">
-            <span data-i18n="home.auth.current_label">Current deployment</span>
-            <span class="status-badge {% if token_auth_enabled %}badge-enabled{% else %}badge-disabled{% endif %}" data-i18n="home.auth.current_{% if token_auth_enabled %}enabled{% else %}disabled{% endif %}">{% if token_auth_enabled %}Token auth enabled{% else %}Token auth disabled{% endif %}</span>
-        </div>
-    </section>
+    <ul class="scene-source-data" aria-label="Supported Online Judge sources">
+        {% for source in docs.supported_sources %}
+        <li data-source="{{ source }}">{{ source }}</li>
+        {% endfor %}
+    </ul>
 
-    {% for card in docs.homepage_cards %}
-    <article class="bento-item bento-featured panel">
-        <div class="featured-header">
-            <h2 data-i18n="home.featured.card_{{ loop.index }}_title">{{ card.title }}</h2>
+    <div class="hero-copy">
+        <p class="product-category" data-i18n="home.hero.category">Problem Intelligence Infrastructure</p>
+        <h1 id="hero-title">OJ API</h1>
+        <p class="hero-statement" data-i18n="home.hero.statement">Every judge. One problem space.</p>
+        <p class="hero-lead" data-i18n="home.hero.lead">A shared intelligence layer for developers, competitors, and AI agents to resolve, retrieve, relate, and connect algorithmic problems.</p>
+        <div class="hero-actions" aria-label="Primary actions">
+            <a class="command command-primary" href="{{ docs_path }}" data-i18n="home.hero.primary_cta">Explore the API</a>
+            <a class="command command-secondary" href="{{ mcp_docs_path }}" data-i18n="home.hero.secondary_cta">MCP for Agents</a>
+        </div>
+    </div>
+
+    <dl class="hero-metrics" aria-label="Deployment summary">
+        <div>
+            <dt data-i18n="home.stats.problems_label">Indexed problems</dt>
+            <dd>{{ total_problems }}</dd>
+        </div>
+        <div>
+            <dt data-i18n="home.stats.sources_label">Core sources</dt>
+            <dd>{{ docs.supported_sources.len() }}</dd>
+        </div>
+        <div>
+            <dt data-i18n="home.stats.version_label">Version</dt>
+            <dd>v{{ version }}</dd>
+        </div>
+        <div>
+            <dt data-i18n="home.auth.current_label">Current deployment</dt>
+            <dd class="metric-status {% if token_auth_enabled %}is-enabled{% else %}is-disabled{% endif %}" data-i18n="home.auth.current_{% if token_auth_enabled %}enabled{% else %}disabled{% endif %}">{% if token_auth_enabled %}Token auth enabled{% else %}Token auth disabled{% endif %}</dd>
+        </div>
+    </dl>
+
+    <div class="scene-inspector" aria-live="polite">
+        <span class="inspector-signal" aria-hidden="true"></span>
+        <span data-i18n="home.hero.inspector_idle">Mapping semantic relationships across sources</span>
+    </div>
+
+    <a class="hero-next" href="#problem-space" aria-label="Continue to product overview">
+        <span data-i18n="home.hero.continue">Enter the problem space</span>
+        <span aria-hidden="true">↓</span>
+    </a>
+</section>
+
+<section class="narrative-section problem-space" id="problem-space" aria-labelledby="problem-space-title">
+    <div class="section-index" aria-hidden="true">01 / UNIFY</div>
+    <div class="narrative-heading">
+        <p class="section-kicker" data-i18n="home.space.kicker">One problem space</p>
+        <h2 id="problem-space-title" data-i18n="home.space.title">Algorithms should not stop at platform boundaries.</h2>
+    </div>
+    <div class="narrative-body">
+        <p data-i18n="home.space.lead">OJ API normalizes fragmented judges into one coherent problem layer, preserving source identity while making every record addressable through the same mental model.</p>
+        <div class="source-orbit" aria-label="Supported sources">
+            {% for source in docs.supported_sources %}
+            <span>{{ source }}</span>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="narrative-section capabilities" id="capabilities" aria-labelledby="capabilities-title">
+    <div class="section-index" aria-hidden="true">02 / INTELLIGENCE</div>
+    <div class="narrative-heading">
+        <p class="section-kicker" data-i18n="home.capabilities.kicker">Core intelligence</p>
+        <h2 id="capabilities-title" data-i18n="home.capabilities.title">Four operations. One connected system.</h2>
+    </div>
+    <ol class="capability-list">
+        <li>
+            <span class="capability-number">01</span>
+            <div>
+                <h3 data-i18n="home.capabilities.resolve.title">Resolve</h3>
+                <p data-i18n="home.capabilities.resolve.body">Turn URLs, slugs, and identifiers into concrete problem records.</p>
+            </div>
+            <code>/api/v1/resolve/*</code>
+        </li>
+        <li>
+            <span class="capability-number">02</span>
+            <div>
+                <h3 data-i18n="home.capabilities.retrieve.title">Retrieve</h3>
+                <p data-i18n="home.capabilities.retrieve.body">Read normalized problem data across every supported source.</p>
+            </div>
+            <code>/api/v1/problems/*</code>
+        </li>
+        <li>
+            <span class="capability-number">03</span>
+            <div>
+                <h3 data-i18n="home.capabilities.relate.title">Relate</h3>
+                <p data-i18n="home.capabilities.relate.body">Find conceptually adjacent problems through semantic similarity.</p>
+            </div>
+            <code>/api/v1/similar</code>
+        </li>
+        <li>
+            <span class="capability-number">04</span>
+            <div>
+                <h3 data-i18n="home.capabilities.connect.title">Connect</h3>
+                <p data-i18n="home.capabilities.connect.body">Expose the same intelligence to applications and AI agents.</p>
+            </div>
+            <code>REST + MCP</code>
+        </li>
+    </ol>
+</section>
+
+<section class="narrative-section endpoint-section" aria-labelledby="endpoint-title">
+    <div class="section-index" aria-hidden="true">03 / SURFACES</div>
+    <div class="narrative-heading">
+        <p class="section-kicker" data-i18n="home.featured.kicker">Selected endpoints</p>
+        <h2 id="endpoint-title" data-i18n="home.featured.title">Start with the paths that define the product.</h2>
+    </div>
+    <div class="endpoint-list">
+        {% for card in docs.homepage_cards %}
+        <article class="endpoint-row">
             <span class="method-tag">{{ card.method }}</span>
-        </div>
-        <div class="featured-path"><code>{{ card.path }}</code></div>
-        <p class="featured-summary" data-i18n="home.featured.card_{{ loop.index }}_summary">{{ card.summary }}</p>
-        <a href="{{ card.docs_href }}" class="featured-link" data-i18n="home.featured.view_details">View details</a>
-    </article>
-    {% endfor %}
+            <div class="endpoint-summary">
+                <h3 data-i18n="home.featured.card_{{ loop.index }}_title">{{ card.title }}</h3>
+                <p data-i18n="home.featured.card_{{ loop.index }}_summary">{{ card.summary }}</p>
+            </div>
+            <code>{{ card.path }}</code>
+            <a href="{{ card.docs_href }}" aria-label="View {{ card.title }} details">↗</a>
+        </article>
+        {% endfor %}
+    </div>
+</section>
 
-    <section class="bento-item bento-example panel">
-        <div class="section-kicker" data-i18n="home.example.kicker">Example</div>
-        <h2 data-i18n="home.example.title">Canonical request</h2>
-        <p class="section-lead" data-i18n="home.example.lead">Start with a single problem-detail request to confirm auth, response shape, and source-key usage.</p>
-        <pre class="code-block"><code>curl \
+<section class="integration-section" aria-labelledby="integration-title">
+    <div class="integration-copy">
+        <p class="section-kicker" data-i18n="home.integrations.kicker">Two integration surfaces</p>
+        <h2 id="integration-title" data-i18n="home.integrations.title">Built for software. Native to agents.</h2>
+        <p data-i18n="home.integrations.lead">Use precise HTTP contracts in applications or expose the same capabilities as tools through Streamable HTTP MCP.</p>
+    </div>
+
+    <div class="integration-console">
+        <fieldset class="surface-switcher">
+            <legend class="visually-hidden" data-i18n="home.integrations.mode_label">Integration mode</legend>
+            <input type="radio" name="integration-surface" id="surface-rest" checked>
+            <label for="surface-rest" data-i18n="home.integrations.rest">REST API</label>
+            <input type="radio" name="integration-surface" id="surface-mcp">
+            <label for="surface-mcp" data-i18n="home.integrations.mcp">MCP Tools</label>
+
+            <div class="surface-panel surface-panel-rest">
+                <div class="code-meta"><span>GET</span><code>/api/v1/problems/leetcode/1</code></div>
+                <pre class="code-block"><code>curl \
   -H "Authorization: Bearer &lt;token&gt;" \
   "http://127.0.0.1:7856/api/v1/problems/leetcode/1"</code></pre>
-    </section>
+            </div>
 
-    <a href="{{ docs_path }}" class="bento-item bento-link panel link-api">
-        <div class="link-content">
-            <div class="section-kicker" data-i18n="home.links.api_kicker">HTTP API</div>
-            <h2 data-i18n="home.links.api_title">HTTP API Reference</h2>
-            <p data-i18n="home.links.api_body">Review all ten public HTTP routes with paths, auth rules, inputs, response shapes, and examples.</p>
-        </div>
-        <div class="link-icon" aria-hidden="true">→</div>
-    </a>
+            <div class="surface-panel surface-panel-mcp">
+                <div class="code-meta"><span>TOOL</span><code>get_problem</code></div>
+                <pre class="code-block"><code>{
+  "name": "get_problem",
+  "arguments": {
+    "source": "leetcode",
+    "id": "1"
+  }
+}</code></pre>
+            </div>
+        </fieldset>
+    </div>
+</section>
 
-    <a href="{{ mcp_docs_path }}" class="bento-item bento-link panel link-mcp">
-        <div class="link-content">
-            <div class="section-kicker" data-i18n="home.links.mcp_kicker">MCP</div>
-            <h2 data-i18n="home.links.mcp_title">MCP Reference</h2>
-            <p data-i18n="home.links.mcp_body">See transport guidance, tool summaries, and examples for the five exposed MCP tools.</p>
-        </div>
-        <div class="link-icon" aria-hidden="true">→</div>
-    </a>
+<section class="access-section" aria-labelledby="auth-matrix-title">
+    <div class="access-heading">
+        <p class="section-kicker" data-i18n="home.auth.kicker">Authentication</p>
+        <h2 id="auth-matrix-title" data-i18n="home.auth.title">One switch. Explicit access rules.</h2>
+        <p data-i18n="home.auth.lead">Public documentation stays open. API, status, and MCP access follow the deployment token policy.</p>
+    </div>
+    <div class="auth-table-wrapper">
+        <table class="auth-matrix">
+            <thead>
+                <tr>
+                    <th data-i18n="home.auth.route">Route</th>
+                    <th data-i18n="home.auth.mode_disabled">Auth Disabled</th>
+                    <th data-i18n="home.auth.mode_enabled">Auth Enabled</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>/</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-public" data-i18n="home.auth.public">Public</td></tr>
+                <tr><td><code>/health</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-public" data-i18n="home.auth.public">Public</td></tr>
+                <tr><td><code>/api/v1/*</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-protected" data-i18n="home.auth.protected">Protected</td></tr>
+                <tr><td><code>/status</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-protected" data-i18n="home.auth.protected">Protected</td></tr>
+                <tr><td><code>/mcp</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-protected" data-i18n="home.auth.protected">Protected</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="final-command" aria-labelledby="final-command-title">
+    <p class="section-kicker" data-i18n="home.final_cta.kicker">Enter the system</p>
+    <h2 id="final-command-title" data-i18n="home.final_cta.title">Build against the entire problem space.</h2>
+    <a class="command command-primary" href="{{ docs_path }}" data-i18n="home.final_cta.action">Explore the API</a>
 </section>
 {% endblock %}
 

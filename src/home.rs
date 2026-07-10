@@ -567,7 +567,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_public_homepage_with_protected_api_badge() {
+    fn renders_algorithmic_observatory_homepage() {
         let html = HomeTemplate {
             total_problems: 42,
             token_auth_enabled: true,
@@ -579,7 +579,12 @@ mod tests {
         .render()
         .expect("home template should render");
 
-        assert!(html.contains("Access coding problem data through one unified API."));
+        assert!(html.contains("OJ API"));
+        assert!(html.contains("Every judge. One problem space."));
+        assert!(html.contains("Problem Intelligence Infrastructure"));
+        assert!(html.contains("scene-shell"));
+        assert!(html.contains("scene-source-data"));
+        assert!(html.contains("data-source=\"leetcode\""));
         assert!(html.contains("Token auth enabled"));
         assert!(html.contains("/api/v1/problems/{source}/{id}"));
         assert!(html.contains("/api/v1/daily"));
@@ -589,6 +594,12 @@ mod tests {
         assert!(html.contains("/docs#tag/daily"));
         assert!(html.contains("/docs#tag/similar"));
         assert!(html.contains("/docs/mcp"));
+        assert!(html.contains("/api/v1/problems/leetcode/1"));
+        for route in ["/", "/health", "/api/v1/*", "/status", "/mcp"] {
+            assert!(html.contains(route));
+        }
+        assert!(!html.contains("bento-grid"));
+        assert!(!html.contains("Playfair Display"));
         assert!(!html.contains("Dashboard"));
     }
 
@@ -633,10 +644,10 @@ mod tests {
             .await
             .expect("body should be readable");
         let html = String::from_utf8(body.to_vec()).expect("homepage should be utf-8");
-        assert!(html.contains("Access coding problem data through one unified API."));
-        assert!(html.contains("Dual-state access rules"));
-        assert!(html.contains("HTTP API Reference"));
-        assert!(html.contains("MCP Reference"));
+        assert!(html.contains("Every judge. One problem space."));
+        assert!(html.contains("One switch. Explicit access rules."));
+        assert!(html.contains("Explore the API"));
+        assert!(html.contains("MCP for Agents"));
         assert!(!html.contains("Dashboard"));
         assert!(!html.contains("/admin/"));
     }
