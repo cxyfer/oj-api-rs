@@ -17,11 +17,11 @@ The system SHALL expose a public homepage at `/` that renders an HTML documentat
 - **THEN** it SHALL NOT require admin session state or render admin navigation intended for `/admin/*`
 
 ### Requirement: Homepage preserves a constrained content contract
-The homepage SHALL present a curated set of information only: a service summary, a dual-state auth matrix, exactly three featured endpoint cards, one ready-to-copy example request, and visible navigation to the detailed docs pages.
+The homepage SHALL present a curated set of information only: a service summary, a guided Spatial Intelligence Map, a dual-state auth matrix, exactly three featured endpoint highlights, at least one ready-to-copy integration example, and visible navigation to the detailed docs pages.
 
 #### Scenario: Homepage shows the selected featured endpoints
 - **WHEN** a user opens `/`
-- **THEN** the page highlights exactly these three endpoints as feature cards:
+- **THEN** the page highlights exactly these three endpoints as curated feature rows:
   - `GET /api/v1/problems/{source}/{id}`
   - `GET /api/v1/daily`
   - `POST /api/v1/similar`
@@ -43,17 +43,33 @@ The homepage SHALL explain auth behavior using a matrix that documents both toke
 - **THEN** the auth matrix includes separate rows for `/`, `/health`, `/api/v1/*`, `/status`, and `/mcp`
 - **AND** the matrix shows how access changes when token auth is disabled versus enabled
 
-### Requirement: Homepage uses the selected Bento Editorial layout
-The homepage SHALL use the selected Bento Editorial direction rather than the earlier split-screen reference layout.
+### Requirement: Homepage uses the selected Algorithmic Observatory direction
+The homepage SHALL use the selected Algorithmic Observatory direction with a full-bleed, guided Three.js Spatial Intelligence Map rather than the superseded Bento Editorial layout.
 
 #### Scenario: User sees the first screen on desktop
 - **WHEN** a user opens `/` on a desktop-sized viewport
-- **THEN** the initial viewport presents the value proposition, auth matrix, three featured endpoint cards, and one example as a coherent first-screen composition without requiring detailed route catalogs to remain on the homepage
-- **AND** the canonical request card occupies a wider row than the docs CTA cards, with the `GET /docs` and `GET /docs/mcp` CTA cards placed on the following row
+- **THEN** the initial viewport presents the OJ API brand, Problem Intelligence Infrastructure positioning, primary `GET /docs` command, deployment metrics, and a nonblank guided Spatial Intelligence Map
+- **AND** the viewport leaves a visible hint of the following content without requiring the auth matrix, featured endpoints, or exhaustive route catalogs to compete with the hero
 
 #### Scenario: Homepage stays curated on smaller screens
 - **WHEN** the homepage is rendered on tablet or mobile widths
-- **THEN** the same curated content remains available in stacked or simplified layouts without moving detailed reference content back onto `/`
+- **THEN** the same curated content remains available in stacked or simplified layouts with a reduced scene budget and no overlapping text or controls
+- **AND** detailed reference content remains outside `/`
+
+### Requirement: Homepage motion remains adaptive and accessible
+The homepage SHALL keep the Three.js scene within explicit rendering budgets and SHALL preserve complete content access when motion is reduced or WebGL is unavailable.
+
+#### Scenario: User prefers reduced motion
+- **WHEN** the browser reports `prefers-reduced-motion: reduce`
+- **THEN** the homepage renders a stable scene frame and disables nonessential continuous motion
+
+#### Scenario: WebGL is unavailable
+- **WHEN** the browser cannot initialize the Three.js renderer
+- **THEN** the homepage retains readable HTML content, navigation, calls to action, and a deterministic CSS background
+
+#### Scenario: Scene leaves the viewport
+- **WHEN** the hero is no longer visible or the document is hidden
+- **THEN** the render loop pauses until rendering is needed again
 
 ### Requirement: Interactive API docs at `/docs`
 The system SHALL expose a public interactive API documentation page at `/docs` backed by the generated OpenAPI spec. This page SHALL document all public non-MCP HTTP endpoints and all JSON admin API endpoints, while excluding admin HTML page routes.
@@ -104,9 +120,9 @@ The system SHALL expose a public HTML reference page at `/docs/mcp` that documen
 - **THEN** the page documents `POST /mcp` as the Streamable HTTP entrypoint for initialize/tool calls
 - **AND** documents `GET /mcp` as the SSE/session-resume endpoint
 
-#### Scenario: Each MCP tool card contains actionable detail
-- **WHEN** a user reviews an MCP tool card on `/docs/mcp`
-- **THEN** the card includes the exact tool name, required inputs, corresponding REST capability, output style, and a concise usage note
+#### Scenario: Each MCP tool reference contains actionable detail
+- **WHEN** a user reviews an MCP tool reference on `/docs/mcp`
+- **THEN** the reference includes the exact tool name, required inputs, corresponding REST capability, output style, and a concise usage note
 
 #### Scenario: MCP page includes connection guidance
 - **WHEN** a user reviews `/docs/mcp`
