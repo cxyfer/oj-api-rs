@@ -769,6 +769,55 @@ mod tests {
         assert!(!mcp_html.contains("home-scene.js"));
     }
 
+    #[test]
+    fn homepage_scene_has_bounded_accessible_contract() {
+        let home_html = HomeTemplate {
+            total_problems: 42,
+            token_auth_enabled: true,
+            version: "0.3.2-test",
+            docs: docs_registry(),
+            docs_path: DOCS_PATH,
+            mcp_docs_path: MCP_DOCS_PATH,
+        }
+        .render()
+        .expect("home template should render");
+
+        assert!(home_html.contains("class=\"scene-shell\" aria-hidden=\"true\""));
+        assert!(home_html.contains("class=\"scene-inspector\" aria-live=\"polite\""));
+        assert!(home_html.contains("type=\"module\" src=\"/static/home-scene.js\""));
+        for source in docs_registry().supported_sources {
+            assert!(home_html.contains(&format!("data-source=\"{source}\"")));
+        }
+
+        let scene_module = include_str!("../static/home-scene.js");
+        for marker in [
+            "three.module.min.js",
+            "IntersectionObserver",
+            "visibilitychange",
+            "prefers-reduced-motion",
+            "MAX_DESKTOP_DPR = 1.5",
+            "MAX_MOBILE_DPR = 1.25",
+            "is-webgl-fallback",
+        ] {
+            assert!(
+                scene_module.contains(marker),
+                "missing scene marker {marker}"
+            );
+        }
+
+        let mcp_html = McpDocsTemplate {
+            docs: docs_registry(),
+            version: "0.3.2-test",
+            home_path: "/",
+            docs_path: DOCS_PATH,
+            token_auth_enabled: true,
+        }
+        .render()
+        .expect("mcp docs template should render");
+        assert!(!mcp_html.contains("three.module.min.js"));
+        assert!(!mcp_html.contains("home-scene.js"));
+    }
+
     #[tokio::test]
     async fn scalar_compatibility_path_remains_a_redirect() {
         let state = test_state(false);
