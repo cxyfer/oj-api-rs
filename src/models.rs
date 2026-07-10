@@ -556,6 +556,7 @@ pub enum ValueType {
     YearMonth,
     Domain,
     Source,
+    DailySource,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -909,6 +910,39 @@ pub static LUOGU_ARGS: &[ArgSpec] = &[
     },
 ];
 
+pub static DAILY_SOURCE_ARGS: &[ArgSpec] = &[
+    ArgSpec {
+        flag: "--daily-source",
+        arity: 1,
+        value_type: ValueType::DailySource,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--date",
+        arity: 1,
+        value_type: ValueType::Date,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--daily-file",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: true,
+    },
+    ArgSpec {
+        flag: "--data-dir",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
+    ArgSpec {
+        flag: "--db-path",
+        arity: 1,
+        value_type: ValueType::Str,
+        ui_exposed: false,
+    },
+];
+
 pub static SPOJ_ARGS: &[ArgSpec] = &[
     ArgSpec {
         flag: "--sync-problemset",
@@ -984,6 +1018,7 @@ pub enum CrawlerSource {
     LeetCode,
     AtCoder,
     Codeforces,
+    DailySource,
     Luogu,
     Spoj,
     Diag,
@@ -995,6 +1030,7 @@ impl CrawlerSource {
             "leetcode" => Ok(Self::LeetCode),
             "atcoder" => Ok(Self::AtCoder),
             "codeforces" => Ok(Self::Codeforces),
+            "daily_source" | "daily-source" => Ok(Self::DailySource),
             "luogu" => Ok(Self::Luogu),
             "spoj" => Ok(Self::Spoj),
             "diag" => Ok(Self::Diag),
@@ -1007,6 +1043,7 @@ impl CrawlerSource {
             Self::LeetCode => "leetcode.py",
             Self::AtCoder => "atcoder.py",
             Self::Codeforces => "codeforces.py",
+            Self::DailySource => "daily_source.py",
             Self::Luogu => "luogu.py",
             Self::Spoj => "luogu.py",
             Self::Diag => "diag.py",
@@ -1018,6 +1055,7 @@ impl CrawlerSource {
             Self::LeetCode => LEETCODE_ARGS,
             Self::AtCoder => ATCODER_ARGS,
             Self::Codeforces => CODEFORCES_ARGS,
+            Self::DailySource => DAILY_SOURCE_ARGS,
             Self::Luogu => LUOGU_ARGS,
             Self::Spoj => SPOJ_ARGS,
             Self::Diag => DIAG_ARGS,
@@ -1079,7 +1117,10 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
                 if v.is_empty() {
                     return Err(format!("{}: value must not be empty", token));
                 }
-                if spec.flag == "--data-dir" || spec.flag == "--db-path" {
+                if spec.flag == "--data-dir"
+                    || spec.flag == "--db-path"
+                    || spec.flag == "--daily-file"
+                {
                     if v.starts_with('/') {
                         return Err(format!("{}: must be a relative path", token));
                     }
@@ -1114,6 +1155,15 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
                     ));
                 }
             }
+            ValueType::DailySource => {
+                let v = &raw_args[i + 1];
+                if v != "sheep" && v != "0x3f" {
+                    return Err(format!(
+                        "{}: invalid daily source '{}', expected 'sheep' or '0x3f'",
+                        token, v
+                    ));
+                }
+            }
             ValueType::YearMonth => {
                 let yv = &raw_args[i + 1];
                 let mv = &raw_args[i + 2];
@@ -1133,6 +1183,22 @@ pub fn validate_args(source: &CrawlerSource, raw_args: &[String]) -> Result<Vec<
         }
 
         i += 1 + arity;
+    }
+
+    if matches!(source, CrawlerSource::DailySource) {
+        let daily_source = raw_args
+            .windows(2)
+            .find(|args| args[0] == "--daily-source")
+            .map(|args| args[1].as_str())
+            .ok_or_else(|| "daily source crawler requires --daily-source".to_string())?;
+
+        if !seen.contains("--date") {
+            return Err("daily source crawler requires --date".to_string());
+        }
+
+        if seen.contains("--daily-file") && daily_source != "0x3f" {
+            return Err("--daily-file is only supported for --daily-source 0x3f".to_string());
+        }
     }
 
     let mut result = raw_args.to_vec();
@@ -1323,6 +1389,11 @@ mod tests {
             ])
         )
         .is_ok());
+        assert!(validate_args(
+            &CrawlerSource::DailySource,
+            &args(&["--daily-source", "sheep", "--date", "2026-06-02"])
+        )
+        .is_ok());
         assert!(validate_args(&CrawlerSource::Luogu, &args(&["--problem", "P1083"])).is_ok());
         assert!(validate_args(&CrawlerSource::Luogu, &args(&["--sync-problemset"])).is_ok());
         assert!(validate_args(
@@ -1371,6 +1442,52 @@ mod tests {
     }
 
     #[test]
+    fn validate_args_keeps_daily_source_flags_on_dedicated_crawler() {
+        let err = validate_args(
+            &CrawlerSource::Codeforces,
+            &args(&["--daily-source", "sheep", "--date", "2026-06-02"]),
+        )
+        .unwrap_err();
+        assert_eq!(err, "unknown argument: --daily-source");
+
+        let source = CrawlerSource::parse("daily_source").expect("daily source parser");
+        assert_eq!(source.script_name(), "daily_source.py");
+        assert!(validate_args(
+            &source,
+            &args(&["--daily-source", "sheep", "--date", "2026-06-02"])
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn validate_args_enforces_daily_source_argument_dependencies() {
+        let source = CrawlerSource::DailySource;
+
+        let err = validate_args(&source, &args(&["--date", "2026-06-02"])).unwrap_err();
+        assert_eq!(err, "daily source crawler requires --daily-source");
+
+        let err = validate_args(&source, &args(&["--daily-source", "sheep"])).unwrap_err();
+        assert_eq!(err, "daily source crawler requires --date");
+
+        let err = validate_args(
+            &source,
+            &args(&[
+                "--daily-source",
+                "sheep",
+                "--date",
+                "2026-06-02",
+                "--daily-file",
+                "data/sheep.csv",
+            ]),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            "--daily-file is only supported for --daily-source 0x3f"
+        );
+    }
+
+    #[test]
     fn validate_args_rejects_invalid_crawler_values() {
         let err = validate_args(&CrawlerSource::LeetCode, &args(&["--domain", "tw"])).unwrap_err();
         assert!(err.contains("invalid domain"));
@@ -1394,6 +1511,40 @@ mod tests {
         let err =
             validate_args(&CrawlerSource::Codeforces, &args(&["--contest", "abc"])).unwrap_err();
         assert!(err.contains("invalid integer"));
+
+        let err = validate_args(
+            &CrawlerSource::DailySource,
+            &args(&["--daily-source", "unknown"]),
+        )
+        .unwrap_err();
+        assert!(err.contains("invalid daily source"));
+
+        assert!(validate_args(
+            &CrawlerSource::DailySource,
+            &args(&[
+                "--daily-source",
+                "0x3f",
+                "--date",
+                "2026-06-02",
+                "--daily-file",
+                "data/0x3f.csv",
+            ])
+        )
+        .is_ok());
+
+        let err = validate_args(
+            &CrawlerSource::DailySource,
+            &args(&["--daily-source", "0x3f", "--daily-file", "../x.csv"]),
+        )
+        .unwrap_err();
+        assert!(err.contains("'..'"));
+
+        let err = validate_args(
+            &CrawlerSource::DailySource,
+            &args(&["--daily-source", "0x3f", "--daily-file", "/tmp/0x3f.csv"]),
+        )
+        .unwrap_err();
+        assert!(err.contains("relative path"));
     }
 
     #[test]

@@ -4,7 +4,7 @@
 TBD - created by archiving change oj-api-rs-v1. Update Purpose after archive.
 ## Requirements
 ### Requirement: Daily challenge retrieval
-The system SHALL return daily challenges via `GET /api/v1/daily?domain={com|cn}&date={YYYY-MM-DD}` or `GET /api/v1/daily?source={leetcode.com|leetcode.cn}&date={YYYY-MM-DD}`. The `domain` parameter SHALL be parsed as a `LeetCodeDomain` enum (`Com`, `Cn`) and mapped to canonical daily sources (`leetcode.com`, `leetcode.cn`). The response SHALL expose `date`, canonical `source`, and a `problems` array assembled from stored problem references. Each response problem SHALL include localized problem detail fields and `similar_questions` as a hydrated array of `ProblemSummary` objects resolved from the stored slug list.
+The system SHALL return daily challenges via `GET /api/v1/daily?domain={com|cn}&date={YYYY-MM-DD}` or `GET /api/v1/daily?source={daily-source}&date={YYYY-MM-DD}`. The `domain` parameter SHALL remain LeetCode-only, parsed as a `LeetCodeDomain` enum (`Com`, `Cn`), and mapped to canonical daily sources (`leetcode.com`, `leetcode.cn`). The `source` parameter SHALL accept LeetCode daily sources (`leetcode.com`, `leetcode.cn`) and known additional daily challenge sources (`sheep`, `0x3f`). The response SHALL expose `date`, canonical `source`, and a `problems` array assembled from stored problem references. Each response problem SHALL include problem detail fields and `similar_questions` as a hydrated array of `ProblemSummary` objects resolved from the stored slug list.
 
 #### Scenario: Today's daily (default)
 - **WHEN** client sends `GET /api/v1/daily` without parameters
@@ -35,7 +35,7 @@ The system SHALL return daily challenges via `GET /api/v1/daily?domain={com|cn}&
 - **THEN** system returns the daily challenge from `leetcode.cn` without conflict
 
 #### Scenario: Daily response includes hydrated similar questions
-- **WHEN** a resolved daily problem has similar question slugs that exist in the LeetCode problem table
+- **WHEN** a resolved daily problem has similar question slugs that exist in the problem table for that problem source
 - **THEN** the response problem returns `similar_questions` as hydrated summary objects in the same order as the stored slug list
 
 #### Scenario: Daily response shape
@@ -45,6 +45,14 @@ The system SHALL return daily challenges via `GET /api/v1/daily?domain={com|cn}&
 #### Scenario: Multiple daily problems preserve order
 - **WHEN** the stored daily record has `problems = ["leetcode:1234", "leetcode:1", "atcoder:abc321_a"]`
 - **THEN** the response `problems` array returns resolved problems in that same reference order
+
+#### Scenario: Sheep daily source
+- **WHEN** client sends `GET /api/v1/daily?source=sheep&date=2026-06-02` and a daily record exists
+- **THEN** system returns HTTP 200 with `source = "sheep"` and resolved Codeforces problems
+
+#### Scenario: 0x3f daily source
+- **WHEN** client sends `GET /api/v1/daily?source=0x3f&date=2026-06-02` and a daily record exists
+- **THEN** system returns HTTP 200 with `source = "0x3f"` and resolved Codeforces problems
 
 ### Requirement: Daily challenge date validation
 The system SHALL validate the `date` parameter format as `YYYY-MM-DD` and enforce range `[2020-04-01, domain-aware today]`. For `domain=cn`, "today" SHALL be computed using UTC+8. For `domain=com`, "today" SHALL be computed using UTC.
@@ -70,7 +78,7 @@ The system SHALL validate the `date` parameter format as `YYYY-MM-DD` and enforc
 - **THEN** system returns HTTP 400 with error detail indicating invalid date
 
 ### Requirement: Daily challenge domain validation
-The system SHALL only accept `com` or `cn` as valid domain values, validated via the `LeetCodeDomain` enum. The `source` parameter SHALL only accept `leetcode.com` or `leetcode.cn` for the LeetCode daily endpoint. If both `domain` and `source` are provided with conflicting values, the system SHALL return HTTP 400.
+The system SHALL only accept `com` or `cn` as valid domain values, validated via the `LeetCodeDomain` enum. The `source` parameter SHALL only accept supported daily source values. If both `domain` and `source` are provided, the system SHALL allow matching LeetCode pairs and SHALL return HTTP 400 for conflicts or for pairing a LeetCode-only `domain` with a non-LeetCode `source`.
 
 #### Scenario: Invalid domain
 - **WHEN** client sends `GET /api/v1/daily?domain=jp`
@@ -84,8 +92,12 @@ The system SHALL only accept `com` or `cn` as valid domain values, validated via
 - **WHEN** client sends `GET /api/v1/daily?domain=com&source=leetcode.cn`
 - **THEN** system returns HTTP 400 with error detail indicating domain and source conflict
 
+#### Scenario: Domain conflicts with additional daily source
+- **WHEN** client sends `GET /api/v1/daily?domain=com&source=sheep`
+- **THEN** system returns HTTP 400 with error detail indicating domain and source conflict
+
 ### Requirement: Daily challenge not found
-The system SHALL return HTTP 404 only when no usable daily challenge record exists in the DB AND no fallback crawler can be triggered. A daily row with malformed JSON, malformed problem refs, or no resolvable problems SHALL be treated as unusable. When a fallback crawler is triggered, the system SHALL return HTTP 202 instead.
+The system SHALL return HTTP 404 only when no usable daily challenge record exists in the DB AND no fallback behavior applies. A daily row with malformed JSON, malformed problem refs, or no resolvable problems SHALL be treated as unusable. When fallback behavior applies, the system SHALL return HTTP 202 instead. LeetCode sources SHALL keep spawning the LeetCode fallback crawler. Configured additional daily sources SHALL spawn the dedicated daily-source fallback crawler from the API handler. Additional daily sources that cannot be fetched because required configuration is missing SHALL return HTTP 202 with an ingestion-required response and SHALL NOT write an empty daily row.
 
 #### Scenario: No data, fallback triggered (com)
 - **WHEN** client sends `GET /api/v1/daily?domain=com&date=2024-06-15` and no DB record exists and no fallback is running
@@ -102,6 +114,30 @@ The system SHALL return HTTP 404 only when no usable daily challenge record exis
 #### Scenario: Missing referenced problems treated as unusable when none resolve
 - **WHEN** the DB has a daily row but none of its problem references resolve from the `problems` table
 - **THEN** the system treats the row as unusable and follows the existing no-data fallback behavior
+
+#### Scenario: Missing Sheep source spawns API fallback crawler
+- **WHEN** client sends `GET /api/v1/daily?source=sheep&date=2026-06-09` and no usable DB record exists
+- **THEN** system returns HTTP 202 with `{"status": "fetching", "retry_after": 30}`
+- **AND** the API handler registers a daily fallback entry for `sheep:2026-06-09`
+- **AND** the API handler spawns `daily_source.py --daily-source sheep --date 2026-06-09`
+
+#### Scenario: Missing 0x3f source spawns API fallback crawler when token is configured
+- **WHEN** client sends `GET /api/v1/daily?source=0x3f&date=2026-06-09` and no usable DB record exists
+- **AND** a direct local Tencent Docs token or its configured environment-variable fallback resolves to a non-empty value
+- **THEN** system returns HTTP 202 with `{"status": "fetching", "retry_after": 30}`
+- **AND** the API handler registers a daily fallback entry for `0x3f:2026-06-09`
+- **AND** the API handler spawns `daily_source.py --daily-source 0x3f --date 2026-06-09`
+
+#### Scenario: Missing 0x3f source without token returns ingestion required
+- **WHEN** client sends `GET /api/v1/daily?source=0x3f&date=2026-06-09` and no usable DB record exists
+- **AND** the direct local Tencent Docs token and its configured environment-variable fallback are both missing or empty
+- **THEN** system returns HTTP 202 with a body that includes `status = "ingestion_required"`, `retry_after = 30`, and `job_started = false`
+- **AND** the API handler does not spawn the daily-source crawler
+
+#### Scenario: Additional source fallback already running
+- **WHEN** client sends `GET /api/v1/daily?source=sheep&date=2026-06-09`
+- **AND** a fallback for `sheep:2026-06-09` is already Running
+- **THEN** system returns HTTP 202 with `{"status": "fetching", "retry_after": 30}` without spawning a new crawler
 
 ### Requirement: CN daily challenge fallback
 The system SHALL trigger a background crawler fallback for `domain=cn` or `source=leetcode.cn` when no usable DB record exists, using the same TOCTOU guard, cooldown, and background task pattern as `domain=com`. The fallback key SHALL use the canonical daily source and date to prevent cross-source cooldown collision. The crawler SHALL be spawned with `--domain cn` argument.
@@ -303,7 +339,7 @@ The system SHALL detect the `daily_challenge` schema during Rust server initiali
 - **THEN** the system skips that row and continues migrating other rows without panicking
 
 ### Requirement: Daily challenge problem localization projection
-The system SHALL assemble daily response problems by resolving stored problem refs from the `problems` table and projecting localized display fields according to the daily challenge source. For `source = "leetcode.cn"`, the response problem `title` SHALL use `title_cn` when present and fallback to `title`, and `content` SHALL use `content_cn` when present and fallback to `content`. For `source = "leetcode.com"`, the response SHALL use default `title` and `content` fields.
+The system SHALL assemble daily response problems by resolving stored problem refs from the `problems` table and projecting display fields according to the daily challenge source. For `source = "leetcode.cn"`, the response problem `title` SHALL use `title_cn` when present and fallback to `title`, and `content` SHALL use `content_cn` when present and fallback to `content`. For all other daily sources, including `leetcode.com`, `sheep`, and `0x3f`, the response SHALL use default `title` and `content` fields. LeetCode host rewriting SHALL apply only when the resolved problem source is `leetcode` and the daily source is `leetcode.com` or `leetcode.cn`.
 
 #### Scenario: CN daily uses Chinese title and content
 - **WHEN** `GET /api/v1/daily?source=leetcode.cn&date=2026-01-01` resolves `leetcode:1` whose problem row has both English and Chinese fields
@@ -321,3 +357,6 @@ The system SHALL assemble daily response problems by resolving stored problem re
 - **WHEN** the daily source is `leetcode.cn` and a resolved problem source is `leetcode`
 - **THEN** the returned problem link uses the `https://leetcode.cn` host
 
+#### Scenario: additional daily source preserves Codeforces link
+- **WHEN** the daily source is `sheep` and a resolved problem source is `codeforces`
+- **THEN** the returned problem link remains the stored Codeforces link

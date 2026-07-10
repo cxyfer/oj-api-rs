@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
@@ -97,6 +98,58 @@ pub struct McpConfig {
     pub allowed_hosts: Vec<String>,
 }
 
+pub const DEFAULT_TENCENT_DOCS_TOKEN_ENV: &str = "TENCENT_DOCS_TOKEN";
+
+#[derive(Clone, Deserialize)]
+#[serde(default)]
+pub struct TencentDocsDailySourceConfig {
+    pub token: String,
+    pub token_env: String,
+}
+
+impl fmt::Debug for TencentDocsDailySourceConfig {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("TencentDocsDailySourceConfig")
+            .field("token", &"[REDACTED]")
+            .field("token_env", &self.token_env)
+            .finish()
+    }
+}
+
+impl TencentDocsDailySourceConfig {
+    pub fn resolve_token(&self) -> Option<String> {
+        let token = self.token.trim();
+        if !token.is_empty() {
+            return Some(token.to_string());
+        }
+
+        let token_env = self.token_env.trim();
+        if token_env.is_empty() {
+            return None;
+        }
+
+        std::env::var(token_env)
+            .ok()
+            .and_then(|token| (!token.trim().is_empty()).then(|| token.trim().to_string()))
+    }
+}
+
+impl Default for TencentDocsDailySourceConfig {
+    fn default() -> Self {
+        Self {
+            token: String::new(),
+            token_env: DEFAULT_TENCENT_DOCS_TOKEN_ENV.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(default)]
+pub struct DailySourcesConfig {
+    pub tencent_docs: TencentDocsDailySourceConfig,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -106,6 +159,7 @@ pub struct Config {
     pub embedding: EmbeddingConfig,
     pub logging: LoggingConfig,
     pub mcp: McpConfig,
+    pub daily_sources: DailySourcesConfig,
     #[serde(skip)]
     pub config_path: PathBuf,
 }
@@ -119,6 +173,7 @@ impl Default for Config {
             embedding: EmbeddingConfig::default(),
             logging: LoggingConfig::default(),
             mcp: McpConfig::default(),
+            daily_sources: DailySourcesConfig::default(),
             config_path: PathBuf::from("config.toml"),
         }
     }
@@ -139,11 +194,10 @@ impl Config {
             std::process::exit(1);
         });
 
-        let mut config: Config = toml::from_str(&content).unwrap_or_else(|e| {
+        let mut config: Config = toml::from_str(&content).unwrap_or_else(|_| {
             eprintln!(
-                "FATAL: failed to parse configuration file '{}': {}",
-                path.display(),
-                e
+                "FATAL: failed to parse configuration file '{}'",
+                path.display()
             );
             std::process::exit(1);
         });
@@ -181,5 +235,111 @@ impl Config {
             );
             std::process::exit(1);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn daily_sources_token_env_defaults_to_tencent_docs_token() {
+        let config: Config = toml::from_str("").unwrap();
+        assert_eq!(
+            config.daily_sources.tencent_docs.token_env,
+            DEFAULT_TENCENT_DOCS_TOKEN_ENV
+        );
+    }
+
+    #[test]
+    fn daily_sources_token_env_accepts_custom_name() {
+        let config: Config =
+            toml::from_str("[daily_sources.tencent_docs]\ntoken_env = \"MY_TENCENT_TOKEN\"\n")
+                .unwrap();
+        assert_eq!(
+            config.daily_sources.tencent_docs.token_env,
+            "MY_TENCENT_TOKEN"
+        );
+    }
+
+    #[test]
+    fn daily_sources_direct_token_takes_precedence_and_is_trimmed() {
+        let config: Config = toml::from_str(
+            "[daily_sources.tencent_docs]\ntoken = \" direct-token \"\ntoken_env = \"MISSING_TOKEN\"\n",
+        )
+        .unwrap();
+        assert_eq!(
+            config.daily_sources.tencent_docs.resolve_token().as_deref(),
+            Some("direct-token")
+        );
+    }
+
+    #[test]
+    fn daily_sources_blank_direct_token_falls_back_to_environment() {
+        let _env_lock = crate::utils::TEST_PATH_MUTEX
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        std::env::set_var("OJ_TEST_TENCENT_TOKEN", " env-token ");
+        let config: Config = toml::from_str(
+            "[daily_sources.tencent_docs]\ntoken = \"  \"\ntoken_env = \"OJ_TEST_TENCENT_TOKEN\"\n",
+        )
+        .unwrap();
+        assert_eq!(
+            config.daily_sources.tencent_docs.resolve_token().as_deref(),
+            Some("env-token")
+        );
+        std::env::remove_var("OJ_TEST_TENCENT_TOKEN");
+    }
+
+    #[test]
+    fn daily_sources_direct_token_does_not_require_environment_fallback() {
+        let config: Config = toml::from_str(
+            "[daily_sources.tencent_docs]\ntoken = \" direct-token \"\ntoken_env = \"  \"\n",
+        )
+        .unwrap();
+        assert_eq!(
+            config.daily_sources.tencent_docs.resolve_token().as_deref(),
+            Some("direct-token")
+        );
+    }
+
+    #[test]
+    fn daily_sources_blank_token_env_disables_environment_fallback() {
+        let config: Config =
+            toml::from_str("[daily_sources.tencent_docs]\ntoken = \"  \"\ntoken_env = \"  \"\n")
+                .unwrap();
+
+        assert_eq!(config.daily_sources.tencent_docs.resolve_token(), None);
+    }
+
+    #[test]
+    fn daily_sources_without_direct_token_or_environment_fallback_returns_none() {
+        let config: Config =
+            toml::from_str("[daily_sources.tencent_docs]\ntoken = \"  \"\ntoken_env = \"  \"\n")
+                .unwrap();
+        assert_eq!(config.daily_sources.tencent_docs.resolve_token(), None);
+    }
+
+    #[test]
+    fn tencent_docs_debug_output_redacts_token() {
+        let config = TencentDocsDailySourceConfig {
+            token: "secret-token".into(),
+            token_env: "TENCENT_DOCS_TOKEN".into(),
+        };
+        let debug = format!("{config:?}");
+        assert!(debug.contains("[REDACTED]"));
+        assert!(!debug.contains("secret-token"));
+    }
+
+    #[test]
+    fn config_example_documents_direct_token_placeholder_and_environment_fallback() {
+        let example = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config.toml.example"),
+        )
+        .unwrap();
+        assert!(example.contains("[daily_sources.tencent_docs]"));
+        assert!(example.contains("token = \"\""));
+        assert!(example.contains("token_env = \"TENCENT_DOCS_TOKEN\""));
+        assert!(!example.contains("token_value"));
     }
 }

@@ -762,6 +762,7 @@ class LeetCodeClient(BaseCrawler):
         daily = dict(
             date=question_info["date"],
             domain=domain,
+            source=f"leetcode.{domain}",
             qid=qid,
             title=question["title"],
             title_cn=question.get("titleCn", ""),

@@ -88,6 +88,16 @@ concurrency = 4
 # Example: ["oj.example.com", "localhost:7856"]
 allowed_hosts = []
 
+[daily_sources.tencent_docs]
+# Local config token takes precedence when non-empty. config.toml is ignored;
+# never commit a real token. Leave this empty to use the environment fallback.
+token = ""
+# Environment-variable fallback for existing deployments.
+token_env = "TENCENT_DOCS_TOKEN"
+
+# Additional daily sources refresh daily at UTC+8 08:00, 10:00, and 12:00.
+# These times are fixed for this release and are not configured through TOML.
+
 [logging]
 rust_log = "info"
 level = "INFO"
