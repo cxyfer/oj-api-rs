@@ -276,8 +276,11 @@ def _validate_proxy_url(url: str) -> None:
         port = parsed.port
     except ValueError as exc:
         raise ValueError(f"Proxy URL has invalid port: '{url}'") from exc
-    if parsed.scheme in {"socks5", "socks5h"} and port is None:
-        raise ValueError(f"Proxy URL missing port: '{url}'")
+    if parsed.scheme in {"socks5", "socks5h"}:
+        if port is None:
+            raise ValueError(f"Proxy URL missing port: '{url}'")
+        if port == 0:
+            raise ValueError(f"Proxy URL has invalid port: '{url}'")
 
 
 @dataclass(frozen=True)

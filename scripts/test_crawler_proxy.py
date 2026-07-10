@@ -132,6 +132,13 @@ def test_config_manager_rejects_invalid_proxy_at_load(tmp_path):
         ConfigManager(str(path))
 
 
+def test_config_manager_rejects_socks_port_zero_at_load(tmp_path):
+    path = write_config(tmp_path, '[crawler]\nsocks5_proxy = "socks5h://127.0.0.1:0"\n')
+
+    with pytest.raises(ValueError, match="invalid port"):
+        ConfigManager(str(path))
+
+
 def test_config_manager_rejects_per_crawler_socks_without_port_at_load(tmp_path):
     path = write_config(
         tmp_path, '[crawler.leetcode]\nsocks5_proxy = "socks5h://127.0.0.1"\n'
