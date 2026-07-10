@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -168,6 +169,24 @@ class CodeforcesClient(BaseCrawler):
             logger.error("Invalid JSON from %s: %s", url, exc)
             return None
 
+    @staticmethod
+    def parse_problem_id(problem_id: str) -> Optional[tuple[int, str, bool]]:
+        match = re.fullmatch(r"(\d+)([A-Za-z][A-Za-z0-9]*)", problem_id.strip())
+        if not match:
+            return None
+        contest_id = int(match.group(1))
+        index = match.group(2).upper()
+        return contest_id, index, len(match.group(1)) >= 6
+
+    @classmethod
+    def problem_url_for_id(cls, problem_id: str) -> Optional[str]:
+        parsed = cls.parse_problem_id(problem_id)
+        if not parsed:
+            return None
+        contest_id, index, is_gym = parsed
+        kind = "gym" if is_gym else "contest"
+        return f"https://codeforces.com/{kind}/{contest_id}/problem/{index}"
+
     def _build_problem_from_api(
         self, problem: dict, stats: dict, contest_name: Optional[str] = None
     ) -> Optional[dict]:
@@ -177,6 +196,8 @@ class CodeforcesClient(BaseCrawler):
         if contest_id is None or not index or not title:
             return None
         slug = f"{contest_id}{index}"
+        contest_id_str = str(contest_id)
+        kind = "gym" if len(contest_id_str) >= 6 else "contest"
         return {
             "id": slug,
             "source": "codeforces",
@@ -186,12 +207,10 @@ class CodeforcesClient(BaseCrawler):
             "difficulty": None,
             "ac_rate": None,
             "rating": problem.get("rating"),
-            "contest": contest_name if contest_name else str(contest_id),
+            "contest": contest_name if contest_name else contest_id_str,
             "problem_index": index,
             "tags": problem.get("tags", []),
-            "link": self.PROBLEM_URL_TEMPLATE.format(
-                contest_id=contest_id, index=index
-            ),
+            "link": f"https://codeforces.com/{kind}/{contest_id}/problem/{index}",
             "category": "Algorithms",
             "paid_only": 0,
             "content": None,
@@ -448,6 +467,38 @@ class CodeforcesClient(BaseCrawler):
             logger.warning("Problem statement missing for %s", url)
         return content
 
+    async def fetch_single_problem(self, problem_id: str) -> bool:
+        parsed = self.parse_problem_id(problem_id)
+        if not parsed:
+            logger.error("Invalid Codeforces problem id: %s", problem_id)
+            return False
+        contest_id, index, _ = parsed
+        problem = {
+            "id": f"{contest_id}{index}",
+            "source": "codeforces",
+            "slug": f"{contest_id}{index}",
+            "title": f"{contest_id}{index}",
+            "title_cn": "",
+            "difficulty": None,
+            "ac_rate": None,
+            "rating": None,
+            "contest": str(contest_id),
+            "problem_index": index,
+            "tags": [],
+            "link": self.problem_url_for_id(f"{contest_id}{index}"),
+            "category": "Algorithms",
+            "paid_only": 0,
+            "content": None,
+            "content_cn": None,
+            "similar_questions": None,
+        }
+        async with self._create_curl_session(impersonate="chrome124") as session:
+            content = await self.fetch_content_by_url(session, problem["link"])
+        if not content:
+            return False
+        problem["content"] = content
+        return self.problems_db.update_problem(problem)
+
     async def fetch_single_contest(self, contest_id: int) -> int:
         async with self._create_curl_session(impersonate="chrome124") as session:
             problems = await self.fetch_contest_problems(contest_id, session)
@@ -629,6 +680,11 @@ class CodeforcesClient(BaseCrawler):
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Codeforces CLI tool")
     parser.add_argument(
+        "--problem",
+        type=str,
+        help="Fetch one problem by derived Codeforces ID, e.g. 1988A or 102951A",
+    )
+    parser.add_argument(
         "--sync-problemset",
         action="store_true",
         help="Sync from Codeforces problemset API",
@@ -701,7 +757,8 @@ async def main() -> None:
     )
 
     if not (
-        args.sync_problemset
+        args.problem
+        or args.sync_problemset
         or args.fetch_contest
         or args.fetch_all
         or args.contest
@@ -716,6 +773,10 @@ async def main() -> None:
 
     if args.status:
         client.show_status()
+
+    if args.problem:
+        if not await client.fetch_single_problem(args.problem):
+            raise SystemExit(1)
 
     if args.sync_problemset:
         await client.sync_problemset()

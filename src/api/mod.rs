@@ -28,6 +28,14 @@ pub fn public_router() -> Router<Arc<AppState>> {
             "/api/v1/problems/difficulties/{source}",
             get(problems::list_difficulties),
         )
+        .route(
+            "/api/v1/problems/atcoder/{contest}/tasks/{problem}",
+            get(problems::get_atcoder_problem_with_tasks_path),
+        )
+        .route(
+            "/api/v1/problems/atcoder/{contest}/{problem}",
+            get(problems::get_atcoder_problem_with_contest),
+        )
         .route("/api/v1/problems/{source}/{id}", get(problems::get_problem))
         .route("/api/v1/problems/batch", post(problems::batch_problems))
         .route("/api/v1/problems/{source}", get(problems::list_problems))

@@ -17,6 +17,22 @@ else:
 
 logger = logging.getLogger("config")
 
+_CRAWLER_HTTP_FIELDS = (
+    "user_agent",
+    "proxy",
+    "http_proxy",
+    "https_proxy",
+    "socks5_proxy",
+)
+_CRAWLER_PROXY_FIELDS = ("proxy", "http_proxy", "https_proxy", "socks5_proxy")
+
+
+def _norm_config_value(val: Any) -> Optional[str]:
+    if val is None:
+        return None
+    s = str(val).strip()
+    return s if s else None
+
 
 class ConfigManager:
     def __init__(self, config_path: Optional[str] = None):
@@ -36,7 +52,26 @@ class ConfigManager:
             )
         with open(self.config_path, "rb") as f:
             self._config = tomllib.load(f)
+        self._validate_crawler_proxy_urls()
         logger.info(f"Configuration loaded from {self.config_path}")
+
+    def _validate_crawler_proxy_urls(self) -> None:
+        crawler_section = self._config.get("crawler", {})
+        if not isinstance(crawler_section, dict):
+            return
+
+        for field in _CRAWLER_PROXY_FIELDS:
+            value = _norm_config_value(crawler_section.get(field))
+            if value is not None:
+                _validate_proxy_url(value)
+
+        for crawler_config in crawler_section.values():
+            if not isinstance(crawler_config, dict):
+                continue
+            for field in _CRAWLER_PROXY_FIELDS:
+                value = _norm_config_value(crawler_config.get(field))
+                if value is not None:
+                    _validate_proxy_url(value)
 
     def _set_nested(self, d: Dict[str, Any], path: tuple, value: Any) -> None:
         for key in path[:-1]:
@@ -198,7 +233,6 @@ class ConfigManager:
         )
 
     def get_crawler_config(self, crawler_name: str) -> "CrawlerHttpConfig":
-        _FIELDS = ("user_agent", "proxy", "http_proxy", "https_proxy", "socks5_proxy")
         global_section = self._config.get("crawler", {})
         per_crawler = (
             global_section.get(crawler_name, {})
@@ -206,25 +240,16 @@ class ConfigManager:
             else {}
         )
 
-        def _norm(val: Any) -> Optional[str]:
-            if val is None:
-                return None
-            s = str(val).strip()
-            return s if s else None
-
         merged = {}
-        for field in _FIELDS:
+        for field in _CRAWLER_HTTP_FIELDS:
             value = (
-                _norm(per_crawler.get(field)) if isinstance(per_crawler, dict) else None
+                _norm_config_value(per_crawler.get(field))
+                if isinstance(per_crawler, dict)
+                else None
             )
             if value is None:
-                value = _norm(global_section.get(field))
+                value = _norm_config_value(global_section.get(field))
             merged[field] = value
-
-        proxy_fields = ("proxy", "http_proxy", "https_proxy", "socks5_proxy")
-        for field in proxy_fields:
-            if merged[field] is not None:
-                _validate_proxy_url(merged[field])
 
         return CrawlerHttpConfig(**merged)
 
@@ -268,6 +293,15 @@ def _validate_proxy_url(url: str) -> None:
         )
     if not parsed.hostname:
         raise ValueError(f"Proxy URL missing host: '{url}'")
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError(f"Proxy URL has invalid port: '{url}'") from exc
+    if parsed.scheme in {"socks5", "socks5h"}:
+        if port is None:
+            raise ValueError(f"Proxy URL missing port: '{url}'")
+        if port == 0:
+            raise ValueError(f"Proxy URL has invalid port: '{url}'")
 
 
 @dataclass(frozen=True)

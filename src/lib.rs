@@ -10,6 +10,7 @@ pub mod auth;
 pub mod config;
 pub mod db;
 pub mod detect;
+pub(crate) mod dynamic_problem;
 pub mod health;
 pub mod home;
 pub mod mcp;

@@ -23,6 +23,8 @@ use utoipa::OpenApi;
     paths(
         // Public API
         crate::api::problems::get_problem,
+        crate::api::problems::get_atcoder_problem_with_contest,
+        crate::api::problems::get_atcoder_problem_with_tasks_path,
         crate::api::problems::batch_problems,
         crate::api::problems::list_problems,
         crate::api::random::random_problems,

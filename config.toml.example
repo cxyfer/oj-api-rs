@@ -52,10 +52,12 @@ workers = 8
 [crawler]
 timeout_secs = 300
 # user_agent = "Mozilla/5.0 (compatible; OJ-API-Bot/1.0)"
+# Supported proxy schemes: http://, https://, socks5://, socks5h://
+# socks5h:// resolves DNS through the proxy.
 # proxy = "http://127.0.0.1:7890"         # shorthand for all protocols
 # http_proxy = ""                          # HTTP-specific proxy
 # https_proxy = ""                         # HTTPS-specific proxy
-# socks5_proxy = ""                        # SOCKS5 proxy (requires aiohttp-socks)
+# socks5_proxy = ""                        # SOCKS5/SOCKS5H proxy (requires aiohttp-socks)
 
 # Per-source timeout overrides (seconds)
 [crawler.per_source_timeout]
