@@ -49,4 +49,3 @@ Define documentation expectations for generated and checked-in configuration exa
 #### Scenario: allow-list semantics documented
 - **WHEN** `config.toml.example` is inspected
 - **THEN** comments explain that the setting applies to `/mcp` Host validation and that an empty list disables the allow-list
-

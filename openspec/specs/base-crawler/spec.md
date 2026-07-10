@@ -93,4 +93,3 @@ Define shared crawler HTTP helpers for user-agent, proxy, aiohttp, and curl_cffi
 #### Scenario: SOCKS5H returns None for request-level
 - **WHEN** resolved proxy is `"socks5h://127.0.0.1:1080"`
 - **THEN** returns `None` (proxy handled by ProxyConnector at session level)
-

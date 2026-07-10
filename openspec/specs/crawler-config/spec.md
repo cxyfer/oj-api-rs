@@ -84,4 +84,3 @@ New TOML fields and sub-tables (`[crawler.<name>]`) SHALL be silently ignored by
 #### Scenario: Rust build unaffected
 - **WHEN** `config.toml` contains new `[crawler]` fields and `[crawler.leetcode]` sub-table
 - **THEN** `cargo build --release` SHALL succeed without any Rust code modifications
-
