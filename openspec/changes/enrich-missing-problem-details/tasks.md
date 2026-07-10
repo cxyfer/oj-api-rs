@@ -20,3 +20,9 @@
 - [x] 3.1 Add focused tests for candidate selection, post-commit ordering, source dispatch, failure isolation, source-detail precedence, Codeforces tags, Gym title/content parsing and identity, and LeetCode whitespace replacement
 - [x] 3.2 Run the focused Python test suite and full Rust test suite
 - [x] 3.3 Run formatting, lint, OpenSpec strict validation, and diff whitespace checks
+
+## 4. Review corrections
+
+- [x] 4.1 Resolve LeetCode slugs to a local numeric ID before candidate selection and storage, retain the slug fallback, and enrich by the exact stored ID
+- [x] 4.2 Prefer non-empty Codeforces API tags while preserving stored tags as the fallback when metadata is missing or empty
+- [x] 4.3 Add regression coverage for LeetCode numeric/fallback identities and Codeforces tag precedence/preservation, then rerun focused and repository verification

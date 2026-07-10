@@ -432,6 +432,26 @@ class DailySourceClient(BaseCrawler):
                 seen.add(ref)
         return refs
 
+    def _resolve_local_leetcode_ids(self, problems: list[dict]) -> list[dict]:
+        resolved: list[dict] = []
+        for problem in problems:
+            problem_id = str(problem.get("id") or "").strip()
+            if problem.get("source") != "leetcode" or problem_id.isdigit():
+                resolved.append(problem)
+                continue
+
+            numeric_id = self.problems_db.get_numeric_problem_id_by_slug(
+                "leetcode", problem.get("slug")
+            )
+            if not numeric_id:
+                resolved.append(problem)
+                continue
+
+            canonical_problem = dict(problem)
+            canonical_problem["id"] = numeric_id
+            resolved.append(canonical_problem)
+        return resolved
+
     def _store_daily_source(
         self, date: str, daily_source: str, problems: list[dict]
     ) -> bool:
@@ -518,7 +538,7 @@ class DailySourceClient(BaseCrawler):
                 else "com"
             )
             result = await LeetCodeClient(domain=domain, **client_args).get_problem(
-                slug=problem.get("slug"), domain=domain
+                problem_id=problem_id, domain=domain
             )
             return bool(result)
         return False
@@ -526,6 +546,7 @@ class DailySourceClient(BaseCrawler):
     async def _store_and_enrich_daily_source(
         self, date: str, daily_source: str, problems: list[dict]
     ) -> bool:
+        problems = self._resolve_local_leetcode_ids(problems)
         candidates = self._enrichment_candidates(problems)
         stored = self._store_daily_source(date, daily_source, problems)
         if not stored:

@@ -680,6 +680,30 @@ class ProblemsDatabaseManager:
             return problem
         return None
 
+    def get_numeric_problem_id_by_slug(self, source, slug):
+        normalized_source = str(source or "").strip()
+        normalized_slug = str(slug or "").strip()
+        if not normalized_source or not normalized_slug:
+            return None
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT id FROM problems WHERE source = ? AND slug = ?",
+                (normalized_source, normalized_slug),
+            )
+            numeric_ids = [
+                problem_id
+                for (raw_problem_id,) in cursor.fetchall()
+                if (problem_id := str(raw_problem_id or "").strip()).isdigit()
+            ]
+            if not numeric_ids:
+                return None
+            return min(numeric_ids, key=lambda value: (int(value), len(value), value))
+        finally:
+            conn.close()
+
     def get_problem_contents(self, source: str) -> list[tuple[str, str]]:
         """Get (id, content) pairs for problems with content."""
         conn = sqlite3.connect(self.db_path)

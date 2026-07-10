@@ -178,7 +178,7 @@ class DailySourceEnrichmentTests(unittest.TestCase):
         )
         snapshot_states = []
 
-        async def get_problem(*, slug, domain):
+        async def get_problem(*, problem_id, domain):
             snapshot_states.append(
                 (
                     client.problems_db.get_problem(id="two-sum", source="leetcode")
@@ -186,7 +186,7 @@ class DailySourceEnrichmentTests(unittest.TestCase):
                     self._daily_rows(),
                 )
             )
-            return {"slug": slug, "domain": domain}
+            return {"id": problem_id, "domain": domain}
 
         with patch.object(daily_source, "LeetCodeClient") as leetcode_client:
             leetcode_client.return_value.get_problem = AsyncMock(
@@ -205,11 +205,76 @@ class DailySourceEnrichmentTests(unittest.TestCase):
             domain="cn", data_dir=str(client.data_dir), db_path=self.db_path
         )
         leetcode_client.return_value.get_problem.assert_awaited_once_with(
-            slug="two-sum", domain="cn"
+            problem_id="two-sum", domain="cn"
         )
         self.assertEqual(
             snapshot_states,
             [(True, [("2026-07-10", "0x3f", '["leetcode:two-sum"]')])],
+        )
+
+    def test_store_and_enrich_uses_local_leetcode_numeric_id(self):
+        client = self._client()
+        numeric_problem = self._problem(
+            "leetcode",
+            "1",
+            slug="two-sum",
+            title=" ",
+            content="\t",
+            link="https://leetcode.com/problems/two-sum/",
+        )
+        numeric_problem["rating"] = 1700.0
+        self._store_existing(client, numeric_problem)
+        problem = self._problem(
+            "leetcode",
+            "two-sum",
+            slug="two-sum",
+            title="Daily title",
+            content="Daily summary",
+            link="https://leetcode.com/problems/two-sum/",
+        )
+        problem["rating"] = 1700.0
+
+        async def get_problem(*, problem_id, domain):
+            return {"id": problem_id, "domain": domain}
+
+        with patch.object(daily_source, "LeetCodeClient") as leetcode_client:
+            leetcode_client.return_value.get_problem = AsyncMock(
+                side_effect=get_problem
+            )
+
+            self.assertTrue(
+                asyncio.run(
+                    client._store_and_enrich_daily_source(
+                        "2026-07-10", "0x3f", [problem]
+                    )
+                )
+            )
+
+        leetcode_client.return_value.get_problem.assert_awaited_once_with(
+            problem_id="1", domain="com"
+        )
+        self.assertEqual(
+            self._daily_rows(),
+            [("2026-07-10", "0x3f", '["leetcode:1"]')],
+        )
+        self.assertIsNone(
+            client.problems_db.get_problem(id="two-sum", source="leetcode")
+        )
+
+    def test_numeric_leetcode_id_lookup_ignores_slug_snapshot(self):
+        client = self._client()
+        self._store_existing(
+            client,
+            self._problem("leetcode", "two-sum", slug="two-sum"),
+        )
+        self._store_existing(
+            client,
+            self._problem("leetcode", "1", slug="two-sum"),
+        )
+
+        self.assertEqual(
+            client.problems_db.get_numeric_problem_id_by_slug("leetcode", "two-sum"),
+            "1",
         )
 
     def test_store_and_enrich_selects_before_storage_and_continues_after_failure(self):

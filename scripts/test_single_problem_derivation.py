@@ -194,7 +194,7 @@ class SingleProblemDerivationTests(unittest.TestCase):
                 problems_db.get_problem(id="106539D", source="codeforces")
             )
 
-    def test_codeforces_single_problem_merges_contest_api_tags(self):
+    def test_codeforces_single_problem_prefers_contest_api_tags(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             problems_db = ProblemsDatabaseManager(str(Path(tmpdir) / "data.db"))
             self.assertTrue(
@@ -210,7 +210,7 @@ class SingleProblemDerivationTests(unittest.TestCase):
                         "rating": 1900.0,
                         "contest": "343",
                         "problem_index": "C",
-                        "tags": [],
+                        "tags": ["daily-only", "greedy"],
                         "link": "https://codeforces.com/contest/343/problem/C",
                         "category": "Algorithms",
                         "paid_only": 0,
@@ -257,6 +257,67 @@ class SingleProblemDerivationTests(unittest.TestCase):
             self.assertEqual(
                 stored["tags"], ["binary search", "greedy", "two pointers"]
             )
+            self.assertEqual(stored["rating"], 1900.0)
+
+    def test_codeforces_single_problem_preserves_tags_when_contest_tags_are_empty(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            problems_db = ProblemsDatabaseManager(str(Path(tmpdir) / "data.db"))
+            self.assertTrue(
+                problems_db.update_problem(
+                    {
+                        "id": "343C",
+                        "source": "codeforces",
+                        "slug": "343C",
+                        "title": "Read Time",
+                        "title_cn": "",
+                        "difficulty": None,
+                        "ac_rate": None,
+                        "rating": 1900.0,
+                        "contest": "343",
+                        "problem_index": "C",
+                        "tags": ["binary search"],
+                        "link": "https://codeforces.com/contest/343/problem/C",
+                        "category": "Algorithms",
+                        "paid_only": 0,
+                        "content": "Existing statement",
+                        "content_cn": None,
+                        "similar_questions": [],
+                    }
+                )
+            )
+            client = object.__new__(CodeforcesClient)
+
+            class FakeSession:
+                async def __aenter__(self):
+                    return object()
+
+                async def __aexit__(self, exc_type, exc, traceback):
+                    return False
+
+            async def fake_fetch_detail_by_url(session, url):
+                return {"title": "C. Read Time", "content": "Official statement"}
+
+            async def fake_fetch_contest_problems(contest_id, session):
+                self.assertEqual(contest_id, 343)
+                return [{"id": "343C", "problem_index": "C", "tags": []}]
+
+            client._create_curl_session = lambda **kwargs: FakeSession()
+            client.fetch_detail_by_url = fake_fetch_detail_by_url
+            client.fetch_contest_problems = fake_fetch_contest_problems
+            client.problems_db = problems_db
+
+            self.assertTrue(
+                asyncio.run(
+                    client.fetch_single_problem("343C", prefer_source_details=True)
+                )
+            )
+
+            stored = problems_db.get_problem(id="343C", source="codeforces")
+            self.assertEqual(stored["title"], "Read Time")
+            self.assertEqual(stored["content"], "Official statement")
+            self.assertEqual(stored["tags"], ["binary search"])
             self.assertEqual(stored["rating"], 1900.0)
 
     def test_codeforces_fetch_single_problem_rejects_prefixed_gym_id(self):

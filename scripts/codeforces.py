@@ -563,11 +563,14 @@ class CodeforcesClient(BaseCrawler):
                 detail["title"], problem["problem_index"]
             )
         problem["content"] = detail["content"]
+        preferred_fields = ["title", "content"]
         if metadata and metadata.get("tags"):
             problem["tags"] = metadata["tags"]
+            if prefer_source_details:
+                preferred_fields.append("tags")
         update_kwargs = {}
         if prefer_source_details:
-            update_kwargs["prefer_incoming_fields"] = ("title", "content", "tags")
+            update_kwargs["prefer_incoming_fields"] = preferred_fields
         return self.problems_db.update_problem(problem, **update_kwargs)
 
     async def fetch_single_contest(self, contest_id: int) -> int:

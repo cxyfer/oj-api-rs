@@ -48,6 +48,19 @@ After parsing Sheep or 0x3f daily problems, the dedicated daily-source crawler S
 - **THEN** the crawler invokes the existing LeetCode detail lookup after the snapshot exists
 - **AND** selects the LeetCode domain from the parsed problem URL without triggering broad problemset initialization
 
+#### Scenario: Local LeetCode numeric ID becomes the daily key
+- **WHEN** a parsed LeetCode URL has slug `two-sum`
+- **AND** the local problem table contains `id=1, slug=two-sum`
+- **THEN** candidate selection and snapshot storage use problem ID `1`
+- **AND** the ordered daily reference is `leetcode:1`
+- **AND** enrichment updates `leetcode:1` without creating a new `leetcode:two-sum` row
+
+#### Scenario: LeetCode slug remains the fallback key
+- **WHEN** a parsed LeetCode URL has slug `two-sum`
+- **AND** no matching local numeric problem ID exists
+- **THEN** candidate selection, snapshot storage, and enrichment use problem ID `two-sum`
+- **AND** daily storage completes without first fetching remote problemset metadata
+
 #### Scenario: Gym enrichment preserves the daily reference key
 - **WHEN** a Codeforces Gym candidate has stored ID `GYM106539D`
 - **THEN** enrichment fetches the corresponding Gym problem and updates `codeforces:GYM106539D`
@@ -68,8 +81,14 @@ After parsing Sheep or 0x3f daily problems, the dedicated daily-source crawler S
 #### Scenario: Codeforces tags come from contest metadata
 - **WHEN** Codeforces single-problem enrichment finds matching contest API metadata for the same problem index
 - **AND** that metadata contains non-empty tags
-- **THEN** the crawler stores those tags with the fetched title and content
+- **THEN** the crawler stores the source tags instead of stored curated tags
 - **AND** preserves curated rating and other metadata omitted by the source response
+
+#### Scenario: Missing Codeforces metadata preserves stored tags
+- **WHEN** a Codeforces enrichment candidate already has non-empty stored tags
+- **AND** matching contest metadata is unavailable or contains an empty tag list
+- **THEN** the fetched title and content may still replace snapshot details
+- **AND** the stored tags remain unchanged as the fallback
 
 #### Scenario: Existing Codeforces row with empty tags retries enrichment
 - **WHEN** a stored Codeforces problem has source title and content but its tags are empty
