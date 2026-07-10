@@ -237,9 +237,13 @@
       "mcp_docs": "MCP 文件"
     },
     "hero": {
-      "eyebrow": "公開 API 文件",
-      "title": "透過單一整合 API 存取程式競賽題目資料。",
-      "lead": "查詢題目資料、取得每日挑戰、搜尋相似題目，並透過 MCP 連接工具客戶端，不必再在零散的資料來源之間切換。"
+      "category": "題目智能基礎設施",
+      "statement": "所有評測平台，一個題目空間。",
+      "lead": "為開發者、競賽使用者與 AI agents 建立共享智能層，用一致方式解析、取得、關聯與連接演算法題目。",
+      "primary_cta": "探索 API",
+      "secondary_cta": "Agents 專用 MCP",
+      "inspector_idle": "正在描繪跨來源的語意關聯",
+      "continue": "進入題目空間"
     },
     "stats": {
       "problems_label": "已索引題目",
@@ -248,8 +252,8 @@
     },
     "auth": {
       "kicker": "驗證方式",
-      "title": "雙狀態存取規則",
-      "lead": "文件頁面始終公開；API、status 與 MCP 是否需要憑證，取決於部署時是否啟用 token auth。",
+      "title": "一個開關，明確的存取規則。",
+      "lead": "公開文件始終開放；API、status 與 MCP 則遵循部署環境的 token policy。",
       "route": "路徑",
       "mode_disabled": "驗證關閉",
       "mode_enabled": "驗證開啟",
@@ -259,8 +263,34 @@
       "current_enabled": "已啟用 token auth",
       "current_disabled": "已關閉 token auth"
     },
+    "space": {
+      "kicker": "單一題目空間",
+      "title": "演算法不該被平台邊界切割。",
+      "lead": "OJ API 將分散的評測平台標準化為一致的題目層；保留來源身分，同時讓每筆記錄都能用同一套心智模型存取。"
+    },
+    "capabilities": {
+      "kicker": "核心智能",
+      "title": "四項操作，一個互聯系統。",
+      "resolve": {
+        "title": "解析",
+        "body": "將 URL、slug 與識別字轉換成具體題目記錄。"
+      },
+      "retrieve": {
+        "title": "取得",
+        "body": "跨所有支援來源讀取標準化題目資料。"
+      },
+      "relate": {
+        "title": "關聯",
+        "body": "透過語意相似度尋找概念相鄰的題目。"
+      },
+      "connect": {
+        "title": "連接",
+        "body": "將相同智能提供給應用程式與 AI agents。"
+      }
+    },
     "featured": {
-      "view_details": "查看詳情",
+      "kicker": "精選 endpoints",
+      "title": "先從定義產品價值的路徑開始。",
       "card_1_title": "題目詳情",
       "card_1_summary": "依平台來源與題目 ID 取得標準化題目資料。",
       "card_2_title": "每日挑戰",
@@ -268,18 +298,18 @@
       "card_3_title": "相似搜尋",
       "card_3_summary": "使用自由文字查詢公開相似度索引中的相關題目。"
     },
-    "example": {
-      "kicker": "範例",
-      "title": "標準請求",
-      "lead": "先用單一題目詳情請求確認驗證狀態、回應結構與 source key 用法。"
+    "integrations": {
+      "kicker": "兩種整合介面",
+      "title": "為軟體打造，原生支援 agents。",
+      "lead": "應用程式可使用精確的 HTTP contracts，也能透過 Streamable HTTP MCP 將相同能力公開為工具。",
+      "mode_label": "整合模式",
+      "rest": "REST API",
+      "mcp": "MCP 工具"
     },
-    "links": {
-      "api_kicker": "HTTP API",
-      "api_title": "HTTP API 參考",
-      "api_body": "查看全部十個公開 HTTP 路由的路徑、驗證規則、輸入、回應結構與範例。",
-      "mcp_kicker": "MCP",
-      "mcp_title": "MCP 參考",
-      "mcp_body": "查看 transport 指南、工具摘要，以及五個 MCP 工具的使用範例。"
+    "final_cta": {
+      "kicker": "進入系統",
+      "title": "面向完整題目空間開始建構。",
+      "action": "探索 API"
     }
   },
   "docs_api": {

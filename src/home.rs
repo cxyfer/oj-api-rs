@@ -919,19 +919,47 @@ mod tests {
 
     #[test]
     fn docs_locale_bundles_cover_public_pages() {
+        fn collect_paths(value: &serde_json::Value, prefix: &str, paths: &mut BTreeSet<String>) {
+            if let serde_json::Value::Object(map) = value {
+                for (key, child) in map {
+                    let path = format!("{prefix}/{key}");
+                    paths.insert(path.clone());
+                    collect_paths(child, &path, paths);
+                }
+            }
+        }
+
         let locales = [
-            include_str!("../static/i18n/en.json"),
-            include_str!("../static/i18n/zh-TW.json"),
-            include_str!("../static/i18n/zh-CN.json"),
+            ("en", include_str!("../static/i18n/en.json")),
+            ("zh-TW", include_str!("../static/i18n/zh-TW.json")),
+            ("zh-CN", include_str!("../static/i18n/zh-CN.json")),
         ];
 
-        for locale in locales {
-            let parsed: serde_json::Value =
-                serde_json::from_str(locale).expect("locale json should parse");
+        let parsed_locales: Vec<_> = locales
+            .iter()
+            .map(|(name, locale)| {
+                let parsed: serde_json::Value =
+                    serde_json::from_str(locale).expect("locale json should parse");
+                (*name, parsed)
+            })
+            .collect();
+
+        for (name, parsed) in &parsed_locales {
             for key in [
                 "/home/nav/overview",
                 "/home/nav/api_docs",
                 "/home/nav/mcp_docs",
+                "/home/hero/category",
+                "/home/hero/statement",
+                "/home/hero/primary_cta",
+                "/home/space/title",
+                "/home/capabilities/resolve/title",
+                "/home/capabilities/retrieve/title",
+                "/home/capabilities/relate/title",
+                "/home/capabilities/connect/title",
+                "/home/integrations/rest",
+                "/home/integrations/mcp",
+                "/home/final_cta/title",
                 "/docs_api/hero/title",
                 "/docs_api/groups/problems",
                 "/docs_mcp/hero/title",
@@ -940,8 +968,31 @@ mod tests {
                 "/docs_mcp/examples/connection_title",
                 "/docs_mcp/examples/request_title",
             ] {
-                assert!(parsed.pointer(key).is_some(), "missing locale key {key}");
+                assert!(
+                    parsed.pointer(key).is_some(),
+                    "missing locale key {key} in {name}"
+                );
             }
+        }
+
+        let mut expected_paths = BTreeSet::new();
+        for root in ["home", "docs_mcp"] {
+            collect_paths(
+                &parsed_locales[0].1[root],
+                &format!("/{root}"),
+                &mut expected_paths,
+            );
+        }
+
+        for (name, parsed) in parsed_locales.iter().skip(1) {
+            let mut actual_paths = BTreeSet::new();
+            for root in ["home", "docs_mcp"] {
+                collect_paths(&parsed[root], &format!("/{root}"), &mut actual_paths);
+            }
+            assert_eq!(
+                actual_paths, expected_paths,
+                "locale key mismatch for {name}"
+            );
         }
     }
 
