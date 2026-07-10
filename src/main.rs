@@ -103,11 +103,14 @@ async fn main() {
         config_path: config_path_for_children,
     });
 
-    // 12. Build OpenAPI spec
+    // 12. Scheduled refresh for additional daily sources (UTC+8 08:00/10:00/12:00)
+    api::daily::spawn_additional_daily_source_scheduler(state.clone());
+
+    // 13. Build OpenAPI spec
     let openapi = api::openapi::ApiDoc::openapi();
     let openapi_json = serde_json::to_value(&openapi).expect("failed to serialize OpenAPI spec");
 
-    // 13. Assemble routers
+    // 14. Assemble routers
     let health_cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -151,7 +154,7 @@ async fn main() {
         .layer(Extension(auth::TokenAuthEnabled(token_auth_flag)))
         .with_state(state);
 
-    // 13. Start server
+    // 15. Start server
     let listener = tokio::net::TcpListener::bind(&config.server.listen_addr)
         .await
         .unwrap_or_else(|e| {

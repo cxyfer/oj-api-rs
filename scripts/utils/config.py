@@ -169,6 +169,27 @@ class ConfigManager:
             base_url=section.get("base_url"),
         )
 
+    @property
+    def tencent_docs_token(self) -> str:
+        return str(self.get("daily_sources.tencent_docs.token", "")).strip()
+
+    @property
+    def tencent_docs_token_env(self) -> str:
+        return str(
+            self.get("daily_sources.tencent_docs.token_env", "TENCENT_DOCS_TOKEN")
+        ).strip()
+
+    def resolve_tencent_docs_token(self) -> Optional[str]:
+        if token := self.tencent_docs_token:
+            return token
+        if not (token_env := self.tencent_docs_token_env):
+            return None
+        token = os.getenv(token_env)
+        if token is None:
+            return None
+        token = token.strip()
+        return token or None
+
     def get_similar_config(self) -> "SimilarConfig":
         section = self.get("similar", {})
         return SimilarConfig(

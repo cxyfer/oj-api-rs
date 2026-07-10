@@ -2,6 +2,7 @@ mod common;
 
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
+use oj_api_rs::config::Config;
 use rusqlite::params;
 use tower::ServiceExt;
 
@@ -342,29 +343,28 @@ async fn daily_endpoint_rejects_domain_with_codeforces_source() {
 }
 
 #[tokio::test]
-async fn daily_endpoint_missing_codeforces_source_returns_ingestion_required_without_job() {
-    let (app, _guard, state) = common::build_test_app_with_state();
+async fn daily_endpoint_missing_0x3f_source_without_token_returns_ingestion_required_without_job() {
+    let mut config = Config::default();
+    config.daily_sources.tencent_docs.token_env = "  ".to_string();
+    let (app, _guard, state) = common::build_test_app_with_state_and_config(config);
 
-    for source in ["0x3f", "sheep"] {
-        let response = app
-            .clone()
-            .oneshot(
-                Request::builder()
-                    .uri(format!("/api/v1/daily?source={source}&date=2026-06-02"))
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/daily?source=0x3f&date=2026-06-02")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
 
-        assert_eq!(response.status(), StatusCode::ACCEPTED);
-        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(json["status"], "ingestion_required");
-        assert_eq!(json["retry_after"], 30);
-        assert_eq!(json["job_started"], false);
-        assert!(json["message"].as_str().unwrap().contains("ingestion"));
-    }
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["status"], "ingestion_required");
+    assert_eq!(json["retry_after"], 30);
+    assert_eq!(json["job_started"], false);
+    assert!(json["message"].as_str().unwrap().contains("ingestion"));
 
     assert!(state.daily_fallback.lock().await.is_empty());
     assert!(state.crawler_jobs.lock().await.is_empty());

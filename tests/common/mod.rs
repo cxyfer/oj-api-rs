@@ -41,11 +41,17 @@ pub fn build_test_app() -> (Router, TestGuard) {
 
 /// Build a test app and return shared state for assertions.
 pub fn build_test_app_with_state() -> (Router, TestGuard, Arc<AppState>) {
+    build_test_app_with_state_and_config(config::Config::default())
+}
+
+/// Build a test app with the supplied configuration and return shared state.
+pub fn build_test_app_with_state_and_config(
+    mut config: config::Config,
+) -> (Router, TestGuard, Arc<AppState>) {
     REGISTER_VEC.call_once(|| {
         db::register_sqlite_vec();
     });
 
-    let mut config = config::Config::default();
     config.server.admin_secret = "test-secret".to_string();
 
     // Use a UUID-based temp file so parallel tests don't conflict

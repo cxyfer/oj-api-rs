@@ -1,12 +1,9 @@
 import argparse
 import asyncio
-import csv
 import json
 import os
-import re
-import sys
 import time
-from datetime import date as Date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Union
 
@@ -15,7 +12,7 @@ from curl_cffi.requests import AsyncSession
 
 from utils.base_crawler import BaseCrawler
 from utils.config import get_config
-from utils.database import DailyChallengeDatabaseManager, ProblemsDatabaseManager
+from utils.database import ProblemsDatabaseManager
 from utils.html_converter import (
     fix_relative_urls_in_soup,
     normalize_math_delimiters,
@@ -36,183 +33,6 @@ RATE_LIMIT_MARKERS = (
     "attention required",
     "cloudflare",
 )
-
-SHEEP_RAW_URL = "https://raw.githubusercontent.com/Yawn-Sean/Daily_CF_Problems/main/daily_problems/{year}/{month}/{month_day}/problems.md"
-MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://(?:www\.)?codeforces\.com/[^)\s]+)\)")
-CF_URL_RE = re.compile(
-    r"https?://(?:www\.)?codeforces\.com/"
-    r"(?:(?:contest/(\d+)/problem/([A-Za-z0-9]+))|"
-    r"(?:problemset/problem/(\d+)/([A-Za-z0-9]+))|"
-    r"(?:gym/(\d+)/problem/([A-Za-z0-9]+)))"
-)
-DATE_HEADERS = {"date", "日期", "時間", "时间", "day"}
-DAILY_DATE_FORMATS = (
-    "%Y-%m-%d",
-    "%Y/%m/%d",
-    "%Y-%m-%d %H:%M:%S",
-    "%Y/%m/%d %H:%M:%S",
-    "%Y-%m-%dT%H:%M:%S",
-)
-RATING_HEADERS = {"rating", "difficulty", "難度", "难度", "分數", "分数"}
-
-
-def _rating_from_text(text: str) -> Optional[int]:
-    match = re.search(r"\d+", text or "")
-    return int(match.group(0)) if match else None
-
-
-def _problem_id_from_url(url: str) -> Optional[tuple[str, str, str, bool]]:
-    match = CF_URL_RE.search(url)
-    if not match:
-        return None
-    contest_id = match.group(1) or match.group(3) or match.group(5)
-    index = match.group(2) or match.group(4) or match.group(6)
-    if not contest_id or not index:
-        return None
-    is_gym = match.group(5) is not None
-    problem_id = f"GYM{contest_id}{index}" if is_gym else f"{contest_id}{index}"
-    contest = f"GYM{contest_id}" if is_gym else contest_id
-    return problem_id, contest, index, is_gym
-
-
-def _codeforces_links(text: str) -> list[tuple[str, str]]:
-    links: list[tuple[str, str]] = []
-    seen_ids: set[str] = set()
-    for label, url in MD_LINK_RE.findall(text or ""):
-        parsed = _problem_id_from_url(url)
-        if not parsed:
-            continue
-        problem_id = parsed[0]
-        if problem_id in seen_ids:
-            continue
-        links.append((label.strip(), url.strip()))
-        seen_ids.add(problem_id)
-    for match in CF_URL_RE.finditer(text or ""):
-        url = match.group(0)
-        parsed = _problem_id_from_url(url)
-        if not parsed:
-            continue
-        problem_id = parsed[0]
-        if problem_id not in seen_ids:
-            links.append(("", url))
-            seen_ids.add(problem_id)
-    return links
-
-
-def _problem_from_link(
-    label: str,
-    url: str,
-    rating: Optional[int] = None,
-    hint: Optional[str] = None,
-) -> Optional[dict]:
-    parsed = _problem_id_from_url(url)
-    if not parsed:
-        return None
-    problem_id, contest, problem_index, _is_gym = parsed
-    title = label.strip() or problem_id
-    return {
-        "id": problem_id,
-        "source": "codeforces",
-        "slug": problem_id,
-        "title": title,
-        "title_cn": "",
-        "difficulty": None,
-        "ac_rate": None,
-        "rating": rating,
-        "contest": contest,
-        "problem_index": problem_index,
-        "tags": [],
-        "link": url,
-        "category": "Algorithms",
-        "paid_only": 0,
-        "content": hint or None,
-        "content_cn": None,
-        "similar_questions": None,
-    }
-
-
-def parse_sheep_daily_markdown(text: str) -> list[dict]:
-    problems: list[dict] = []
-    for line in text.splitlines():
-        stripped = line.strip()
-        if (
-            not stripped.startswith("|")
-            or "---" in stripped
-            or "Difficulty" in stripped
-        ):
-            continue
-        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
-        if len(cells) < 2:
-            continue
-        rating = _rating_from_text(cells[0])
-        hint = cells[2] if len(cells) > 2 and cells[2] else None
-        for label, url in _codeforces_links(cells[1]):
-            problem = _problem_from_link(label, url, rating=rating, hint=hint)
-            if problem:
-                problems.append(problem)
-    return problems
-
-
-def _read_daily_table(path: Path) -> list[dict[str, str]]:
-    text = path.read_text(encoding="utf-8-sig")
-    sample = text[:2048]
-    try:
-        dialect = csv.Sniffer().sniff(sample, delimiters=",\t;")
-    except csv.Error:
-        dialect = csv.excel_tab if "\t" in sample else csv.excel
-    return list(csv.DictReader(text.splitlines(), dialect=dialect))
-
-
-def _parse_daily_date(value: str) -> Optional[Date]:
-    value = (value or "").strip()
-    if not value:
-        return None
-    for fmt in DAILY_DATE_FORMATS:
-        try:
-            return datetime.strptime(value, fmt).date()
-        except ValueError:
-            continue
-    return None
-
-
-def _row_date_matches(row: dict[str, str], date: str) -> bool:
-    target_date = _parse_daily_date(date)
-    if target_date is None:
-        return False
-
-    date_values = [
-        value or ""
-        for key, value in row.items()
-        if (key or "").strip().lower() in DATE_HEADERS
-    ]
-    if date_values:
-        return any(_parse_daily_date(value) == target_date for value in date_values)
-    return any(_parse_daily_date(value or "") == target_date for value in row.values())
-
-
-def _row_rating(row: dict[str, str]) -> Optional[int]:
-    for key, value in row.items():
-        if (key or "").strip().lower() in RATING_HEADERS:
-            rating = _rating_from_text(value or "")
-            if rating is not None:
-                return rating
-    return None
-
-
-def parse_0x3f_daily_file(path: Path, date: str) -> list[dict]:
-    problems: list[dict] = []
-    if not path.exists():
-        raise FileNotFoundError(path)
-    for row in _read_daily_table(path):
-        if not _row_date_matches(row, date):
-            continue
-        row_text = " ".join(value or "" for value in row.values())
-        rating = _row_rating(row)
-        for label, url in _codeforces_links(row_text):
-            problem = _problem_from_link(label, url, rating=rating)
-            if problem:
-                problems.append(problem)
-    return problems
 
 
 class CodeforcesClient(BaseCrawler):
@@ -236,7 +56,6 @@ class CodeforcesClient(BaseCrawler):
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.progress_file = self.data_dir / "codeforces_progress.json"
         self.problems_db = ProblemsDatabaseManager(db_path)
-        self.daily_db = DailyChallengeDatabaseManager(db_path)
         self.rate_limit = max(rate_limit, 2.0)
         self.max_retries = max_retries
         self.backoff_base = backoff_base
@@ -748,66 +567,6 @@ class CodeforcesClient(BaseCrawler):
         logger.info("Reprocessed %s/%s Codeforces problems", total_updated, total)
         return total_updated
 
-    def _daily_refs(self, problems: list[dict]) -> list[str]:
-        refs: list[str] = []
-        seen: set[str] = set()
-        for problem in problems:
-            problem_id = problem.get("id")
-            if not problem_id:
-                continue
-            ref = f"codeforces:{problem_id}"
-            if ref not in seen:
-                refs.append(ref)
-                seen.add(ref)
-        return refs
-
-    def _store_daily_source(
-        self, date: str, daily_source: str, problems: list[dict]
-    ) -> bool:
-        refs = self._daily_refs(problems)
-        if not refs:
-            logger.warning("No parseable %s daily problems for %s", daily_source, date)
-            return False
-        return self.daily_db.update_daily_source(date, daily_source, problems, refs)
-
-    @staticmethod
-    def _sheep_daily_url(date: str) -> str:
-        parsed = datetime.strptime(date, "%Y-%m-%d")
-        return SHEEP_RAW_URL.format(
-            year=f"{parsed.year:04d}",
-            month=f"{parsed.month:02d}",
-            month_day=f"{parsed.month:02d}{parsed.day:02d}",
-        )
-
-    async def fetch_sheep_daily(self, date: str) -> bool:
-        url = self._sheep_daily_url(date)
-        async with self._create_curl_session(impersonate="chrome124") as session:
-            markdown = await self._fetch_text(session, url)
-        if not markdown:
-            logger.warning("No Sheep daily markdown for %s", date)
-            return False
-        problems = parse_sheep_daily_markdown(markdown)
-        return self._store_daily_source(date, "sheep", problems)
-
-    def import_0x3f_daily(self, date: str, daily_file: str | None) -> bool:
-        if not daily_file:
-            raise ValueError("--daily-file is required for --daily-source 0x3f")
-        try:
-            problems = parse_0x3f_daily_file(Path(daily_file), date)
-        except FileNotFoundError:
-            logger.error("0x3f daily file not found: %s", daily_file)
-            return False
-        return self._store_daily_source(date, "0x3f", problems)
-
-    async def fetch_daily_source(
-        self, daily_source: str, date: str, daily_file: str | None = None
-    ) -> bool:
-        if daily_source == "sheep":
-            return await self.fetch_sheep_daily(date)
-        if daily_source == "0x3f":
-            return self.import_0x3f_daily(date, daily_file)
-        raise ValueError(f"unsupported daily source: {daily_source}")
-
     def show_status(self) -> None:
         progress = self.get_progress()
         fetched = progress.get("fetched_contests", [])
@@ -895,17 +654,6 @@ async def main() -> None:
         help="Disable progress-based skipping for contest fetching",
     )
     parser.add_argument("--contest", type=int, help="Fetch a single contest by ID")
-    parser.add_argument(
-        "--daily-source",
-        choices=("sheep", "0x3f"),
-        help="Import a curated daily source",
-    )
-    parser.add_argument("--date", type=str, help="Daily source date, format YYYY-MM-DD")
-    parser.add_argument(
-        "--daily-file",
-        type=str,
-        help="Local CSV/TSV export for --daily-source 0x3f",
-    )
     parser.add_argument("--status", action="store_true", help="Show progress status")
     parser.add_argument(
         "--fill-missing-content",
@@ -957,7 +705,6 @@ async def main() -> None:
         or args.fetch_contest
         or args.fetch_all
         or args.contest
-        or args.daily_source
         or args.status
         or args.fill_missing_content
         or args.missing_content_stats
@@ -980,15 +727,6 @@ async def main() -> None:
 
     if args.contest:
         await client.fetch_single_contest(args.contest)
-
-    if args.daily_source:
-        if not args.date:
-            parser.error("--date is required with --daily-source")
-        ok = await client.fetch_daily_source(
-            args.daily_source, args.date, args.daily_file
-        )
-        if not ok:
-            sys.exit(2)
 
     if args.fill_missing_content:
         await client.fill_missing_content()

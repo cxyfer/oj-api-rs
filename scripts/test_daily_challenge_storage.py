@@ -1,17 +1,71 @@
 import asyncio
 import json
+import os
 import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from codeforces import (
-    CodeforcesClient,
+import daily_source
+from daily_source import (
+    DailySourceClient,
+    extract_tencent_docs_csv,
+    parse_0x3f_daily_csv,
     parse_0x3f_daily_file,
     parse_sheep_daily_markdown,
 )
 from leetcode import LeetCodeClient
+from utils.config import ConfigManager
 from utils.database import DailyChallengeDatabaseManager, ProblemsDatabaseManager
+
+
+class TencentDocsConfigTests(unittest.TestCase):
+    def _config(self, toml_text: str) -> ConfigManager:
+        tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tmpdir.cleanup)
+        config_path = Path(tmpdir.name) / "config.toml"
+        config_path.write_text(toml_text, encoding="utf-8")
+        return ConfigManager(config_path=str(config_path))
+
+    def test_token_env_defaults_to_tencent_docs_token(self):
+        config = self._config("")
+        self.assertEqual(config.tencent_docs_token_env, "TENCENT_DOCS_TOKEN")
+
+    def test_token_env_uses_custom_name(self):
+        config = self._config(
+            '[daily_sources.tencent_docs]\ntoken_env = "MY_TENCENT_TOKEN"\n'
+        )
+        self.assertEqual(config.tencent_docs_token_env, "MY_TENCENT_TOKEN")
+
+    def test_empty_token_env_disables_environment_fallback(self):
+        config = self._config('[daily_sources.tencent_docs]\ntoken_env = "  "\n')
+        self.assertEqual(config.tencent_docs_token_env, "")
+        with patch.dict(os.environ, {"TENCENT_DOCS_TOKEN": "env-token"}):
+            self.assertIsNone(config.resolve_tencent_docs_token())
+
+    def test_resolve_token_prefers_config_value_and_trims_whitespace(self):
+        config = self._config(
+            "[daily_sources.tencent_docs]\n"
+            'token = " config-token "\n'
+            'token_env = "OJ_TEST_TENCENT_TOKEN"\n'
+        )
+        with patch.dict(os.environ, {"OJ_TEST_TENCENT_TOKEN": "env-token"}):
+            self.assertEqual(config.tencent_docs_token, "config-token")
+            self.assertEqual(config.resolve_tencent_docs_token(), "config-token")
+
+    def test_resolve_token_falls_back_to_environment_when_config_is_blank(self):
+        config = self._config(
+            "[daily_sources.tencent_docs]\n"
+            'token = "  "\n'
+            'token_env = "OJ_TEST_TENCENT_TOKEN"\n'
+        )
+        with patch.dict(os.environ, {"OJ_TEST_TENCENT_TOKEN": " secret "}):
+            self.assertEqual(config.resolve_tencent_docs_token(), "secret")
+        with patch.dict(os.environ, {"OJ_TEST_TENCENT_TOKEN": "   "}):
+            self.assertIsNone(config.resolve_tencent_docs_token())
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertIsNone(config.resolve_tencent_docs_token())
 
 
 class DailyChallengeStorageTests(unittest.TestCase):
@@ -390,6 +444,148 @@ class DailyChallengeStorageTests(unittest.TestCase):
         self.assertEqual([problem["id"] for problem in problems], ["1930A", "1930B"])
         self.assertEqual([problem["rating"] for problem in problems], [1700, 1800])
 
+    def test_parse_0x3f_daily_csv_extracts_mixed_oj_urls(self):
+        csv_text = (
+            "日期,難度,題目\n"
+            '2026-06-02,1800,"'
+            "[Two Sum](https://leetcode.com/problems/two-sum/) "
+            "[ABC001 A](https://atcoder.jp/contests/abc001/tasks/abc001_1) "
+            "[GYM106539D](https://codeforces.com/gym/106539/problem/D) "
+            "[P1001](https://www.luogu.com.cn/problem/P1001)"
+            '"\n'
+        )
+
+        problems = parse_0x3f_daily_csv(csv_text, "2026-06-02")
+
+        self.assertEqual(
+            [(problem["source"], problem["id"]) for problem in problems],
+            [
+                ("leetcode", "two-sum"),
+                ("atcoder", "abc001_1"),
+                ("codeforces", "GYM106539D"),
+                ("luogu", "P1001"),
+            ],
+        )
+        self.assertEqual([problem["rating"] for problem in problems], [1800] * 4)
+
+    def test_parse_0x3f_daily_csv_dedupes_luogu_hosts(self):
+        csv_text = (
+            "日期,題目\n"
+            "2026-06-02,"
+            "https://www.luogu.com.cn/problem/P1001 "
+            "https://www.luogu.com/problem/P1001\n"
+        )
+
+        problems = parse_0x3f_daily_csv(csv_text, "2026-06-02")
+
+        self.assertEqual(
+            [(problem["source"], problem["id"]) for problem in problems],
+            [("luogu", "P1001")],
+        )
+
+    def test_extract_tencent_docs_csv_from_structured_and_text_payloads(self):
+        self.assertEqual(
+            extract_tencent_docs_csv(
+                {
+                    "result": {
+                        "structuredContent": {"csv_data": "```csv\n日期,題目\n```"}
+                    }
+                }
+            ),
+            "日期,題目",
+        )
+        self.assertEqual(
+            extract_tencent_docs_csv(
+                {"result": {"content": [{"type": "text", "text": "a,b\n1,2"}]}}
+            ),
+            "a,b\n1,2",
+        )
+
+    def test_extract_tencent_docs_csv_raises_on_error_payloads(self):
+        with self.assertRaisesRegex(ValueError, "JSON-RPC request failed"):
+            extract_tencent_docs_csv({"error": {"code": -32600, "message": "bad"}})
+        with self.assertRaisesRegex(ValueError, "MCP tool request failed"):
+            extract_tencent_docs_csv(
+                {"result": {"structuredContent": {"error": "permission denied"}}}
+            )
+
+    def _patched_token_config(self, token):
+        class TokenConfig:
+            tencent_docs_token_env = "TENCENT_DOCS_TOKEN"
+
+            def resolve_tencent_docs_token(self):
+                return token
+
+        original_get_config = daily_source.get_config
+        daily_source.get_config = lambda: TokenConfig()
+        self.addCleanup(setattr, daily_source, "get_config", original_get_config)
+
+    def test_fetch_0x3f_daily_online_stores_row_via_mcp(self):
+        client = self._codeforces_client_no_config()
+        self._patched_token_config("token")
+
+        class FakeMcp:
+            def __init__(self, session, token):
+                self.token = token
+
+            async def get_sheet_info(self, file_id):
+                assert file_id == daily_source.TENCENT_DOCS_0X3F_FILE_ID
+                return {
+                    "sheets": [
+                        {
+                            "sheet_id": daily_source.TENCENT_DOCS_0X3F_SHEET_ID,
+                            "row_count": 3,
+                            "col_count": 3,
+                        }
+                    ]
+                }
+
+            async def get_cell_csv(
+                self, file_id, sheet_id, row_count=None, col_count=None
+            ):
+                assert sheet_id == daily_source.TENCENT_DOCS_0X3F_SHEET_ID
+                return (
+                    "日期,難度,題目\n"
+                    "2026-06-02,1800,https://leetcode.com/problems/two-sum/\n"
+                )
+
+        class FakeSession:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+        client._create_curl_session = lambda **kwargs: FakeSession()
+        with patch.object(daily_source, "TencentDocsMcpClient", FakeMcp):
+            self.assertTrue(asyncio.run(client.import_0x3f_daily("2026-06-02", None)))
+
+        rows = self._daily_rows()
+        self.assertEqual(rows, [("2026-06-02", "0x3f", '["leetcode:two-sum"]')])
+
+    def test_daily_file_takes_precedence_over_online_fetch(self):
+        client = self._codeforces_client_no_config()
+        self._patched_token_config("token")
+        daily_file = Path(self._tmpdir.name) / "0x3f.csv"
+        daily_file.write_text(
+            "日期,題目\n2026-06-02,https://leetcode.com/problems/two-sum/\n",
+            encoding="utf-8",
+        )
+
+        class ExplodingMcp:
+            def __init__(self, *args, **kwargs):
+                raise AssertionError(
+                    "online fetch must not run when --daily-file is set"
+                )
+
+        with patch.object(daily_source, "TencentDocsMcpClient", ExplodingMcp):
+            self.assertTrue(
+                asyncio.run(client.import_0x3f_daily("2026-06-02", str(daily_file)))
+            )
+
+        rows = self._daily_rows()
+        self.assertEqual(rows, [("2026-06-02", "0x3f", '["leetcode:two-sum"]')])
+
     def test_0x3f_import_requires_parseable_input(self):
         client = self._codeforces_client_no_config()
         daily_file = Path(self._tmpdir.name) / "0x3f.csv"
@@ -397,15 +593,31 @@ class DailyChallengeStorageTests(unittest.TestCase):
             "日期,題目\n2026-06-02,not a codeforces url\n", encoding="utf-8"
         )
 
-        self.assertFalse(client.import_0x3f_daily("2026-06-02", str(daily_file)))
         self.assertFalse(
-            client.import_0x3f_daily(
-                "2026-06-02", str(daily_file.with_name("missing.csv"))
+            asyncio.run(client.import_0x3f_daily("2026-06-02", str(daily_file)))
+        )
+        self.assertFalse(
+            asyncio.run(
+                client.import_0x3f_daily(
+                    "2026-06-02", str(daily_file.with_name("missing.csv"))
+                )
             )
         )
         self.assertEqual(self._daily_rows(), [])
-        with self.assertRaises(ValueError):
-            client.import_0x3f_daily("2026-06-02", None)
+        original_get_config = daily_source.get_config
+
+        class MissingTokenConfig:
+            tencent_docs_token_env = "TENCENT_DOCS_TOKEN"
+
+            def resolve_tencent_docs_token(self):
+                return None
+
+        try:
+            daily_source.get_config = lambda: MissingTokenConfig()
+            with self.assertRaisesRegex(ValueError, "missing or empty"):
+                asyncio.run(client.import_0x3f_daily("2026-06-02", None))
+        finally:
+            daily_source.get_config = original_get_config
 
     def _create_legacy_daily_table(self):
         with sqlite3.connect(self.db_path) as conn:
@@ -458,7 +670,7 @@ class DailyChallengeStorageTests(unittest.TestCase):
             ).fetchall()
 
     def _codeforces_client_no_config(self):
-        client = CodeforcesClient.__new__(CodeforcesClient)
+        client = DailySourceClient.__new__(DailySourceClient)
         client.problems_db = ProblemsDatabaseManager(self.db_path)
         client.daily_db = DailyChallengeDatabaseManager(self.db_path)
         return client

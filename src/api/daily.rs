@@ -2,6 +2,8 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
+use chrono::{Datelike, TimeZone};
+
 use axum::extract::{Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
@@ -194,27 +196,127 @@ pub struct DailyQuery {
     pub r#async: Option<bool>,
 }
 
-#[derive(Debug, Clone, Copy)]
+const ADDITIONAL_DAILY_SOURCE_REFRESH_HOURS: [u32; 3] = [8, 10, 12];
+const ADDITIONAL_DAILY_SOURCES: [DailySourceSelection; 2] = [
+    DailySourceSelection::sheep(),
+    DailySourceSelection::zero_x3f(),
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AdditionalDailySource {
+    Sheep,
+    ZeroX3f,
+}
+
+impl AdditionalDailySource {
+    fn source(self) -> &'static str {
+        match self {
+            Self::Sheep => "sheep",
+            Self::ZeroX3f => "0x3f",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DailySourceKind {
+    LeetCode(LeetCodeDomain),
+    Additional(AdditionalDailySource),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct DailySourceSelection {
     source: &'static str,
-    domain: Option<LeetCodeDomain>,
+    kind: DailySourceKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DailyFallbackPlan {
+    job_source: &'static str,
+    script: &'static str,
+    timeout_key: &'static str,
+    args: Vec<String>,
 }
 
 impl DailySourceSelection {
+    const fn leetcode(domain: LeetCodeDomain) -> Self {
+        Self {
+            source: canonical_daily_source(domain),
+            kind: DailySourceKind::LeetCode(domain),
+        }
+    }
+
+    const fn sheep() -> Self {
+        Self {
+            source: "sheep",
+            kind: DailySourceKind::Additional(AdditionalDailySource::Sheep),
+        }
+    }
+
+    const fn zero_x3f() -> Self {
+        Self {
+            source: "0x3f",
+            kind: DailySourceKind::Additional(AdditionalDailySource::ZeroX3f),
+        }
+    }
+
     fn today(&self) -> String {
-        self.domain
-            .map(|domain| domain.today())
-            .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string())
+        match self.kind {
+            DailySourceKind::LeetCode(domain) => domain.today(),
+            DailySourceKind::Additional(_) => utc8_today().to_string(),
+        }
     }
 
     fn today_naive(&self) -> chrono::NaiveDate {
-        self.domain
-            .map(|domain| domain.today_naive())
-            .unwrap_or_else(|| chrono::Utc::now().date_naive())
+        match self.kind {
+            DailySourceKind::LeetCode(domain) => domain.today_naive(),
+            DailySourceKind::Additional(_) => utc8_today(),
+        }
     }
 
-    fn is_leetcode(&self) -> bool {
-        self.domain.is_some()
+    fn fallback_plan(
+        &self,
+        date: &str,
+        config: &crate::config::Config,
+    ) -> Option<DailyFallbackPlan> {
+        match self.kind {
+            DailySourceKind::LeetCode(domain) => {
+                let domain_arg = domain.to_string();
+                let args = if date == domain.today() {
+                    vec!["--daily".into(), "--domain".into(), domain_arg]
+                } else {
+                    vec![
+                        "--date".into(),
+                        date.to_string(),
+                        "--domain".into(),
+                        domain_arg,
+                    ]
+                };
+                Some(DailyFallbackPlan {
+                    job_source: "leetcode",
+                    script: "leetcode.py",
+                    timeout_key: "leetcode",
+                    args,
+                })
+            }
+            DailySourceKind::Additional(source) => {
+                if source == AdditionalDailySource::ZeroX3f
+                    && !tencent_docs_token_configured(config)
+                {
+                    return None;
+                }
+                Some(DailyFallbackPlan {
+                    job_source: "daily_source",
+                    script: "daily_source.py",
+                    timeout_key: "daily_source",
+                    args: vec![
+                        "--daily-source".into(),
+                        source.source().into(),
+                        "--date".into(),
+                        date.to_string(),
+                    ],
+                })
+            }
+        }
     }
 }
 
@@ -223,22 +325,10 @@ fn resolve_daily_source(
     source: Option<&str>,
 ) -> Result<DailySourceSelection, ProblemDetail> {
     let from_source = match source {
-        Some("leetcode.com") => Some(DailySourceSelection {
-            source: "leetcode.com",
-            domain: Some(LeetCodeDomain::Com),
-        }),
-        Some("leetcode.cn") => Some(DailySourceSelection {
-            source: "leetcode.cn",
-            domain: Some(LeetCodeDomain::Cn),
-        }),
-        Some("sheep") => Some(DailySourceSelection {
-            source: "sheep",
-            domain: None,
-        }),
-        Some("0x3f") => Some(DailySourceSelection {
-            source: "0x3f",
-            domain: None,
-        }),
+        Some("leetcode.com") => Some(DailySourceSelection::leetcode(LeetCodeDomain::Com)),
+        Some("leetcode.cn") => Some(DailySourceSelection::leetcode(LeetCodeDomain::Cn)),
+        Some("sheep") => Some(DailySourceSelection::sheep()),
+        Some("0x3f") => Some(DailySourceSelection::zero_x3f()),
         Some(s) => {
             return Err(ProblemDetail::bad_request(format!(
                 "invalid source '{}', expected 'leetcode.com', 'leetcode.cn', 'sheep', or '0x3f'",
@@ -253,32 +343,69 @@ fn resolve_daily_source(
             let domain = d
                 .parse::<LeetCodeDomain>()
                 .map_err(|_| ProblemDetail::bad_request("domain must be 'com' or 'cn'"))?;
-            Some(DailySourceSelection {
-                source: canonical_daily_source(domain),
-                domain: Some(domain),
-            })
+            Some(DailySourceSelection::leetcode(domain))
         }
         None => None,
     };
 
     match (from_domain, from_source) {
-        (Some(d), Some(s)) if d.domain != s.domain => {
+        (Some(d), Some(s)) if d != s => {
             Err(ProblemDetail::bad_request("domain and source conflict"))
         }
         (Some(d), _) => Ok(d),
         (None, Some(s)) => Ok(s),
-        (None, None) => Ok(DailySourceSelection {
-            source: "leetcode.com",
-            domain: Some(LeetCodeDomain::Com),
-        }),
+        (None, None) => Ok(DailySourceSelection::leetcode(LeetCodeDomain::Com)),
     }
 }
 
-fn canonical_daily_source(domain: LeetCodeDomain) -> &'static str {
+const fn canonical_daily_source(domain: LeetCodeDomain) -> &'static str {
     match domain {
         LeetCodeDomain::Com => "leetcode.com",
         LeetCodeDomain::Cn => "leetcode.cn",
     }
+}
+
+fn utc8_offset() -> chrono::FixedOffset {
+    chrono::FixedOffset::east_opt(8 * 3600).unwrap()
+}
+
+fn utc8_today() -> chrono::NaiveDate {
+    chrono::Utc::now()
+        .with_timezone(&utc8_offset())
+        .date_naive()
+}
+
+fn utc8_date_string(now: chrono::DateTime<chrono::Utc>) -> String {
+    now.with_timezone(&utc8_offset()).date_naive().to_string()
+}
+
+fn next_additional_daily_source_refresh_after(
+    now: chrono::DateTime<chrono::Utc>,
+) -> chrono::DateTime<chrono::Utc> {
+    let offset = utc8_offset();
+    let now_local = now.with_timezone(&offset);
+    let today = now_local.date_naive();
+
+    for hour in ADDITIONAL_DAILY_SOURCE_REFRESH_HOURS {
+        let candidate = offset
+            .with_ymd_and_hms(today.year(), today.month(), today.day(), hour, 0, 0)
+            .single()
+            .unwrap();
+        if candidate > now_local {
+            return candidate.with_timezone(&chrono::Utc);
+        }
+    }
+
+    let tomorrow = today.succ_opt().unwrap();
+    offset
+        .with_ymd_and_hms(tomorrow.year(), tomorrow.month(), tomorrow.day(), 8, 0, 0)
+        .single()
+        .unwrap()
+        .with_timezone(&chrono::Utc)
+}
+
+fn tencent_docs_token_configured(config: &crate::config::Config) -> bool {
+    config.daily_sources.tencent_docs.resolve_token().is_some()
 }
 
 async fn wait_and_fetch(
@@ -403,107 +530,41 @@ async fn handle_daily_fallback_terminal_failure(
     );
 }
 
-#[utoipa::path(
-    get,
-    path = "/api/v1/daily",
-    params(
-        DailyQuery,
-    ),
-    responses(
-        (status = 200, description = "Daily challenge", body = DailyChallengeResponse),
-        (status = 202, description = "Crawler triggered, no data yet. Retry after the specified seconds.", body = DailyFetchingResponse),
-        (status = 400, description = "Invalid parameters", body = ProblemDetail, content_type = "application/problem+json"),
-        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
-    ),
-    security(("bearer_auth" = [])),
-    tag = "Daily"
-)]
-pub async fn get_daily(
-    State(state): State<Arc<AppState>>,
-    Query(query): Query<DailyQuery>,
-) -> impl IntoResponse {
-    let selection = match resolve_daily_source(query.domain.as_deref(), query.source.as_deref()) {
-        Ok(selection) => selection,
-        Err(e) => return e.into_response(),
-    };
-    let today = selection.today();
-    let date = query.date.as_deref().unwrap_or(&today);
-    let should_wait = !query.r#async.unwrap_or(false);
+type DailyFallbackWaiter = (Arc<Notify>, Arc<std::sync::atomic::AtomicBool>);
 
-    // Validate date format
-    let date_re = regex::Regex::new(r"^\d{4}-\d{2}-\d{2}$").unwrap();
-    if !date_re.is_match(date) {
-        return ProblemDetail::bad_request("invalid date format, expected YYYY-MM-DD")
-            .into_response();
-    }
+enum DailyFallbackLaunch {
+    Ready { waiter: Option<DailyFallbackWaiter> },
+    Cooldown(u64),
+    IngestionRequired,
+    SetupFailed,
+    LaunchFailed { message: &'static str },
+}
 
-    let parsed = match chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
-        Ok(d) => d,
-        Err(_) => {
-            return ProblemDetail::bad_request("invalid calendar date").into_response();
-        }
+async fn ensure_daily_fallback_running(
+    state: &Arc<AppState>,
+    selection: DailySourceSelection,
+    date: &str,
+    should_wait: bool,
+) -> DailyFallbackLaunch {
+    let Some(plan) = selection.fallback_plan(date, &state.config) else {
+        return DailyFallbackLaunch::IngestionRequired;
     };
 
-    let lower = chrono::NaiveDate::from_ymd_opt(2020, 4, 1).unwrap();
-    let upper = selection.today_naive();
-
-    if parsed < lower {
-        return ProblemDetail::bad_request("date must be >= 2020-04-01").into_response();
-    }
-    if parsed > upper {
-        return ProblemDetail::bad_request("date must be <= today").into_response();
-    }
-
-    let pool = state.ro_pool.clone();
-    let source = selection.source.to_string();
-    let date_owned = date.to_string();
-    let result = tokio::task::spawn_blocking(move || {
-        let record = crate::db::daily::get_daily_record(&pool, &source, &date_owned)?;
-        Some(build_daily_response(&pool, record))
-    })
-    .await
-    .unwrap_or(None);
-
-    if let Some(daily) = result {
-        return Json(daily).into_response();
-    }
-
-    if !selection.is_leetcode() {
-        return daily_ingestion_required_response();
-    }
-
-    // Fallback: spawn crawler
     let key = crate::models::daily_fallback_crawler_runtime_key(selection.source, date);
     let now = tokio::time::Instant::now();
     let job_id = uuid::Uuid::new_v4().to_string();
 
     // Atomically check + claim slot under single lock to prevent TOCTOU race
-    let notify_opt = {
+    let waiter = {
         let mut fallback = state.daily_fallback.lock().await;
         if let Some(entry) = fallback.get(&key) {
             if entry.status == crate::models::CrawlerStatus::Running {
-                if should_wait {
-                    let notify = entry.notify.clone();
-                    let completed = entry.completed.clone();
-                    drop(fallback);
-                    if let Some(d) = wait_and_fetch(
-                        notify,
-                        completed,
-                        &state,
-                        selection.source.to_string(),
-                        date.to_string(),
-                    )
-                    .await
-                    {
-                        return Json(d).into_response();
-                    }
-                }
-                return daily_fetching_response(30);
+                let waiter = should_wait.then(|| (entry.notify.clone(), entry.completed.clone()));
+                return DailyFallbackLaunch::Ready { waiter };
             }
             if let Some(until) = entry.cooldown_until {
                 if now < until {
-                    let remaining = (until - now).as_secs();
-                    return daily_fetching_response(remaining);
+                    return DailyFallbackLaunch::Cooldown((until - now).as_secs());
                 }
             }
         }
@@ -522,35 +583,15 @@ pub async fn get_daily(
                 stderr: None,
             },
         );
-        if should_wait {
-            Some((notify, completed))
-        } else {
-            None
-        }
-    };
-
-    // Determine args
-    let domain = selection.domain.expect("LeetCode fallback has domain");
-    let today_str = domain.today();
-    let domain_arg = domain.to_string();
-    let started_at = chrono::Utc::now().to_rfc3339();
-    let args: Vec<String> = if date == today_str {
-        vec!["--daily".into(), "--domain".into(), domain_arg]
-    } else {
-        vec![
-            "--date".into(),
-            date.to_string(),
-            "--domain".into(),
-            domain_arg,
-        ]
+        should_wait.then_some((notify, completed))
     };
 
     let job = crate::models::CrawlerJob {
         job_id: job_id.clone(),
-        source: "leetcode".to_string(),
-        args: args.clone(),
+        source: plan.job_source.to_string(),
+        args: plan.args.clone(),
         trigger: crate::models::CrawlerTrigger::DailyFallback,
-        started_at: started_at.clone(),
+        started_at: chrono::Utc::now().to_rfc3339(),
         finished_at: None,
         status: crate::models::CrawlerStatus::Running,
         stdout: None,
@@ -571,14 +612,13 @@ pub async fn get_daily(
     .await
     {
         tracing::warn!("failed to persist daily fallback metadata: {}", err);
-        handle_daily_fallback_terminal_failure(&state, &key, &job_id, now, &artifact_paths).await;
-        return ProblemDetail::internal("failed to persist daily fallback metadata")
-            .into_response();
+        handle_daily_fallback_terminal_failure(state, &key, &job_id, now, &artifact_paths).await;
+        return DailyFallbackLaunch::SetupFailed;
     }
 
     let mut cmd = tokio::process::Command::new("uv");
-    cmd.args(["run", "python3", "leetcode.py"]);
-    cmd.args(&args);
+    cmd.args(["run", "python3", plan.script]);
+    cmd.args(&plan.args);
     cmd.current_dir("scripts/");
     cmd.kill_on_drop(true);
     cmd.stdout(std::process::Stdio::piped());
@@ -594,12 +634,11 @@ pub async fn get_daily(
         Ok(c) => c,
         Err(e) => {
             tracing::error!("failed to spawn daily fallback crawler: {}", e);
-            handle_daily_fallback_terminal_failure(&state, &key, &job_id, now, &artifact_paths)
+            handle_daily_fallback_terminal_failure(state, &key, &job_id, now, &artifact_paths)
                 .await;
-            if should_wait {
-                return daily_fetching_response(30);
-            }
-            return ProblemDetail::internal("failed to spawn crawler").into_response();
+            return DailyFallbackLaunch::LaunchFailed {
+                message: "failed to spawn crawler",
+            };
         }
     };
     let capture = match crate::utils::start_live_output_capture(&mut child, &artifact_paths).await {
@@ -610,12 +649,11 @@ pub async fn get_daily(
                 crate::utils::kill_pgid(pid);
             }
             let _ = child.wait().await;
-            handle_daily_fallback_terminal_failure(&state, &key, &job_id, now, &artifact_paths)
+            handle_daily_fallback_terminal_failure(state, &key, &job_id, now, &artifact_paths)
                 .await;
-            if should_wait {
-                return daily_fetching_response(30);
-            }
-            return ProblemDetail::internal("failed to capture crawler output").into_response();
+            return DailyFallbackLaunch::LaunchFailed {
+                message: "failed to capture crawler output",
+            };
         }
     };
     let state_clone = state.clone();
@@ -624,7 +662,7 @@ pub async fn get_daily(
         .config
         .crawler
         .per_source_timeout
-        .get("leetcode")
+        .get(plan.timeout_key)
         .copied()
         .unwrap_or(state.config.crawler.timeout_secs);
     let pid = child.id().expect("child should have a pid");
@@ -760,26 +798,154 @@ pub async fn get_daily(
         schedule_daily_fallback_cleanup(state_clone, key_clone, job_id, now);
     });
 
-    if let Some((notify, completed)) = notify_opt {
-        if let Some(d) = wait_and_fetch(
-            notify,
-            completed,
-            &state,
-            selection.source.to_string(),
-            date.to_string(),
-        )
-        .await
-        {
-            return Json(d).into_response();
+    DailyFallbackLaunch::Ready { waiter }
+}
+
+/// Spawn a background task that refreshes additional daily sources at the
+/// fixed UTC+8 refresh hours, reusing the daily fallback runtime keys so
+/// scheduled jobs and API fallback never run duplicates.
+pub fn spawn_additional_daily_source_scheduler(state: Arc<AppState>) {
+    tokio::spawn(async move {
+        loop {
+            let now = chrono::Utc::now();
+            let next = next_additional_daily_source_refresh_after(now);
+            let wait = (next - now)
+                .to_std()
+                .unwrap_or_else(|_| std::time::Duration::from_secs(0));
+            tokio::time::sleep(wait).await;
+
+            let date = utc8_date_string(chrono::Utc::now());
+            for selection in ADDITIONAL_DAILY_SOURCES {
+                match ensure_daily_fallback_running(&state, selection, &date, false).await {
+                    DailyFallbackLaunch::Ready { .. } => {
+                        tracing::info!(
+                            "scheduled daily source refresh running: {} {}",
+                            selection.source,
+                            date
+                        );
+                    }
+                    DailyFallbackLaunch::IngestionRequired => {
+                        tracing::info!(
+                            "scheduled daily source refresh skipped (token not configured): {}",
+                            selection.source
+                        );
+                    }
+                    DailyFallbackLaunch::Cooldown(secs) => {
+                        tracing::info!(
+                            "scheduled daily source refresh in cooldown ({}s): {} {}",
+                            secs,
+                            selection.source,
+                            date
+                        );
+                    }
+                    DailyFallbackLaunch::SetupFailed | DailyFallbackLaunch::LaunchFailed { .. } => {
+                        tracing::warn!(
+                            "scheduled daily source refresh failed to launch: {} {}",
+                            selection.source,
+                            date
+                        );
+                    }
+                }
+            }
         }
-        return daily_fetching_response(30);
+    });
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/daily",
+    params(
+        DailyQuery,
+    ),
+    responses(
+        (status = 200, description = "Daily challenge", body = DailyChallengeResponse),
+        (status = 202, description = "Crawler triggered, no data yet. Retry after the specified seconds.", body = DailyFetchingResponse),
+        (status = 400, description = "Invalid parameters", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "Daily"
+)]
+pub async fn get_daily(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<DailyQuery>,
+) -> impl IntoResponse {
+    let selection = match resolve_daily_source(query.domain.as_deref(), query.source.as_deref()) {
+        Ok(selection) => selection,
+        Err(e) => return e.into_response(),
+    };
+    let today = selection.today();
+    let date = query.date.as_deref().unwrap_or(&today);
+    let should_wait = !query.r#async.unwrap_or(false);
+
+    // Validate date format
+    let date_re = regex::Regex::new(r"^\d{4}-\d{2}-\d{2}$").unwrap();
+    if !date_re.is_match(date) {
+        return ProblemDetail::bad_request("invalid date format, expected YYYY-MM-DD")
+            .into_response();
     }
 
-    (
-        axum::http::StatusCode::ACCEPTED,
-        Json(serde_json::json!({"status": "fetching", "retry_after": 30})),
-    )
-        .into_response()
+    let parsed = match chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
+        Ok(d) => d,
+        Err(_) => {
+            return ProblemDetail::bad_request("invalid calendar date").into_response();
+        }
+    };
+
+    let lower = chrono::NaiveDate::from_ymd_opt(2020, 4, 1).unwrap();
+    let upper = selection.today_naive();
+
+    if parsed < lower {
+        return ProblemDetail::bad_request("date must be >= 2020-04-01").into_response();
+    }
+    if parsed > upper {
+        return ProblemDetail::bad_request("date must be <= today").into_response();
+    }
+
+    let pool = state.ro_pool.clone();
+    let source = selection.source.to_string();
+    let date_owned = date.to_string();
+    let result = tokio::task::spawn_blocking(move || {
+        let record = crate::db::daily::get_daily_record(&pool, &source, &date_owned)?;
+        Some(build_daily_response(&pool, record))
+    })
+    .await
+    .unwrap_or(None);
+
+    if let Some(daily) = result {
+        return Json(daily).into_response();
+    }
+
+    match ensure_daily_fallback_running(&state, selection, date, should_wait).await {
+        DailyFallbackLaunch::Ready { waiter } => {
+            if let Some((notify, completed)) = waiter {
+                if let Some(d) = wait_and_fetch(
+                    notify,
+                    completed,
+                    &state,
+                    selection.source.to_string(),
+                    date.to_string(),
+                )
+                .await
+                {
+                    return Json(d).into_response();
+                }
+            }
+            daily_fetching_response(30)
+        }
+        DailyFallbackLaunch::Cooldown(remaining) => daily_fetching_response(remaining),
+        DailyFallbackLaunch::IngestionRequired => daily_ingestion_required_response(),
+        DailyFallbackLaunch::SetupFailed => {
+            ProblemDetail::internal("failed to persist daily fallback metadata").into_response()
+        }
+        DailyFallbackLaunch::LaunchFailed { message } => {
+            if should_wait {
+                daily_fetching_response(30)
+            } else {
+                ProblemDetail::internal(message).into_response()
+            }
+        }
+    }
 }
 
 fn apply_daily_fallback_terminal_update(
@@ -850,7 +1016,10 @@ mod tests {
     }
 
     fn test_state() -> Arc<AppState> {
-        let config = Config::default();
+        test_state_with_config(Config::default())
+    }
+
+    fn test_state_with_config(config: Config) -> Arc<AppState> {
         Arc::new(AppState {
             ro_pool: crate::db::create_ro_pool(":memory:", 1, config.database.busy_timeout_ms),
             rw_pool: crate::db::create_rw_pool(":memory:", 1, config.database.busy_timeout_ms),
@@ -1294,5 +1463,227 @@ mod tests {
         drop(history);
         drop(fake_uv);
         let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
+    }
+
+    #[test]
+    fn next_refresh_picks_next_utc8_slot() {
+        use chrono::TimeZone;
+        // UTC+8 slots 08:00/10:00/12:00 map to 00:00/02:00/04:00 UTC.
+        let cases = [
+            // before 08:00 UTC+8 → today 08:00
+            ((2026, 6, 9, 23, 30, 0), (2026, 6, 10, 0, 0, 0)),
+            // exactly 08:00 UTC+8 → today 10:00
+            ((2026, 6, 10, 0, 0, 0), (2026, 6, 10, 2, 0, 0)),
+            // 11:00 UTC+8 → today 12:00
+            ((2026, 6, 10, 3, 0, 0), (2026, 6, 10, 4, 0, 0)),
+            // after 12:00 UTC+8 → tomorrow 08:00
+            ((2026, 6, 10, 5, 0, 0), (2026, 6, 11, 0, 0, 0)),
+        ];
+        for ((y, mo, d, h, mi, s), (ey, emo, ed, eh, emi, es)) in cases {
+            let now = chrono::Utc.with_ymd_and_hms(y, mo, d, h, mi, s).unwrap();
+            let expected = chrono::Utc
+                .with_ymd_and_hms(ey, emo, ed, eh, emi, es)
+                .unwrap();
+            assert_eq!(
+                super::next_additional_daily_source_refresh_after(now),
+                expected,
+                "now = {now}"
+            );
+        }
+    }
+
+    #[test]
+    fn fallback_plan_checks_source_eligibility() {
+        let env_lock = crate::utils::TEST_PATH_MUTEX
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        let mut config = Config::default();
+        config.daily_sources.tencent_docs.token_env = "OJ_TEST_0X3F_ELIGIBILITY".to_string();
+
+        let sheep = super::DailySourceSelection::sheep();
+        let plan = sheep
+            .fallback_plan("2026-06-09", &config)
+            .expect("sheep is always eligible");
+        assert_eq!(plan.job_source, "daily_source");
+        assert_eq!(plan.script, "daily_source.py");
+        assert_eq!(
+            plan.args,
+            vec!["--daily-source", "sheep", "--date", "2026-06-09"]
+        );
+
+        let zero_x3f = super::DailySourceSelection::zero_x3f();
+        std::env::remove_var("OJ_TEST_0X3F_ELIGIBILITY");
+        assert!(zero_x3f.fallback_plan("2026-06-09", &config).is_none());
+
+        config.daily_sources.tencent_docs.token = " config-token ".to_string();
+        let plan = zero_x3f
+            .fallback_plan("2026-06-09", &config)
+            .expect("0x3f eligible with config token");
+        assert_eq!(
+            plan.args,
+            vec!["--daily-source", "0x3f", "--date", "2026-06-09"]
+        );
+
+        config.daily_sources.tencent_docs.token.clear();
+        std::env::set_var("OJ_TEST_0X3F_ELIGIBILITY", "token");
+        let plan = zero_x3f
+            .fallback_plan("2026-06-09", &config)
+            .expect("0x3f eligible with token env");
+        assert_eq!(
+            plan.args,
+            vec!["--daily-source", "0x3f", "--date", "2026-06-09"]
+        );
+        std::env::remove_var("OJ_TEST_0X3F_ELIGIBILITY");
+        drop(env_lock);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn get_daily_spawns_daily_source_fallback_for_sheep() {
+        let _root_lock = crate::utils::TEST_JOB_ARTIFACTS_ROOT_MUTEX
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        let fake_uv = FakeUvGuard::install().await;
+        let state = test_state();
+        let runtime_key = daily_fallback_crawler_runtime_key("sheep", "2026-03-14");
+
+        let response = super::get_daily(
+            State(state.clone()),
+            Query(DailyQuery {
+                domain: None,
+                source: Some("sheep".to_string()),
+                date: Some("2026-03-14".to_string()),
+                r#async: Some(true),
+            }),
+        )
+        .await
+        .into_response();
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+
+        let (job_id, source, args) = {
+            let crawler_jobs = state.crawler_jobs.lock().await;
+            let job = crawler_jobs
+                .get(&runtime_key)
+                .expect("sheep fallback job missing");
+            (job.job_id.clone(), job.source.clone(), job.args.clone())
+        };
+        assert_eq!(source, "daily_source");
+        assert_eq!(
+            args,
+            vec!["--daily-source", "sheep", "--date", "2026-03-14"]
+        );
+
+        wait_for_daily_job_terminal(&state, &runtime_key).await;
+        drop(fake_uv);
+        let paths = crate::utils::canonical_job_artifact_paths(JobType::Crawler, &job_id).unwrap();
+        let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn get_daily_spawns_0x3f_fallback_when_token_env_is_set() {
+        let _root_lock = crate::utils::TEST_JOB_ARTIFACTS_ROOT_MUTEX
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        let fake_uv = FakeUvGuard::install().await;
+        std::env::set_var("OJ_TEST_0X3F_FALLBACK_TOKEN", "token");
+        let mut config = Config::default();
+        config.daily_sources.tencent_docs.token_env = "OJ_TEST_0X3F_FALLBACK_TOKEN".to_string();
+        let state = test_state_with_config(config);
+        let runtime_key = daily_fallback_crawler_runtime_key("0x3f", "2026-03-14");
+
+        let response = super::get_daily(
+            State(state.clone()),
+            Query(DailyQuery {
+                domain: None,
+                source: Some("0x3f".to_string()),
+                date: Some("2026-03-14".to_string()),
+                r#async: Some(true),
+            }),
+        )
+        .await
+        .into_response();
+        std::env::remove_var("OJ_TEST_0X3F_FALLBACK_TOKEN");
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+
+        let (job_id, args) = {
+            let crawler_jobs = state.crawler_jobs.lock().await;
+            let job = crawler_jobs
+                .get(&runtime_key)
+                .expect("0x3f fallback job missing");
+            (job.job_id.clone(), job.args.clone())
+        };
+        assert_eq!(args, vec!["--daily-source", "0x3f", "--date", "2026-03-14"]);
+
+        wait_for_daily_job_terminal(&state, &runtime_key).await;
+        drop(fake_uv);
+        let paths = crate::utils::canonical_job_artifact_paths(JobType::Crawler, &job_id).unwrap();
+        let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
+    }
+
+    #[tokio::test]
+    async fn get_daily_returns_ingestion_required_for_0x3f_without_token_env() {
+        let mut config = Config::default();
+        config.daily_sources.tencent_docs.token_env = "OJ_TEST_0X3F_MISSING_TOKEN".to_string();
+        let state = test_state_with_config(config);
+        let runtime_key = daily_fallback_crawler_runtime_key("0x3f", "2026-03-14");
+
+        let response = super::get_daily(
+            State(state.clone()),
+            Query(DailyQuery {
+                domain: None,
+                source: Some("0x3f".to_string()),
+                date: Some("2026-03-14".to_string()),
+                r#async: Some(true),
+            }),
+        )
+        .await
+        .into_response();
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .unwrap();
+        let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(parsed["status"], "ingestion_required");
+        assert_eq!(parsed["retry_after"], 30);
+        assert_eq!(parsed["job_started"], false);
+
+        assert!(!state.daily_fallback.lock().await.contains_key(&runtime_key));
+        assert!(!state.crawler_jobs.lock().await.contains_key(&runtime_key));
+    }
+
+    #[tokio::test]
+    async fn get_daily_reuses_running_additional_source_fallback() {
+        let state = test_state();
+        let runtime_key = daily_fallback_crawler_runtime_key("sheep", "2026-03-14");
+        state
+            .daily_fallback
+            .lock()
+            .await
+            .insert(runtime_key.clone(), fallback_entry());
+
+        let response = super::get_daily(
+            State(state.clone()),
+            Query(DailyQuery {
+                domain: None,
+                source: Some("sheep".to_string()),
+                date: Some("2026-03-14".to_string()),
+                r#async: Some(true),
+            }),
+        )
+        .await
+        .into_response();
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+
+        // No new job spawned: existing Running entry is reused untouched.
+        assert!(!state.crawler_jobs.lock().await.contains_key(&runtime_key));
+        let fallback = state.daily_fallback.lock().await;
+        assert_eq!(
+            fallback
+                .get(&runtime_key)
+                .map(|entry| entry.job_id.as_str()),
+            Some("daily-running")
+        );
     }
 }
