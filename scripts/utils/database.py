@@ -1498,9 +1498,10 @@ class DailyChallengeDatabaseManager:
         cursor = conn.cursor()
         try:
             date = daily.get("date")
-            source = daily.get("source") or self._daily_source_from_domain(
-                daily.get("domain")
-            )
+            source = daily.get("source")
+            if source == "leetcode":
+                source = daily.get("domain")
+            source = self._daily_source_from_domain(source or daily.get("domain"))
             problem_refs = self._normalize_problem_refs(daily)
             if not date or not source or not problem_refs:
                 raise ValueError(

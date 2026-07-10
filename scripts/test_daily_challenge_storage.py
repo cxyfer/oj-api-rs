@@ -87,6 +87,78 @@ class DailyChallengeStorageTests(unittest.TestCase):
             self._daily_rows(), [("2026-01-01", "leetcode.com", '["leetcode:1234"]')]
         )
 
+    def test_update_daily_normalizes_internal_leetcode_source_with_domain(self):
+        manager = DailyChallengeDatabaseManager(self.db_path)
+
+        for domain, source in (("com", "leetcode.com"), ("cn", "leetcode.cn")):
+            with self.subTest(domain=domain):
+                self.assertTrue(
+                    manager.update_daily(
+                        {
+                            "date": f"2026-01-0{1 if domain == 'com' else 2}",
+                            "domain": domain,
+                            "source": "leetcode",
+                            "id": 1234,
+                        }
+                    )
+                )
+
+        self.assertEqual(
+            self._daily_rows(),
+            [
+                ("2026-01-01", "leetcode.com", '["leetcode:1234"]'),
+                ("2026-01-02", "leetcode.cn", '["leetcode:1234"]'),
+            ],
+        )
+
+    def test_fetch_daily_challenge_preserves_canonical_cn_daily_source(self):
+        class RecordingDailyDatabase:
+            def __init__(self):
+                self.daily = None
+
+            def update_daily(self, daily):
+                self.daily = daily.copy()
+                return True
+
+        client = LeetCodeClient.__new__(LeetCodeClient)
+        client.daily_db = RecordingDailyDatabase()
+        client._headers = lambda **_kwargs: {}
+
+        async def graphql_post(*_args, **_kwargs):
+            return {
+                "data": {
+                    "todayRecord": [
+                        {
+                            "date": "2026-07-10",
+                            "question": {
+                                "frontendQuestionId": "3534",
+                                "title": "Path Existence Queries in a Graph II",
+                                "titleCn": "图中的路径存在性查询 II",
+                                "difficulty": "Hard",
+                                "acRate": 0.419,
+                                "titleSlug": "path-existence-queries-in-a-graph-ii",
+                                "topicTags": [],
+                            },
+                        }
+                    ]
+                }
+            }
+
+        async def get_problem(*_args, **_kwargs):
+            return {
+                "id": "3534",
+                "source": "leetcode",
+                "slug": "path-existence-queries-in-a-graph-ii",
+            }
+
+        client._graphql_post_cn = graphql_post
+        client.get_problem = get_problem
+
+        daily = asyncio.run(client.fetch_daily_challenge("cn"))
+
+        self.assertEqual(daily["source"], "leetcode.cn")
+        self.assertEqual(client.daily_db.daily["source"], "leetcode.cn")
+
     def test_update_daily_maps_cn_source(self):
         manager = DailyChallengeDatabaseManager(self.db_path)
 
@@ -97,6 +169,52 @@ class DailyChallengeStorageTests(unittest.TestCase):
         self.assertEqual(
             self._daily_rows(), [("2026-01-01", "leetcode.cn", '["leetcode:1"]')]
         )
+
+    def test_fetch_daily_challenge_preserves_canonical_daily_source(self):
+        class RecordingDailyDatabase:
+            def __init__(self):
+                self.daily = None
+
+            def update_daily(self, daily):
+                self.daily = daily.copy()
+                return True
+
+        client = LeetCodeClient.__new__(LeetCodeClient)
+        client.daily_db = RecordingDailyDatabase()
+        client._headers = lambda **_kwargs: {}
+
+        async def graphql_post(*_args, **_kwargs):
+            return {
+                "data": {
+                    "activeDailyCodingChallengeQuestion": {
+                        "date": "2026-07-10",
+                        "link": "/problems/path-existence-queries-in-a-graph-ii/",
+                        "question": {
+                            "frontendQuestionId": "3534",
+                            "title": "Path Existence Queries in a Graph II",
+                            "difficulty": "Hard",
+                            "acRate": 41.9,
+                            "titleSlug": "path-existence-queries-in-a-graph-ii",
+                            "topicTags": [],
+                        },
+                    }
+                }
+            }
+
+        async def get_problem(*_args, **_kwargs):
+            return {
+                "id": "3534",
+                "source": "leetcode",
+                "slug": "path-existence-queries-in-a-graph-ii",
+            }
+
+        client._graphql_post_aiohttp = graphql_post
+        client.get_problem = get_problem
+
+        daily = asyncio.run(client.fetch_daily_challenge("com"))
+
+        self.assertEqual(daily["source"], "leetcode.com")
+        self.assertEqual(client.daily_db.daily["source"], "leetcode.com")
 
     def test_update_daily_preserves_explicit_ref_order_and_colons(self):
         manager = DailyChallengeDatabaseManager(self.db_path)
