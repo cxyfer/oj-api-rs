@@ -1,5 +1,9 @@
 {% extends "docs_base.html" %}
 
+{% block page_styles %}
+<link rel="stylesheet" href="/static/home.css">
+{% endblock %}
+
 {% block nav %}
 <a href="#overview" data-i18n="home.nav.overview">Overview</a>
 <a href="{{ docs_path }}" data-i18n="home.nav.api_docs">API Docs</a>
@@ -115,4 +119,8 @@
         <div class="link-icon" aria-hidden="true">→</div>
     </a>
 </section>
+{% endblock %}
+
+{% block page_scripts %}
+<script type="module" src="/static/home-scene.js"></script>
 {% endblock %}

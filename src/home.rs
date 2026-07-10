@@ -725,6 +725,62 @@ mod tests {
     }
 
     #[test]
+    fn public_pages_load_only_their_owned_assets() {
+        let home_html = HomeTemplate {
+            total_problems: 42,
+            token_auth_enabled: true,
+            version: "0.3.2-test",
+            docs: docs_registry(),
+            docs_path: DOCS_PATH,
+            mcp_docs_path: MCP_DOCS_PATH,
+        }
+        .render()
+        .expect("home template should render");
+
+        assert!(home_html.contains("/static/site.css"));
+        assert!(home_html.contains("/static/home.css"));
+        assert!(home_html.contains("/static/home-scene.js"));
+
+        let mcp_html = McpDocsTemplate {
+            docs: docs_registry(),
+            version: "0.3.2-test",
+            home_path: "/",
+            docs_path: DOCS_PATH,
+            token_auth_enabled: true,
+        }
+        .render()
+        .expect("mcp docs template should render");
+
+        assert!(mcp_html.contains("/static/site.css"));
+        assert!(mcp_html.contains("/static/mcp.css"));
+        assert!(mcp_html.contains("/static/mcp.js"));
+        assert!(!mcp_html.contains("three.module.min.js"));
+        assert!(!mcp_html.contains("home-scene.js"));
+    }
+
+    #[tokio::test]
+    async fn scalar_compatibility_path_remains_a_redirect() {
+        let state = test_state(false);
+        let app = Router::new().merge(public_router()).with_state(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(API_DOCS_PATH)
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+
+        assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(
+            response.headers().get(axum::http::header::LOCATION),
+            Some(&axum::http::HeaderValue::from_static(DOCS_PATH))
+        );
+    }
+
+    #[test]
     fn renders_api_docs_with_grouped_routes_and_collapsed_details() {
         let html = ApiDocsTemplate {
             docs: docs_registry(),

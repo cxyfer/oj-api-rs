@@ -1,0 +1,161 @@
+:root {
+    color-scheme: dark;
+    --home-bg: #0f1020;
+    --home-panel: rgba(255, 255, 255, 0.06);
+    --home-line: rgba(255, 255, 255, 0.1);
+    --home-text: #f5f2ff;
+    --home-muted: #b4accf;
+    --home-accent: #c8a8ff;
+    --home-accent-2: #7ef1d7;
+    --home-accent-3: #e6d7ff;
+    --home-shadow: 0 28px 90px rgba(5, 5, 20, 0.4);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    margin: 0;
+    font-family: 'Familjen Grotesk', sans-serif;
+    color: var(--home-text);
+    background:
+        radial-gradient(circle at top left, rgba(200, 168, 255, 0.22), transparent 26%),
+        radial-gradient(circle at 80% 20%, rgba(126, 241, 215, 0.1), transparent 24%),
+        linear-gradient(180deg, #131528 0%, #0d0e1a 100%);
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(circle at center, black, transparent 78%);
+}
+
+button,
+a,
+summary {
+    -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+    outline: 2px solid var(--home-accent-2);
+    outline-offset: 4px;
+}
+
+.home-shell {
+    position: relative;
+    overflow: hidden;
+}
+
+.home-wrap {
+    position: relative;
+    max-width: 1280px;
+    min-height: 100svh;
+    margin: 0 auto;
+    padding: clamp(16px, 2.4vw, 28px) clamp(18px, 3vw, 28px) 52px;
+}
+
+.home-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: clamp(24px, 4vh, 48px);
+}
+
+.home-brand {
+    color: var(--home-text);
+    text-decoration: none;
+    font-size: 1.08rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.home-nav {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+
+.home-nav a,
+.lang-toggle {
+    color: var(--home-muted);
+    text-decoration: none;
+    font: inherit;
+}
+
+.home-nav a:hover,
+.lang-toggle:hover {
+    color: var(--home-text);
+}
+
+.lang-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--home-line);
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 999px;
+    padding: 10px 14px;
+    cursor: pointer;
+}
+
+.lang-current {
+    color: var(--home-text);
+    font-weight: 600;
+}
+
+.panel {
+    border-radius: 32px;
+    border: 1px solid var(--home-line);
+    background: var(--home-panel);
+    box-shadow: var(--home-shadow);
+    backdrop-filter: blur(16px);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.section-kicker {
+    margin-bottom: 12px;
+    color: var(--home-accent-2);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+}
+
+.section-lead {
+    margin: 0 0 16px;
+    color: var(--home-muted);
+    font-size: 0.92rem;
+    line-height: 1.65;
+    text-wrap: pretty;
+}
+
+.code-block {
+    margin: 0;
+    padding: 16px;
+    overflow: auto;
+    border: 1px solid var(--home-line);
+    border-radius: 16px;
+    background: #111522;
+    color: #f6f0ff;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+    .home-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

@@ -8,3 +8,16 @@ Entries are workspace records, not authoritative runtime decisions.
 | 2026-07-10 | baseline | docs/aegis/baseline/2026-07-10-initial-baseline.md | oj-api-rs Initial Baseline |
 | 2026-07-10 | spec | docs/aegis/specs/2026-07-10-algorithmic-observatory-design.md | Algorithmic Observatory Homepage and MCP Reference Design |
 | 2026-07-10 | plan | docs/aegis/plans/2026-07-10-algorithmic-observatory-implementation.md | Algorithmic Observatory Implementation Plan |
+| 2026-07-10 | work | docs/aegis/work/2026-07-10-algorithmic-observatory/10-intent.md | Algorithmic Observatory Implementation intent |
+| 2026-07-10 | work | docs/aegis/work/2026-07-10-algorithmic-observatory/20-checkpoint.md | Algorithmic Observatory Implementation checkpoint |
+| 2026-07-10 | work | docs/aegis/work/2026-07-10-algorithmic-observatory/90-evidence.md | Algorithmic Observatory Implementation evidence |
+| 2026-07-10 | work | docs/aegis/work/2026-07-10-algorithmic-observatory/99-reflection.md | Algorithmic Observatory Implementation reflection |
+| 2026-07-10 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/task-intent-draft.json | Algorithmic Observatory Implementation task intent draft |
+| 2026-07-10 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/baseline-read-set-hint.json | Algorithmic Observatory Implementation baseline read-set hint |
+| 2026-07-10 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/baseline-usage-draft.json | Algorithmic Observatory Implementation baseline usage draft |
+| 2026-07-10 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/impact-statement-draft.json | Algorithmic Observatory Implementation impact statement draft |
+| 2026-07-10 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/todo-checkpoint-draft.json | Algorithmic Observatory Implementation todo checkpoint draft |
+| 2026-07-10 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/drift-check-draft.json | Algorithmic Observatory Implementation drift check draft |
+| 2026-07-10 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-baseline-tests.json | 2026-07-10-algorithmic-observatory evidence baseline-tests |
+| 2026-07-10 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/resume-state-hint.json | 2026-07-10-algorithmic-observatory resume state hint |
+| 2026-07-10 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-task-1-assets.json | 2026-07-10-algorithmic-observatory evidence task-1-assets |

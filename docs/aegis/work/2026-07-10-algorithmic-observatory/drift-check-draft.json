@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-07-10-algorithmic-observatory",
+  "taskIntentRef": "docs/aegis/work/2026-07-10-algorithmic-observatory/task-intent-draft.json",
+  "baselineRefs": [
+    "docs/aegis/plans/2026-07-10-algorithmic-observatory-implementation.md"
+  ],
+  "scopeStatus": "Task 1 stayed within public asset ownership and render tests.",
+  "compatStatus": "Scalar redirect, public routes, templates, and full test suite remain green.",
+  "retirementStatus": "No Bento retirement yet; rules moved intact to homepage owner for Task 2 deletion.",
+  "newRiskSignals": [],
+  "decision": "continue"
+}

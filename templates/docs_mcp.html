@@ -2,6 +2,10 @@
 
 {% block title %}MCP Reference - OJ API{% endblock %}
 
+{% block page_styles %}
+<link rel="stylesheet" href="/static/mcp.css">
+{% endblock %}
+
 {% block nav %}
 <a href="{{ home_path }}" data-i18n="home.nav.overview">Overview</a>
 <a href="{{ docs_path }}" data-i18n="home.nav.api_docs">API Docs</a>
@@ -201,4 +205,8 @@
     window.addEventListener('hashchange', openByHash);
     document.addEventListener('DOMContentLoaded', openByHash);
 </script>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/mcp.js" defer></script>
 {% endblock %}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-07-10-algorithmic-observatory",
+  "currentTodo": "Build the semantic Algorithmic Observatory homepage.",
+  "completedTodos": [
+    "Verified clean baseline.",
+    "Task 1 asset ownership split passes 206 tests."
+  ],
+  "activeSlice": "Task 2: semantic homepage structure and CSS.",
+  "evidenceRefs": [
+    "docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-baseline-tests.json",
+    "docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-task-1-assets.json"
+  ],
+  "blockedOn": null,
+  "nextStep": "Commit Task 1, then add the failing observatory homepage render test.",
+  "updatedAt": "2026-07-10"
+}
