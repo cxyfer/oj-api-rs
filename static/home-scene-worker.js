@@ -516,11 +516,22 @@ function sampleCanvasPixels(renderer) {
         const context = renderer.getContext();
         const width = context.drawingBufferWidth;
         const height = context.drawingBufferHeight;
-        const pixels = new Uint8Array(width * height * 4);
-        context.readPixels(0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, pixels);
+        const sampleWidth = Math.min(100, width);
+        const sampleHeight = Math.min(100, height);
+        const sampleX = Math.floor((width - sampleWidth) / 2);
+        const sampleY = Math.floor((height - sampleHeight) / 2);
+        const pixels = new Uint8Array(sampleWidth * sampleHeight * 4);
+        context.readPixels(
+            sampleX,
+            sampleY,
+            sampleWidth,
+            sampleHeight,
+            context.RGBA,
+            context.UNSIGNED_BYTE,
+            pixels
+        );
         let coloredSamples = 0;
-        const stride = Math.max(4, Math.floor(pixels.length / 12000 / 4) * 4);
-        for (let index = 0; index < pixels.length; index += stride) {
+        for (let index = 0; index < pixels.length; index += 4) {
             if (pixels[index] + pixels[index + 1] + pixels[index + 2] > 70) coloredSamples += 1;
         }
         if (coloredSamples > 12) return 'nonblank';

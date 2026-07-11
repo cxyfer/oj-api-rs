@@ -3,6 +3,7 @@
 (function initializeMcpReference() {
     const feedback = document.querySelector('.copy-feedback');
     const copyButtons = Array.from(document.querySelectorAll('[data-copy-target]'));
+    let feedbackTimeout;
 
     function translate(key, fallback) {
         if (!window.i18n || typeof window.i18n.t !== 'function') return fallback;
@@ -47,9 +48,17 @@
             const copiedText = translate('docs_mcp.copy.copied', 'Copied');
             if (label) label.textContent = copiedText;
             if (feedback) feedback.textContent = copiedText;
-            window.setTimeout(() => {
+
+            if (button._copyTimeout) window.clearTimeout(button._copyTimeout);
+            if (feedbackTimeout) window.clearTimeout(feedbackTimeout);
+
+            button._copyTimeout = window.setTimeout(() => {
                 if (label) label.textContent = translate('docs_mcp.copy.copy', 'Copy');
+                delete button._copyTimeout;
+            }, 1800);
+            feedbackTimeout = window.setTimeout(() => {
                 if (feedback) feedback.textContent = '';
+                feedbackTimeout = undefined;
             }, 1800);
         } catch (error) {
             const failedText = translate('docs_mcp.copy.failed', 'Copy failed');

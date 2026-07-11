@@ -40,6 +40,7 @@ body::before {
         linear-gradient(rgba(243, 241, 234, 0.028) 1px, transparent 1px),
         linear-gradient(90deg, rgba(243, 241, 234, 0.028) 1px, transparent 1px);
     background-size: 64px 64px;
+    -webkit-mask-image: linear-gradient(to bottom, black, transparent 85%);
     mask-image: linear-gradient(to bottom, black, transparent 85%);
 }
 
@@ -184,6 +185,12 @@ a {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
 }
 
 @media (max-width: 760px) {

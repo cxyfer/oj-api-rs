@@ -24,6 +24,7 @@
         radial-gradient(circle at 42% 74%, rgba(199, 244, 91, 0.48) 0 1px, transparent 2px),
         radial-gradient(circle at 88% 84%, rgba(83, 224, 232, 0.5) 0 1px, transparent 2px);
     background-size: 96px 96px, 96px 96px, 420px 420px, 520px 520px, 460px 460px, 600px 600px;
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 12%, black 92%, transparent);
     mask-image: linear-gradient(to bottom, transparent, black 12%, black 92%, transparent);
 }
 
