@@ -43,3 +43,36 @@ The main-thread renderer, three.module.min.js, three.core.min.js, and the tempor
 ## Boundary
 
 This ADR is an advisory Aegis Method Pack record. It does not grant completion authority or replace project-authoritative architecture sources.
+
+## Amendment - 2026-07-11 - Record the executed declarative SVG/CSS animated fallback while preserving Worker-only Three.js ownership.
+
+- Status: amended
+
+### Source Evidence
+
+- Task 1 source commit e4faef3, two-stage independent review, responsive Chromium checks, reduced-motion pixel stability, and Fast 3G plus 4x CPU differential profiling.
+### Change Summary
+
+Record the executed declarative SVG/CSS animated fallback while preserving Worker-only Three.js ownership.
+
+### Compatibility Boundary
+
+Fallback remains non-interactive and data-free; successful Worker scene, public routes, registry, locales, MCP, Scalar, auth, inspector datasets, and Worker-only Three.js ownership remain unchanged.
+
+### Retirement Impact
+
+The two-line-only fallback is superseded in place; no Canvas 2D renderer, main-thread Three.js path, JavaScript fallback loop, compatibility alias, or second data owner is retained.
+
+### Baseline Sync
+
+- Needed: needed
+- Target: docs/aegis/baseline/2026-07-10-initial-baseline.md
+- Action: update baseline
+- Reason: The current-state baseline must name the inline SVG/CSS fallback owners, reduced-motion behavior, and measured scene-attributable performance boundary.
+
+### Evidence References
+
+- docs/aegis/work/2026-07-11-observatory-animated-fallback/90-evidence.md
+### Boundary
+
+This amendment is an advisory Aegis Method Pack record. It does not grant completion authority or replace project-authoritative architecture sources.

@@ -1,16 +1,17 @@
 {
   "schemaVersion": "aegis.schema.v0",
   "taskId": "2026-07-11-observatory-animated-fallback",
-  "currentTodo": "Dispatch Task 1 fresh implementer.",
+  "currentTodo": "Final independent review and evidence commit",
   "completedTodos": [
-    "Approved spec converted into an executable plan with readiness, review, and browser gates."
+    "Task 1 source implementation and two-stage review",
+    "Responsive Worker/fallback/reduced-motion browser verification",
+    "Fast 3G plus 4x CPU differential performance verification"
   ],
-  "activeSlice": "Task 1 contract-first SVG/CSS fallback implementation.",
+  "activeSlice": "Durable closure and final verification",
   "evidenceRefs": [
-    "docs/aegis/specs/2026-07-11-observatory-animated-fallback-brief.md",
-    "docs/aegis/plans/2026-07-11-observatory-animated-fallback.md"
+    "docs/aegis/work/2026-07-11-observatory-animated-fallback/90-evidence.md"
   ],
   "blockedOn": null,
-  "nextStep": "Dispatch a fresh implementer with the Task 1 context packet, then run spec and quality reviews.",
+  "nextStep": "Run workspace bundle/check, final independent review, and commit durable evidence",
   "updatedAt": "2026-07-11"
 }

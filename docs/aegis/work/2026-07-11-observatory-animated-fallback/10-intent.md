@@ -30,15 +30,18 @@
 - docs/aegis/adr/ADR-0001-homepage-threejs-worker-boundary.md
 - docs/aegis/baseline/2026-07-10-initial-baseline.md
 - Acknowledged before plan:
-- none
-- Cited in plan:
-- none
-- Missing refs:
 - docs/aegis/specs/2026-07-11-observatory-animated-fallback-brief.md
 - docs/aegis/specs/2026-07-10-algorithmic-observatory-design.md
 - docs/aegis/adr/ADR-0001-homepage-threejs-worker-boundary.md
 - docs/aegis/baseline/2026-07-10-initial-baseline.md
-- Advisory decision: needs-baseline-readback
+- Cited in plan:
+- docs/aegis/specs/2026-07-11-observatory-animated-fallback-brief.md
+- docs/aegis/specs/2026-07-10-algorithmic-observatory-design.md
+- docs/aegis/adr/ADR-0001-homepage-threejs-worker-boundary.md
+- docs/aegis/baseline/2026-07-10-initial-baseline.md
+- Missing refs:
+- none
+- Advisory decision: continue
 
 ## ImpactStatementDraft
 
@@ -54,3 +57,23 @@
 - No Canvas 2D, main-thread Three.js, new dependency, live problem data, hover/click fallback, or API/database work.
 
 These records are Method Pack drafts / hints, not authoritative runtime decisions.
+
+## BaselineUsageDraft
+
+- Required baseline refs:
+- docs/aegis/specs/2026-07-11-observatory-animated-fallback-brief.md
+- docs/aegis/specs/2026-07-10-algorithmic-observatory-design.md
+- docs/aegis/adr/ADR-0001-homepage-threejs-worker-boundary.md
+- docs/aegis/baseline/2026-07-10-initial-baseline.md
+- Delivered context refs:
+- none
+- Acknowledged before plan:
+- docs/aegis/specs/2026-07-11-observatory-animated-fallback-brief.md
+- docs/aegis/specs/2026-07-10-algorithmic-observatory-design.md
+- docs/aegis/adr/ADR-0001-homepage-threejs-worker-boundary.md
+- docs/aegis/baseline/2026-07-10-initial-baseline.md
+- Cited in plan:
+- docs/aegis/plans/2026-07-11-observatory-animated-fallback.md
+- Missing refs:
+- none
+- Advisory decision: continue

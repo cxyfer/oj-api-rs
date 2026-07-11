@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "baselineRefs": [
+    "docs/aegis/baseline/2026-07-10-initial-baseline.md"
+  ],
+  "impactStatement": "docs/aegis/work/2026-07-11-observatory-animated-fallback/impact-statement-draft.json",
+  "compatPlan": "Routes, registry, locales, MCP, Scalar, auth, successful Worker scene, inspector behavior, and reduced-motion semantics remain unchanged.",
+  "retirementPlan": "Two-line-only fallback superseded; no second renderer or compatibility alias retained",
+  "evidenceBundle": [
+    "docs/aegis/work/2026-07-11-observatory-animated-fallback/evidence-bundle-draft-final-browser-performance.json"
+  ]
+}

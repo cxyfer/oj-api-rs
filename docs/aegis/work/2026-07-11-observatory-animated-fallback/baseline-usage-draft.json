@@ -8,13 +8,15 @@
     "docs/aegis/baseline/2026-07-10-initial-baseline.md"
   ],
   "deliveredContextRefs": [],
-  "acknowledgedBeforePlanRefs": [],
-  "citedInPlanRefs": [],
-  "missingRefs": [
+  "acknowledgedBeforePlanRefs": [
     "docs/aegis/specs/2026-07-11-observatory-animated-fallback-brief.md",
     "docs/aegis/specs/2026-07-10-algorithmic-observatory-design.md",
     "docs/aegis/adr/ADR-0001-homepage-threejs-worker-boundary.md",
     "docs/aegis/baseline/2026-07-10-initial-baseline.md"
   ],
-  "decision": "needs-baseline-readback"
+  "citedInPlanRefs": [
+    "docs/aegis/plans/2026-07-11-observatory-animated-fallback.md"
+  ],
+  "missingRefs": [],
+  "decision": "continue"
 }

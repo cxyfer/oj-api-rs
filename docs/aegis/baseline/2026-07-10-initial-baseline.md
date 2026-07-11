@@ -68,7 +68,9 @@ and static assets as implementation evidence.
 - `static/home-scene-worker.js` is the sole Three.js runtime owner and renders to a
   transferred `OffscreenCanvas` using the self-contained `three.home.min.js` bundle.
 - Unsupported Worker, OffscreenCanvas, or WebGL capability and runtime WebGL
-  failure select the deterministic CSS fallback; no main-thread renderer is retained.
+  failure select a deterministic inline SVG with CSS-only observatory motion;
+  no main-thread renderer is retained. Reduced motion keeps the complete SVG
+  composition static.
 - The existing documentation registry remains the source for featured endpoints and MCP tools.
 
 ### 5.2 Architecture Non-negotiables
@@ -94,6 +96,8 @@ and static assets as implementation evidence.
 - Shared public shell -> `templates/docs_base.html` and shared public CSS.
 - Localization -> `static/i18n/en.json`, `zh-TW.json`, and `zh-CN.json`.
 - Homepage scene bridge -> `static/home-scene.js`.
+- Homepage declarative fallback structure and motion -> `templates/home.html`
+  and `static/home.css`.
 - Homepage Three.js runtime -> `static/home-scene-worker.js` and
   `static/vendor/three.home.min.js`.
 - Worker boundary rationale ->
@@ -104,6 +108,8 @@ and static assets as implementation evidence.
 - `src/home.rs` is already a large maintained source file, so changes should stay wiring-only.
 - A throttled profile still contains a non-scene main-thread Layout long task;
   its cause is outside the Worker migration and remains a separate performance follow-up.
+- Scene-disabled differential profiling attributes less than 200 ms of the
+  initial long task to the Worker bridge plus SVG/CSS fallback surface.
 - The one-time full-buffer `readPixels` operation remains Worker-only but can
   cost hundreds of milliseconds under throttling.
 

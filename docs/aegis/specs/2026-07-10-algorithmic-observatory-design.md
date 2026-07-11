@@ -149,8 +149,10 @@ resolution, retrieval, and MCP/API access paths.
   inspector and canvas datasets; the worker does not own localized copy or DOM.
 - The main thread must not import Three.js or retain a second renderer path.
 - If module Worker, `OffscreenCanvas`, canvas transfer, or WebGL initialization
-  is unavailable, the page activates the existing deterministic CSS fallback
-  and retains complete HTML content. It does not load Three.js on the main thread.
+  is unavailable, the page activates the existing fallback owner with a
+  deterministic inline SVG observatory and CSS-only motion. It retains complete
+  HTML content and does not load Three.js on the main thread. The fallback is
+  intentionally non-interactive.
 
 ## 9. Visual System
 
@@ -189,7 +191,8 @@ resolution, retrieval, and MCP/API access paths.
 - `prefers-reduced-motion: reduce` renders one stable scene frame and disables
   nonessential transitions.
 - Worker, OffscreenCanvas, or WebGL failure leaves the content fully readable
-  over a deterministic CSS background.
+  over the inline SVG observatory fallback. Under reduced motion the complete
+  composition remains visible and fully static.
 
 ## 12. Performance Budget
 
@@ -208,6 +211,9 @@ resolution, retrieval, and MCP/API access paths.
   below `2.5s`, CLS remains at or below `0.1`, and no main-thread long task above
   `200ms` is attributable to scene bootstrap, interaction bridging, or fallback.
 - No raster hero image is required; the domain-specific scene is the primary visual asset.
+- The fallback runs only three CSS keyframe families for the core, hubs, and
+  route pulses; fixed nodes do not animate, and animation runs only after the
+  bounded fallback state is selected.
 
 ## 13. Ownership and File Boundaries
 
@@ -216,6 +222,8 @@ resolution, retrieval, and MCP/API access paths.
 - `templates/docs_base.html`: shared public shell and page-specific asset blocks.
 - `static/site.css`: shared public shell and design tokens.
 - `static/home.css`: homepage-only composition and scene overlays.
+- `templates/home.html` and `static/home.css`: deterministic inline SVG fallback
+  structure and declarative motion.
 - `static/mcp.css`: MCP-only reference styling.
 - `static/home-scene.js`: main-thread DOM, i18n, event, observer, dataset, and
   Worker lifecycle bridge; it does not import Three.js.
