@@ -215,6 +215,15 @@ impl AdditionalDailySource {
             Self::ZeroX3f => "0x3f",
         }
     }
+
+    fn is_available_on(self, date: chrono::NaiveDate) -> bool {
+        let (first_date, active_days) = match self {
+            Self::Sheep => (chrono::NaiveDate::from_ymd_opt(2024, 2, 26).unwrap(), 6),
+            Self::ZeroX3f => (chrono::NaiveDate::from_ymd_opt(2022, 4, 8).unwrap(), 5),
+        };
+
+        date >= first_date && date.weekday().num_days_from_monday() < active_days
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -270,6 +279,13 @@ impl DailySourceSelection {
         match self.kind {
             DailySourceKind::LeetCode(domain) => domain.today_naive(),
             DailySourceKind::Additional(_) => utc8_today(),
+        }
+    }
+
+    fn is_available_on(&self, date: chrono::NaiveDate) -> bool {
+        match self.kind {
+            DailySourceKind::LeetCode(_) => true,
+            DailySourceKind::Additional(source) => source.is_available_on(date),
         }
     }
 
@@ -373,10 +389,6 @@ fn utc8_today() -> chrono::NaiveDate {
     chrono::Utc::now()
         .with_timezone(&utc8_offset())
         .date_naive()
-}
-
-fn utc8_date_string(now: chrono::DateTime<chrono::Utc>) -> String {
-    now.with_timezone(&utc8_offset()).date_naive().to_string()
 }
 
 fn next_additional_daily_source_refresh_after(
@@ -814,8 +826,17 @@ pub fn spawn_additional_daily_source_scheduler(state: Arc<AppState>) {
                 .unwrap_or_else(|_| std::time::Duration::from_secs(0));
             tokio::time::sleep(wait).await;
 
-            let date = utc8_date_string(chrono::Utc::now());
+            let today = utc8_today();
+            let date = today.to_string();
             for selection in ADDITIONAL_DAILY_SOURCES {
+                if !selection.is_available_on(today) {
+                    tracing::info!(
+                        "scheduled daily source refresh skipped (unavailable date): {} {}",
+                        selection.source,
+                        date
+                    );
+                    continue;
+                }
                 match ensure_daily_fallback_running(&state, selection, &date, false).await {
                     DailyFallbackLaunch::Ready { .. } => {
                         tracing::info!(
@@ -900,6 +921,10 @@ pub async fn get_daily(
     }
     if parsed > upper {
         return ProblemDetail::bad_request("date must be <= today").into_response();
+    }
+    if !selection.is_available_on(parsed) {
+        return ProblemDetail::not_found("daily challenge is unavailable for this source and date")
+            .into_response();
     }
 
     let pool = state.ro_pool.clone();
@@ -1537,6 +1562,22 @@ mod tests {
         drop(env_lock);
     }
 
+    #[test]
+    fn additional_daily_sources_enforce_weekdays_and_start_dates() {
+        let sheep = super::DailySourceSelection::sheep();
+        let zero_x3f = super::DailySourceSelection::zero_x3f();
+
+        assert!(sheep.is_available_on(chrono::NaiveDate::from_ymd_opt(2024, 2, 26).unwrap()));
+        assert!(!sheep.is_available_on(chrono::NaiveDate::from_ymd_opt(2024, 2, 25).unwrap()));
+        assert!(sheep.is_available_on(chrono::NaiveDate::from_ymd_opt(2026, 6, 6).unwrap()));
+        assert!(!sheep.is_available_on(chrono::NaiveDate::from_ymd_opt(2026, 6, 7).unwrap()));
+
+        assert!(zero_x3f.is_available_on(chrono::NaiveDate::from_ymd_opt(2022, 4, 8).unwrap()));
+        assert!(!zero_x3f.is_available_on(chrono::NaiveDate::from_ymd_opt(2022, 4, 7).unwrap()));
+        assert!(zero_x3f.is_available_on(chrono::NaiveDate::from_ymd_opt(2026, 6, 5).unwrap()));
+        assert!(!zero_x3f.is_available_on(chrono::NaiveDate::from_ymd_opt(2026, 6, 6).unwrap()));
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn get_daily_spawns_daily_source_fallback_for_sheep() {
@@ -1590,14 +1631,14 @@ mod tests {
         let mut config = Config::default();
         config.daily_sources.tencent_docs.token_env = "OJ_TEST_0X3F_FALLBACK_TOKEN".to_string();
         let state = test_state_with_config(config);
-        let runtime_key = daily_fallback_crawler_runtime_key("0x3f", "2026-03-14");
+        let runtime_key = daily_fallback_crawler_runtime_key("0x3f", "2026-03-13");
 
         let response = super::get_daily(
             State(state.clone()),
             Query(DailyQuery {
                 domain: None,
                 source: Some("0x3f".to_string()),
-                date: Some("2026-03-14".to_string()),
+                date: Some("2026-03-13".to_string()),
                 r#async: Some(true),
             }),
         )
@@ -1613,7 +1654,7 @@ mod tests {
                 .expect("0x3f fallback job missing");
             (job.job_id.clone(), job.args.clone())
         };
-        assert_eq!(args, vec!["--daily-source", "0x3f", "--date", "2026-03-14"]);
+        assert_eq!(args, vec!["--daily-source", "0x3f", "--date", "2026-03-13"]);
 
         wait_for_daily_job_terminal(&state, &runtime_key).await;
         drop(fake_uv);
@@ -1626,14 +1667,14 @@ mod tests {
         let mut config = Config::default();
         config.daily_sources.tencent_docs.token_env = "OJ_TEST_0X3F_MISSING_TOKEN".to_string();
         let state = test_state_with_config(config);
-        let runtime_key = daily_fallback_crawler_runtime_key("0x3f", "2026-03-14");
+        let runtime_key = daily_fallback_crawler_runtime_key("0x3f", "2026-03-13");
 
         let response = super::get_daily(
             State(state.clone()),
             Query(DailyQuery {
                 domain: None,
                 source: Some("0x3f".to_string()),
-                date: Some("2026-03-14".to_string()),
+                date: Some("2026-03-13".to_string()),
                 r#async: Some(true),
             }),
         )

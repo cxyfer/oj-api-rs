@@ -57,6 +57,8 @@ The system SHALL return daily challenges via `GET /api/v1/daily?domain={com|cn}&
 ### Requirement: Daily challenge date validation
 The system SHALL validate the `date` parameter format as `YYYY-MM-DD` and enforce range `[2020-04-01, domain-aware today]`. For `domain=cn`, "today" SHALL be computed using UTC+8. For `domain=com`, "today" SHALL be computed using UTC.
 
+Additional daily sources SHALL only be available from their first published date and on their publishing weekdays: `0x3f` from `2022-04-08` on Monday through Friday, and `sheep` from `2024-02-26` on Monday through Saturday. An unavailable additional-source date SHALL return HTTP 404 without reading the database or starting a fallback crawler. Scheduled additional-source refreshes SHALL skip unavailable UTC+8 dates.
+
 #### Scenario: Date before lower bound
 - **WHEN** client sends `GET /api/v1/daily?domain=com&date=2019-01-01`
 - **THEN** system returns HTTP 400 with error detail indicating date must be >= 2020-04-01
@@ -76,6 +78,11 @@ The system SHALL validate the `date` parameter format as `YYYY-MM-DD` and enforc
 #### Scenario: Invalid calendar date
 - **WHEN** client sends `GET /api/v1/daily?domain=com&date=2024-02-30`
 - **THEN** system returns HTTP 400 with error detail indicating invalid date
+
+#### Scenario: Additional source unavailable date
+- **WHEN** client requests `GET /api/v1/daily?source=sheep&date=2026-06-07` or `GET /api/v1/daily?source=0x3f&date=2026-06-06`
+- **THEN** the system returns HTTP 404
+- **AND** does not register or start a fallback crawler job
 
 ### Requirement: Daily challenge domain validation
 The system SHALL only accept `com` or `cn` as valid domain values, validated via the `LeetCodeDomain` enum. The `source` parameter SHALL only accept supported daily source values. If both `domain` and `source` are provided, the system SHALL allow matching LeetCode pairs and SHALL return HTTP 400 for conflicts or for pairing a LeetCode-only `domain` with a non-LeetCode `source`.
