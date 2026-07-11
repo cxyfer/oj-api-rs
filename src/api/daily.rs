@@ -882,6 +882,7 @@ pub fn spawn_additional_daily_source_scheduler(state: Arc<AppState>) {
         (status = 200, description = "Daily challenge", body = DailyChallengeResponse),
         (status = 202, description = "Crawler triggered, no data yet. Retry after the specified seconds.", body = DailyFetchingResponse),
         (status = 400, description = "Invalid parameters", body = ProblemDetail, content_type = "application/problem+json"),
+        (status = 404, description = "Daily challenge unavailable for source and date", body = ProblemDetail, content_type = "application/problem+json"),
         (status = 500, description = "Internal error", body = ProblemDetail, content_type = "application/problem+json"),
     ),
     security(("bearer_auth" = [])),

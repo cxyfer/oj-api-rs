@@ -194,3 +194,19 @@ impl utoipa::Modify for SecurityAddon {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use utoipa::OpenApi;
+
+    use super::ApiDoc;
+
+    #[test]
+    fn daily_endpoint_documents_unavailable_source_dates() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+
+        assert!(spec["paths"]["/api/v1/daily"]["get"]["responses"]
+            .get("404")
+            .is_some());
+    }
+}

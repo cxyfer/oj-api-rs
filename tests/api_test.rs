@@ -344,7 +344,24 @@ async fn daily_endpoint_rejects_domain_with_codeforces_source() {
 
 #[tokio::test]
 async fn daily_endpoint_rejects_unavailable_additional_source_dates_without_jobs() {
-    let (app, _guard, state) = common::build_test_app_with_state_and_config(Config::default());
+    let (app, guard, state) = common::build_test_app_with_state_and_config(Config::default());
+    seed_daily_problem_with_source(
+        guard.db_path(),
+        "codeforces",
+        "1930A",
+        "1930A",
+        Some("Maximise The Score"),
+        None,
+        Some("Codeforces hint"),
+        None,
+        &[],
+    );
+    seed_daily_row(
+        guard.db_path(),
+        "2026-06-07",
+        "sheep",
+        &["codeforces:1930A"],
+    );
 
     for (source, date) in [
         ("sheep", "2024-02-25"),
