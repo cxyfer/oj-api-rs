@@ -903,6 +903,383 @@ mod tests {
     }
 
     #[test]
+    fn homepage_fallback_is_declarative_animated_and_bounded() {
+        fn css_block<'a>(source: &'a str, marker: &str) -> Option<&'a str> {
+            let marker_start = source.find(marker)?;
+            let opening_brace = marker_start + source[marker_start..].find('{')?;
+            let mut depth = 0usize;
+
+            for (offset, byte) in source.as_bytes()[opening_brace..].iter().enumerate() {
+                match *byte {
+                    b'{' => depth += 1,
+                    b'}' => {
+                        depth = depth.checked_sub(1)?;
+                        if depth == 0 {
+                            return Some(&source[marker_start..opening_brace + offset + 1]);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            None
+        }
+
+        let home_html = HomeTemplate {
+            total_problems: 42,
+            token_auth_enabled: true,
+            version: "0.3.2-test",
+            docs: docs_registry(),
+            docs_path: DOCS_PATH,
+            mcp_docs_path: MCP_DOCS_PATH,
+        }
+        .render()
+        .expect("home template should render");
+
+        assert!(home_html.contains(
+            "data-fallback-scene aria-hidden=\"true\" focusable=\"false\" viewBox=\"0 0 1440 804\" preserveAspectRatio=\"xMidYMid slice\""
+        ));
+        assert_eq!(home_html.matches("data-fallback-core").count(), 1);
+        assert_eq!(home_html.matches("data-fallback-hub").count(), 5);
+        assert_eq!(home_html.matches("data-fallback-node").count(), 30);
+        assert_eq!(home_html.matches("data-fallback-route").count(), 4);
+        assert_eq!(home_html.matches("data-fallback-pulse").count(), 4);
+        assert!(!home_html.contains("<animate"));
+
+        let fallback_css = include_str!("../static/home.css");
+        for marker in [
+            "@keyframes fallback-core-drift",
+            "@keyframes fallback-hub-breathe",
+            "@keyframes fallback-route-pulse",
+            "stroke-dasharray",
+            "stroke-dashoffset",
+        ] {
+            assert!(
+                fallback_css.contains(marker),
+                "missing fallback CSS marker {marker}"
+            );
+        }
+        assert_eq!(fallback_css.matches("@keyframes fallback-").count(), 3);
+        assert!(
+            fallback_css.contains(".scene-shell.is-ready .fallback-scene {\n    opacity: 0;\n}")
+        );
+        assert!(fallback_css
+            .contains(".scene-shell.is-webgl-fallback .fallback-scene {\n    opacity: 1;\n}"));
+        assert!(fallback_css
+            .contains("linear-gradient(120deg, transparent 0 65%, rgba(83, 224, 232, 0.06)"));
+        assert!(fallback_css
+            .contains("linear-gradient(32deg, transparent 0 72%, rgba(255, 106, 85, 0.05)"));
+        for selector in [".fallback-core", ".fallback-hub", ".fallback-pulse"] {
+            let rule_start = format!("{selector} {{");
+            let animation_rule = fallback_css
+                .match_indices(&rule_start)
+                .filter_map(|(index, _)| {
+                    let rule = &fallback_css[index..];
+                    rule.find("\n}").map(|end| &rule[..end])
+                })
+                .find(|rule| rule.contains("animation:"))
+                .unwrap_or_else(|| panic!("missing base animation rule for {selector}"));
+            assert!(
+                animation_rule.contains("animation-play-state: paused"),
+                "base animation must be paused for {selector}"
+            );
+        }
+        assert_eq!(
+            fallback_css
+                .matches("@media (prefers-reduced-motion: reduce) {")
+                .count(),
+            1
+        );
+        let reduced_motion = css_block(fallback_css, "@media (prefers-reduced-motion: reduce)")
+            .expect("reduced-motion media block should exist");
+        let reduced_animation_rule = css_block(reduced_motion, ".fallback-network,")
+            .expect("reduced-motion fallback animation rule should exist");
+        for selector in [
+            ".fallback-core",
+            ".fallback-hub",
+            ".fallback-node",
+            ".fallback-pulse",
+        ] {
+            assert!(
+                reduced_animation_rule.contains(selector),
+                "reduced-motion rule must include {selector}"
+            );
+        }
+        assert!(reduced_animation_rule.contains("animation: none;"));
+        assert_eq!(
+            fallback_css
+                .matches("animation-play-state: running")
+                .count(),
+            1
+        );
+        let running_rule = css_block(
+            fallback_css,
+            ".scene-shell.is-webgl-fallback .fallback-core,",
+        )
+        .expect("fallback running animation rule should exist");
+        for selector in [
+            ".scene-shell.is-webgl-fallback .fallback-core",
+            ".scene-shell.is-webgl-fallback .fallback-hub",
+            ".scene-shell.is-webgl-fallback .fallback-pulse",
+        ] {
+            assert!(running_rule.contains(selector));
+        }
+        assert_eq!(
+            running_rule
+                .matches(".scene-shell.is-webgl-fallback .fallback-")
+                .count(),
+            3
+        );
+        assert!(!running_rule.contains(".fallback-node"));
+        assert!(running_rule.contains("animation-play-state: running;"));
+        let node_rule = css_block(fallback_css, ".fallback-node {\n    opacity: 0.66;")
+            .expect("individual fallback node rule should exist");
+        assert!(!node_rule.contains("animation:"));
+        assert!(!node_rule.contains("animation-delay:"));
+        assert!(!node_rule.contains("transform"));
+        assert!(!fallback_css.contains("fallback-node-breathe"));
+
+        let scene_module = include_str!("../static/home-scene.js");
+        let failure_object = scene_module
+            .split("const SCENE_FAILURE = Object.freeze({\n")
+            .nth(1)
+            .and_then(|javascript| javascript.split("\n});").next())
+            .expect("SCENE_FAILURE object should exist");
+        let failure_entries: Vec<_> = failure_object.lines().map(str::trim).collect();
+        assert_eq!(
+            failure_entries,
+            vec![
+                "WORKER_UNSUPPORTED: 'worker-unsupported',",
+                "OFFSCREEN_UNSUPPORTED: 'offscreen-unsupported',",
+                "WORKER_LOAD: 'worker-load',",
+                "WORKER_MESSAGE: 'worker-message',",
+                "CANVAS_TRANSFER: 'canvas-transfer',",
+                "INVALID_READY: 'invalid-ready',",
+                "WORKER_RUNTIME: 'worker-runtime',",
+                "WEBGL_CONTEXT_LOST: 'webgl-context-lost',",
+            ],
+            "SCENE_FAILURE must contain exactly the eight bounded codes"
+        );
+        for code in [
+            "worker-unsupported",
+            "offscreen-unsupported",
+            "worker-load",
+            "worker-message",
+            "canvas-transfer",
+            "invalid-ready",
+            "worker-runtime",
+            "webgl-context-lost",
+        ] {
+            assert!(
+                scene_module.contains(code),
+                "missing bounded failure code {code}"
+            );
+            assert_eq!(
+                scene_module.matches(&format!("'{code}'")).count(),
+                1,
+                "failure code literal must have one canonical owner: {code}"
+            );
+        }
+        for marker in [
+            "const SCENE_FAILURE = Object.freeze({",
+            "const ALLOWED_SCENE_FAILURES = new Set(Object.values(SCENE_FAILURE))",
+            "activateWorkerFallback(reason = SCENE_FAILURE.WORKER_RUNTIME)",
+            "activateFallback(shell, canvas, reason)",
+            "function handleWorkerMessage(event) {\n        if (workerFailed) return;",
+            "const normalizedReason = ALLOWED_SCENE_FAILURES.has(reason)",
+            "targetCanvas.dataset.sceneFailure = normalizedReason",
+            "delete canvas.dataset.sceneFailure",
+            "worker.postMessage(message, transfer || []);\n        } catch {\n            activateWorkerFallback(SCENE_FAILURE.WORKER_MESSAGE);",
+            "message.nonblank !== true || message.pixelStatus !== 'nonblank'",
+            "activateWorkerFallback(SCENE_FAILURE.INVALID_READY);",
+            "message.reason === 'webgl context lost'\n                        ? SCENE_FAILURE.WEBGL_CONTEXT_LOST\n                        : SCENE_FAILURE.WORKER_RUNTIME",
+            "if (typeof Worker !== 'function') {\n        activateWorkerFallback(SCENE_FAILURE.WORKER_UNSUPPORTED);",
+            "typeof OffscreenCanvas !== 'function' ||\n        typeof canvas.transferControlToOffscreen !== 'function'\n    ) {\n        activateWorkerFallback(SCENE_FAILURE.OFFSCREEN_UNSUPPORTED);",
+            "worker = new Worker('/static/home-scene-worker.js', { type: 'module' });\n    } catch {\n        activateWorkerFallback(SCENE_FAILURE.WORKER_LOAD);",
+            "addEventListener('error', () => activateWorkerFallback(SCENE_FAILURE.WORKER_LOAD))",
+            "addEventListener('messageerror', () =>\n        activateWorkerFallback(SCENE_FAILURE.WORKER_MESSAGE)",
+            "offscreenCanvas = canvas.transferControlToOffscreen();\n    } catch {\n        activateWorkerFallback(SCENE_FAILURE.CANVAS_TRANSFER);",
+            "if (!shell || !hero) {\n        activateWorkerFallback(SCENE_FAILURE.WORKER_RUNTIME);",
+        ] {
+            assert!(
+                scene_module.contains(marker),
+                "missing fallback diagnostic marker {marker}"
+            );
+        }
+        assert_eq!(scene_module.matches("dataset.sceneFailure =").count(), 1);
+        assert!(!scene_module.contains("sceneFailure = message"));
+        assert!(!scene_module.contains("error.message"));
+        assert!(!scene_module.contains("error.stack"));
+
+        let fallback_contract = format!("{home_html}\n{fallback_css}\n{scene_module}");
+        for forbidden in [
+            "CanvasRenderingContext2D",
+            "getContext('2d')",
+            "getContext(\"2d\")",
+            "requestAnimationFrame",
+            "fetch(",
+        ] {
+            assert!(
+                !fallback_contract.contains(forbidden),
+                "fallback contract must not contain {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn homepage_scene_failure_is_terminal_in_executed_bridge() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let scene_module = root.join("static/home-scene.js");
+        let harness = r#"
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+
+const scenePath = process.argv[1];
+const source = fs.readFileSync(scenePath, 'utf8');
+const state = { worker: null };
+
+class ClassList {
+    constructor() {
+        this.values = new Set();
+    }
+
+    add(value) {
+        this.values.add(value);
+    }
+
+    remove(value) {
+        this.values.delete(value);
+    }
+
+    contains(value) {
+        return this.values.has(value);
+    }
+}
+
+class MockWorker {
+    constructor() {
+        this.listeners = {};
+        this.terminated = false;
+        state.worker = this;
+    }
+
+    addEventListener(type, listener) {
+        this.listeners[type] = listener;
+    }
+
+    postMessage() {}
+
+    terminate() {
+        this.terminated = true;
+    }
+}
+
+class MockObserver {
+    observe() {}
+}
+
+const shell = {
+    classList: new ClassList(),
+    clientWidth: 1200,
+    clientHeight: 700,
+};
+const hero = { addEventListener() {} };
+const inspector = { textContent: 'idle' };
+const canvas = {
+    dataset: {},
+    closest(selector) {
+        if (selector === '.scene-shell') return shell;
+        if (selector === '.observatory-hero') return hero;
+        return null;
+    },
+    getBoundingClientRect() {
+        return { left: 0, top: 0, width: 1200, height: 700 };
+    },
+    transferControlToOffscreen() {
+        return {};
+    },
+};
+const document = {
+    hidden: false,
+    querySelector(selector) {
+        if (selector === '[data-observatory-scene]') return canvas;
+        if (selector === '.scene-inspector span:last-child') return inspector;
+        return null;
+    },
+    querySelectorAll(selector) {
+        if (selector === '.scene-source-data [data-source]') {
+            return [{ dataset: { source: 'leetcode' } }];
+        }
+        return [];
+    },
+    addEventListener() {},
+};
+const window = {
+    devicePixelRatio: 1,
+    matchMedia() {
+        return { matches: false };
+    },
+};
+
+vm.runInNewContext(source, {
+    document,
+    window,
+    Worker: MockWorker,
+    OffscreenCanvas: function OffscreenCanvas() {},
+    IntersectionObserver: MockObserver,
+    ResizeObserver: MockObserver,
+});
+
+assert.ok(state.worker, 'scene bridge should create a worker');
+const dispatch = (data) => state.worker.listeners.message({ data });
+dispatch({ type: 'failure', reason: 'webgl initialization failed' });
+
+assert.equal(state.worker.terminated, true);
+assert.equal(canvas.dataset.sceneStatus, 'fallback');
+assert.equal(canvas.dataset.sceneNonblank, 'false');
+assert.equal(canvas.dataset.sceneFailure, 'worker-runtime');
+assert.equal(shell.classList.contains('is-webgl-fallback'), true);
+assert.equal(shell.classList.contains('is-ready'), false);
+
+const terminalDataset = { ...canvas.dataset };
+dispatch({ type: 'ready', nonblank: true, pixelStatus: 'nonblank', frameCount: 7 });
+dispatch({ type: 'frame', frameCount: 8 });
+dispatch({
+    type: 'selection',
+    identity: 'queued-selection',
+    metadata: {
+        source: 'leetcode',
+        problemTitle: 'Queued',
+        algorithm: 'graph',
+        similarity: 99,
+        accessPath: '/queued',
+    },
+});
+
+assert.deepEqual(canvas.dataset, terminalDataset);
+assert.equal(canvas.dataset.sceneStatus, 'fallback');
+assert.equal(canvas.dataset.sceneNonblank, 'false');
+assert.equal(canvas.dataset.sceneFailure, 'worker-runtime');
+assert.equal(shell.classList.contains('is-ready'), false);
+"#;
+
+        let output = std::process::Command::new("node")
+            .arg("-e")
+            .arg(harness)
+            .arg(&scene_module)
+            .output()
+            .expect("node should execute the homepage scene lifecycle harness");
+
+        assert!(
+            output.status.success(),
+            "homepage scene lifecycle harness failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[test]
     fn homepage_scene_vendor_is_self_contained_and_retires_full_distribution() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let worker_module = std::fs::read_to_string(root.join("static/home-scene-worker.js"))

@@ -34,12 +34,192 @@
 .scene-fallback {
     position: absolute;
     inset: 0;
+    pointer-events: none;
     background-image:
         linear-gradient(120deg, transparent 0 65%, rgba(83, 224, 232, 0.06) 65% 65.2%, transparent 65.2%),
         linear-gradient(32deg, transparent 0 72%, rgba(255, 106, 85, 0.05) 72% 72.2%, transparent 72.2%);
 }
 
+.fallback-scene {
+    display: block;
+    width: 100%;
+    height: 100%;
+    opacity: 1;
+    transition: opacity 400ms ease;
+}
+
+.scene-shell.is-ready .fallback-scene {
+    opacity: 0;
+}
+
+.scene-shell.is-webgl-fallback .fallback-scene {
+    opacity: 1;
+}
+
+.fallback-network,
+.fallback-core,
+.fallback-hub,
+.fallback-nodes,
+.fallback-pulses {
+    transform-box: fill-box;
+    transform-origin: center;
+}
+
+.fallback-edge,
+.fallback-route,
+.fallback-pulse,
+.fallback-orbit,
+.fallback-core-face,
+.fallback-core-wire,
+.fallback-hub-ring {
+    fill: none;
+    vector-effect: non-scaling-stroke;
+}
+
+.fallback-edge {
+    stroke: rgba(83, 224, 232, 0.18);
+    stroke-width: 1;
+}
+
+.fallback-edge-global {
+    stroke: rgba(243, 241, 234, 0.16);
+}
+
+.fallback-route {
+    stroke: rgba(243, 241, 234, 0.22);
+    stroke-width: 1.2;
+}
+
+.fallback-core {
+    animation: fallback-core-drift 18s ease-in-out infinite alternate;
+    animation-play-state: paused;
+}
+
+.fallback-orbit {
+    stroke: rgba(83, 224, 232, 0.34);
+    stroke-width: 1;
+}
+
+.fallback-orbit-b {
+    stroke: rgba(255, 106, 85, 0.25);
+}
+
+.fallback-core-face {
+    fill: rgba(83, 224, 232, 0.035);
+    stroke: rgba(83, 224, 232, 0.72);
+    stroke-width: 1.4;
+}
+
+.fallback-core-wire {
+    stroke: rgba(243, 241, 234, 0.42);
+    stroke-width: 1;
+}
+
+.fallback-core-center {
+    fill: var(--paper);
+    opacity: 0.88;
+}
+
+.fallback-hub {
+    animation: fallback-hub-breathe 7s ease-in-out infinite;
+    animation-delay: var(--fallback-delay);
+    animation-play-state: paused;
+}
+
+.fallback-hub-ring {
+    stroke: currentColor;
+    stroke-width: 1.2;
+    opacity: 0.72;
+}
+
+.fallback-hub-ring-inner {
+    stroke-width: 0.8;
+    opacity: 0.36;
+}
+
+.fallback-hub-center,
+.fallback-node {
+    fill: currentColor;
+}
+
+.fallback-hub-cyan,
+.fallback-node-cyan {
+    color: var(--cyan);
+}
+
+.fallback-hub-coral,
+.fallback-node-coral {
+    color: var(--coral);
+}
+
+.fallback-hub-lime,
+.fallback-node-lime {
+    color: var(--lime);
+}
+
+.fallback-hub-paper,
+.fallback-node-paper {
+    color: var(--paper);
+}
+
+.fallback-hub-blue,
+.fallback-node-blue {
+    color: #7aa7ff;
+}
+
+.fallback-node {
+    opacity: 0.66;
+}
+
+.fallback-pulse {
+    fill: none;
+    stroke: var(--paper);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-dasharray: 8 92;
+    stroke-dashoffset: 0;
+    vector-effect: non-scaling-stroke;
+    animation: fallback-route-pulse var(--fallback-duration) linear infinite;
+    animation-delay: var(--fallback-delay);
+    animation-play-state: paused;
+}
+
+.scene-shell.is-webgl-fallback .fallback-core,
+.scene-shell.is-webgl-fallback .fallback-hub,
+.scene-shell.is-webgl-fallback .fallback-pulse {
+    animation-play-state: running;
+}
+
+@keyframes fallback-core-drift {
+    from {
+        transform: translate(-5px, 2px) rotate(-2deg);
+    }
+    to {
+        transform: translate(6px, -3px) rotate(2deg);
+    }
+}
+
+@keyframes fallback-hub-breathe {
+    0%,
+    100% {
+        opacity: 0.62;
+        transform: scale(0.97);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.03);
+    }
+}
+
+@keyframes fallback-route-pulse {
+    to {
+        stroke-dashoffset: -200;
+    }
+}
+
 .scene-canvas {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     opacity: 0;
@@ -657,7 +837,18 @@
 
 @media (prefers-reduced-motion: reduce) {
     .scene-canvas,
+    .fallback-scene,
     .command {
         transition: none;
+    }
+
+    .fallback-network,
+    .fallback-core,
+    .fallback-hub,
+    .fallback-nodes,
+    .fallback-node,
+    .fallback-pulses,
+    .fallback-pulse {
+        animation: none;
     }
 }

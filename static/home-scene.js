@@ -1,6 +1,17 @@
 const MOBILE_QUERY = '(max-width: 760px)';
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 const INTERACTIVE_SELECTOR = 'a, button, input, label, select, textarea, summary';
+const SCENE_FAILURE = Object.freeze({
+    WORKER_UNSUPPORTED: 'worker-unsupported',
+    OFFSCREEN_UNSUPPORTED: 'offscreen-unsupported',
+    WORKER_LOAD: 'worker-load',
+    WORKER_MESSAGE: 'worker-message',
+    CANVAS_TRANSFER: 'canvas-transfer',
+    INVALID_READY: 'invalid-ready',
+    WORKER_RUNTIME: 'worker-runtime',
+    WEBGL_CONTEXT_LOST: 'webgl-context-lost',
+});
+const ALLOWED_SCENE_FAILURES = new Set(Object.values(SCENE_FAILURE));
 
 const canvas = document.querySelector('[data-observatory-scene]');
 const sourceElements = Array.from(document.querySelectorAll('.scene-source-data [data-source]'));
@@ -28,22 +39,22 @@ function initializeScene() {
     let pointerInside = false;
     let heroVisible = true;
 
-    function activateWorkerFallback() {
+    function activateWorkerFallback(reason = SCENE_FAILURE.WORKER_RUNTIME) {
         if (workerFailed) return;
         workerFailed = true;
         resetInteractionState();
         if (worker) worker.terminate();
         worker = null;
         if (shell) shell.classList.remove('is-ready');
-        activateFallback(shell, canvas);
+        activateFallback(shell, canvas, reason);
     }
 
     function post(message, transfer) {
         if (!worker || workerFailed) return;
         try {
             worker.postMessage(message, transfer || []);
-        } catch (error) {
-            activateWorkerFallback();
+        } catch {
+            activateWorkerFallback(SCENE_FAILURE.WORKER_MESSAGE);
         }
     }
 
@@ -86,17 +97,19 @@ function initializeScene() {
     }
 
     function handleWorkerMessage(event) {
+        if (workerFailed) return;
         const message = event.data || {};
         switch (message.type) {
             case 'ready':
                 if (message.nonblank !== true || message.pixelStatus !== 'nonblank') {
-                    activateWorkerFallback();
+                    activateWorkerFallback(SCENE_FAILURE.INVALID_READY);
                     break;
                 }
                 shell.classList.add('is-ready');
                 canvas.dataset.sceneStatus = 'ready';
                 canvas.dataset.sceneNonblank = 'true';
                 canvas.dataset.frameCount = String(message.frameCount);
+                delete canvas.dataset.sceneFailure;
                 break;
             case 'frame':
                 canvas.dataset.frameCount = String(message.frameCount);
@@ -109,7 +122,11 @@ function initializeScene() {
                 handleSelection(message.metadata, message.identity);
                 break;
             case 'failure':
-                activateWorkerFallback();
+                activateWorkerFallback(
+                    message.reason === 'webgl context lost'
+                        ? SCENE_FAILURE.WEBGL_CONTEXT_LOST
+                        : SCENE_FAILURE.WORKER_RUNTIME
+                );
                 break;
             default:
                 break;
@@ -167,44 +184,63 @@ function initializeScene() {
         post({ type: 'rendering', visible: heroVisible, hidden: document.hidden });
     }
 
+    if (!shell || !hero) {
+        activateWorkerFallback(SCENE_FAILURE.WORKER_RUNTIME);
+        return;
+    }
+
+    if (typeof Worker !== 'function') {
+        activateWorkerFallback(SCENE_FAILURE.WORKER_UNSUPPORTED);
+        return;
+    }
+
     if (
-        typeof Worker !== 'function' ||
-        typeof canvas.transferControlToOffscreen !== 'function' ||
-        !shell ||
-        !hero
+        typeof OffscreenCanvas !== 'function' ||
+        typeof canvas.transferControlToOffscreen !== 'function'
     ) {
-        activateWorkerFallback();
+        activateWorkerFallback(SCENE_FAILURE.OFFSCREEN_UNSUPPORTED);
         return;
     }
 
     try {
         worker = new Worker('/static/home-scene-worker.js', { type: 'module' });
-        worker.addEventListener('message', handleWorkerMessage);
-        worker.addEventListener('error', activateWorkerFallback);
-        worker.addEventListener('messageerror', activateWorkerFallback);
-        const offscreenCanvas = canvas.transferControlToOffscreen();
-        const mobile = window.matchMedia(MOBILE_QUERY).matches;
-        const reducedMotion = window.matchMedia(REDUCED_MOTION_QUERY).matches;
-        canvas.dataset.sceneStatus = 'initializing';
-        post(
-            {
-                type: 'init',
-                canvas: offscreenCanvas,
-                sourceNames: sourceElements.map((element) => element.dataset.source),
-                width: Math.max(1, shell.clientWidth),
-                height: Math.max(1, shell.clientHeight),
-                pixelRatio: window.devicePixelRatio || 1,
-                mobile,
-                reducedMotion,
-                visible: heroVisible,
-                hidden: document.hidden,
-            },
-            [offscreenCanvas]
-        );
-    } catch (error) {
-        activateWorkerFallback();
+    } catch {
+        activateWorkerFallback(SCENE_FAILURE.WORKER_LOAD);
         return;
     }
+
+    worker.addEventListener('message', handleWorkerMessage);
+    worker.addEventListener('error', () => activateWorkerFallback(SCENE_FAILURE.WORKER_LOAD));
+    worker.addEventListener('messageerror', () =>
+        activateWorkerFallback(SCENE_FAILURE.WORKER_MESSAGE)
+    );
+
+    let offscreenCanvas;
+    try {
+        offscreenCanvas = canvas.transferControlToOffscreen();
+    } catch {
+        activateWorkerFallback(SCENE_FAILURE.CANVAS_TRANSFER);
+        return;
+    }
+
+    const mobile = window.matchMedia(MOBILE_QUERY).matches;
+    const reducedMotion = window.matchMedia(REDUCED_MOTION_QUERY).matches;
+    canvas.dataset.sceneStatus = 'initializing';
+    post(
+        {
+            type: 'init',
+            canvas: offscreenCanvas,
+            sourceNames: sourceElements.map((element) => element.dataset.source),
+            width: Math.max(1, shell.clientWidth),
+            height: Math.max(1, shell.clientHeight),
+            pixelRatio: window.devicePixelRatio || 1,
+            mobile,
+            reducedMotion,
+            visible: heroVisible,
+            hidden: document.hidden,
+        },
+        [offscreenCanvas]
+    );
 
     const intersectionObserver = new IntersectionObserver(
         ([entry]) => {
@@ -238,8 +274,12 @@ function updateInspectorText(inspector, metadata) {
     inspector.textContent = `${metadata.source} · ${metadata.problemTitle} · ${metadata.algorithm} · ${metadata.similarity}% ${similarity} (${illustrative})`;
 }
 
-function activateFallback(shell, targetCanvas) {
+function activateFallback(shell, targetCanvas, reason) {
     if (shell) shell.classList.add('is-webgl-fallback');
+    const normalizedReason = ALLOWED_SCENE_FAILURES.has(reason)
+        ? reason
+        : SCENE_FAILURE.WORKER_RUNTIME;
     targetCanvas.dataset.sceneStatus = 'fallback';
     targetCanvas.dataset.sceneNonblank = 'false';
+    targetCanvas.dataset.sceneFailure = normalizedReason;
 }
