@@ -862,6 +862,7 @@ mod tests {
             "if (reducedMotion) return",
             "problemMetadata",
             "raycaster.params.Points.threshold",
+            "raycaster.layers.enable(INTERACTION_LAYER)",
             "intersection.index",
             "selectedTarget",
             "MAX_CONTROLLED_PULSES",
@@ -870,6 +871,7 @@ mod tests {
             "refreshHoveredTarget",
             "if (!forceStatic && pointerInside) refreshHoveredTarget()",
             "pulseHitTarget",
+            "pulseHitTarget.layers.set(INTERACTION_LAYER)",
             "intersectObjects(raycastTargets, false, intersections)",
         ] {
             assert!(

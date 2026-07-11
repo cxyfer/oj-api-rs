@@ -5,6 +5,7 @@ const MAX_MOBILE_DPR = 1.25;
 const DESKTOP_NODE_COUNT = 110;
 const MOBILE_NODE_COUNT = 48;
 const MAX_CONTROLLED_PULSES = 4;
+const INTERACTION_LAYER = 1;
 const FRAME_REPORT_INTERVAL_MS = 250;
 const TAU = Math.PI * 2;
 const palette = [0x53e0e8, 0xff6a55, 0xc7f45b, 0xf3f1ea, 0x6fa7ff];
@@ -83,6 +84,7 @@ function createSceneRuntime(options) {
     const network = new THREE.Group();
     const raycaster = new THREE.Raycaster();
     raycaster.params.Points.threshold = isMobile ? 0.16 : 0.12;
+    raycaster.layers.enable(INTERACTION_LAYER);
     const pointer = new THREE.Vector2(2, 2);
     const pointerTarget = new THREE.Vector2(0, 0);
     const lastPointerCoordinates = new THREE.Vector2(2, 2);
@@ -456,6 +458,7 @@ function createControlledPulses(anchorPositions, anchorMeshes, isMobile) {
                 depthWrite: false,
             })
         );
+        pulseHitTarget.layers.set(INTERACTION_LAYER);
         const source = anchorMeshes[index].userData.interactionTarget.metadata.source;
         const metadata = { accessPath: accessPathLabels[index], source };
         pulseHitTarget.userData.interactionTarget = {
