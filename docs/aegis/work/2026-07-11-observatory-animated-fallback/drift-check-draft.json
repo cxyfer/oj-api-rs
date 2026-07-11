@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-07-11-observatory-animated-fallback",
+  "taskIntentRef": "docs/aegis/work/2026-07-11-observatory-animated-fallback/task-intent-draft.json",
+  "baselineRefs": [
+    "docs/aegis/specs/2026-07-11-observatory-animated-fallback-brief.md",
+    "docs/aegis/specs/2026-07-10-algorithmic-observatory-design.md",
+    "docs/aegis/adr/ADR-0001-homepage-threejs-worker-boundary.md",
+    "docs/aegis/baseline/2026-07-10-initial-baseline.md"
+  ],
+  "scopeStatus": "not-yet-verified",
+  "compatStatus": "not-yet-verified",
+  "retirementStatus": "not-yet-verified",
+  "newRiskSignals": [
+    "Fallback animation could accidentally run behind the successful scene, add main-thread paint pressure, obscure mobile copy, or create a duplicate renderer owner."
+  ],
+  "decision": "needs-baseline-readback"
+}

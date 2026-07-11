@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-07-11-observatory-animated-fallback",
+  "lastCheckpointRef": "docs/aegis/work/2026-07-11-observatory-animated-fallback/todo-checkpoint-draft.json",
+  "resumeInstruction": "Resume from Task 1 dispatch; do not modify the successful Worker renderer or add Canvas 2D.",
+  "knownPartialWork": [
+    "Approved spec converted into an executable plan with readiness, review, and browser gates."
+  ],
+  "mustReadBeforeContinuing": [
+    "docs/aegis/work/2026-07-11-observatory-animated-fallback/10-intent.md",
+    "docs/aegis/work/2026-07-11-observatory-animated-fallback/20-checkpoint.md",
+    "docs/aegis/work/2026-07-11-observatory-animated-fallback/todo-checkpoint-draft.json"
+  ],
+  "unsafeToAssume": [
+    "The fallback may use a JavaScript renderer or that animation can run while the Worker scene is ready."
+  ]
+}

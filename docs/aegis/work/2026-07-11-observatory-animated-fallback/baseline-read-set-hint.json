@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "candidateDocs": [
+    "docs/aegis/specs/2026-07-11-observatory-animated-fallback-brief.md",
+    "docs/aegis/specs/2026-07-10-algorithmic-observatory-design.md",
+    "docs/aegis/adr/ADR-0001-homepage-threejs-worker-boundary.md",
+    "docs/aegis/baseline/2026-07-10-initial-baseline.md"
+  ],
+  "whyRelevant": "These records fix the approved visual behavior, Worker-only Three.js owner, compatibility boundary, and performance budget.",
+  "missingAuthority": []
+}

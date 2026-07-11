@@ -27,3 +27,15 @@ Entries are workspace records, not authoritative runtime decisions.
 | 2026-07-11 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/gate-input-pack.json | 2026-07-10-algorithmic-observatory gate input pack |
 | 2026-07-11 | work | docs/aegis/work/2026-07-10-algorithmic-observatory/proof-bundle.md | 2026-07-10-algorithmic-observatory proof bundle |
 | 2026-07-11 | spec | docs/aegis/specs/2026-07-11-observatory-animated-fallback-brief.md | Observatory Animated Fallback Spec Brief |
+| 2026-07-11 | work | docs/aegis/work/2026-07-11-observatory-animated-fallback/10-intent.md | Observatory Animated Fallback intent |
+| 2026-07-11 | work | docs/aegis/work/2026-07-11-observatory-animated-fallback/20-checkpoint.md | Observatory Animated Fallback checkpoint |
+| 2026-07-11 | work | docs/aegis/work/2026-07-11-observatory-animated-fallback/90-evidence.md | Observatory Animated Fallback evidence |
+| 2026-07-11 | work | docs/aegis/work/2026-07-11-observatory-animated-fallback/99-reflection.md | Observatory Animated Fallback reflection |
+| 2026-07-11 | artifact | docs/aegis/work/2026-07-11-observatory-animated-fallback/task-intent-draft.json | Observatory Animated Fallback task intent draft |
+| 2026-07-11 | artifact | docs/aegis/work/2026-07-11-observatory-animated-fallback/baseline-read-set-hint.json | Observatory Animated Fallback baseline read-set hint |
+| 2026-07-11 | artifact | docs/aegis/work/2026-07-11-observatory-animated-fallback/baseline-usage-draft.json | Observatory Animated Fallback baseline usage draft |
+| 2026-07-11 | artifact | docs/aegis/work/2026-07-11-observatory-animated-fallback/impact-statement-draft.json | Observatory Animated Fallback impact statement draft |
+| 2026-07-11 | artifact | docs/aegis/work/2026-07-11-observatory-animated-fallback/todo-checkpoint-draft.json | Observatory Animated Fallback todo checkpoint draft |
+| 2026-07-11 | artifact | docs/aegis/work/2026-07-11-observatory-animated-fallback/drift-check-draft.json | Observatory Animated Fallback drift check draft |
+| 2026-07-11 | plan | docs/aegis/plans/2026-07-11-observatory-animated-fallback.md | Observatory Animated Fallback Implementation Plan |
+| 2026-07-11 | artifact | docs/aegis/work/2026-07-11-observatory-animated-fallback/resume-state-hint.json | 2026-07-11-observatory-animated-fallback resume state hint |

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "affectedLayers": [
+    "homepage template and presentation",
+    "scene lifecycle diagnostic contract"
+  ],
+  "owners": [
+    "templates/home.html and static/home.css own declarative fallback; static/home-scene.js only activates it and records bounded failure codes."
+  ],
+  "invariants": [
+    "Three.js remains Worker-only; fallback has no JS render loop, interaction, network request, or second data registry."
+  ],
+  "compatBoundary": "Routes, registry, locales, MCP, Scalar, auth, successful Worker scene, inspector behavior, and reduced-motion semantics remain unchanged.",
+  "nonGoals": [
+    "No Canvas 2D, main-thread Three.js, new dependency, live problem data, hover/click fallback, or API/database work."
+  ]
+}
