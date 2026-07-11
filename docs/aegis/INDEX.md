@@ -26,3 +26,4 @@ Entries are workspace records, not authoritative runtime decisions.
 | 2026-07-11 | adr | docs/aegis/adr/ADR-0001-homepage-threejs-worker-boundary.md | ADR-0001 - Keep the homepage Three.js runtime in a module Worker |
 | 2026-07-11 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/gate-input-pack.json | 2026-07-10-algorithmic-observatory gate input pack |
 | 2026-07-11 | work | docs/aegis/work/2026-07-10-algorithmic-observatory/proof-bundle.md | 2026-07-10-algorithmic-observatory proof bundle |
+| 2026-07-11 | spec | docs/aegis/specs/2026-07-11-observatory-animated-fallback-brief.md | Observatory Animated Fallback Spec Brief |
