@@ -782,7 +782,9 @@ class LuoguClient(BaseCrawler):
         samples = problem.get("samples", [])
         return self._compose_content_markdown(content, samples)
 
-    async def fetch_single_problem(self, problem_id: str) -> bool:
+    async def fetch_single_problem(
+        self, problem_id: str, *, prefer_source_details: bool = False
+    ) -> bool:
         normalized_id = self.parse_problem_id(problem_id)
         if not normalized_id:
             logger.error("Invalid Luogu problem id: %s", problem_id)
@@ -815,7 +817,10 @@ class LuoguClient(BaseCrawler):
             )
         if not mapped.get("content"):
             return False
-        return self.problems_db.update_problem(mapped)
+        update_kwargs = {}
+        if prefer_source_details:
+            update_kwargs["prefer_incoming_fields"] = ("title", "content")
+        return self.problems_db.update_problem(mapped, **update_kwargs)
 
     async def sync_content(self, source: str = "luogu") -> None:
         missing = self.problems_db.get_problem_ids_missing_content(source=source)

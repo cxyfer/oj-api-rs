@@ -427,14 +427,31 @@ class CodeforcesClient(BaseCrawler):
         text = "\n".join(lines)
         return normalize_newlines(text).strip()
 
-    def _extract_problem_statement(self, html: str) -> Optional[str]:
+    def _extract_problem_detail(self, html: str) -> Optional[dict[str, str]]:
         soup = BeautifulSoup(html, "html.parser")
         statement = soup.select_one("div.problem-statement")
         if not statement:
             return None
-        return self._clean_problem_markdown(
+        title_element = statement.select_one(".header .title")
+        title = title_element.get_text(" ", strip=True) if title_element else ""
+        content = self._clean_problem_markdown(
             str(statement), base_url="https://codeforces.com"
         )
+        if not content:
+            return None
+        return {"title": title, "content": content}
+
+    def _extract_problem_statement(self, html: str) -> Optional[str]:
+        detail = self._extract_problem_detail(html)
+        return detail["content"] if detail else None
+
+    @staticmethod
+    def _normalize_problem_title(title: str, problem_index: str) -> str:
+        normalized = str(title or "").strip()
+        index = str(problem_index or "").strip()
+        if not normalized or not index:
+            return normalized
+        return re.sub(rf"^{re.escape(index)}\s*\.\s*", "", normalized, count=1).strip()
 
     async def fetch_problem_content(
         self, session: AsyncSession, contest_id: int, index: str
@@ -453,39 +470,75 @@ class CodeforcesClient(BaseCrawler):
     async def fetch_content_by_url(
         self, session: AsyncSession, url: str
     ) -> Optional[str]:
+        detail = await self.fetch_detail_by_url(session, url)
+        return detail["content"] if detail else None
+
+    async def fetch_detail_by_url(
+        self, session: AsyncSession, url: str
+    ) -> Optional[dict[str, str]]:
         separator = "&" if "?" in url else "?"
         html = await self._fetch_text(
             session, f"{url}{separator}locale=en", referer=url
         )
         if not html:
             return None
-        if "/enter" in html.lower():
-            logger.warning("Login required while fetching %s", url)
-            return None
-        content = self._extract_problem_statement(html)
-        if not content:
+        detail = self._extract_problem_detail(html)
+        if not detail:
             logger.warning("Problem statement missing for %s", url)
-        return content
+        return detail
 
-    async def fetch_single_problem(self, problem_id: str) -> bool:
-        parsed = self.parse_problem_id(problem_id)
+    async def fetch_single_problem(
+        self,
+        problem_id: str,
+        *,
+        stored_problem_id: Optional[str] = None,
+        prefer_source_details: bool = False,
+    ) -> bool:
+        normalized_problem_id = problem_id.strip()
+        if normalized_problem_id.upper().startswith("GYM"):
+            logger.error("Invalid Codeforces problem id: %s", problem_id)
+            return False
+
+        parsed = self.parse_problem_id(normalized_problem_id)
         if not parsed:
             logger.error("Invalid Codeforces problem id: %s", problem_id)
             return False
         contest_id, index, _ = parsed
+        if stored_problem_id is None:
+            storage_id = f"{contest_id}{index}"
+            contest = str(contest_id)
+            link = self.problem_url_for_id(storage_id)
+        else:
+            normalized_stored_id = stored_problem_id.strip()
+            if not normalized_stored_id.upper().startswith("GYM"):
+                logger.error(
+                    "Invalid stored Codeforces problem id: %s", stored_problem_id
+                )
+                return False
+            stored_parsed = self.parse_problem_id(normalized_stored_id[3:])
+            if not stored_parsed or stored_parsed[:2] != (contest_id, index):
+                logger.error(
+                    "Stored Codeforces problem id does not match %s: %s",
+                    problem_id,
+                    stored_problem_id,
+                )
+                return False
+            storage_id = f"GYM{contest_id}{index}"
+            contest = f"GYM{contest_id}"
+            link = f"https://codeforces.com/gym/{contest_id}/problem/{index}"
         problem = {
-            "id": f"{contest_id}{index}",
+            "id": storage_id,
             "source": "codeforces",
-            "slug": f"{contest_id}{index}",
-            "title": f"{contest_id}{index}",
+            "slug": storage_id,
+            "title": storage_id,
             "title_cn": "",
             "difficulty": None,
             "ac_rate": None,
             "rating": None,
-            "contest": str(contest_id),
+            "contest": contest,
             "problem_index": index,
             "tags": [],
-            "link": self.problem_url_for_id(f"{contest_id}{index}"),
+            "link": link,
             "category": "Algorithms",
             "paid_only": 0,
             "content": None,
@@ -493,11 +546,36 @@ class CodeforcesClient(BaseCrawler):
             "similar_questions": None,
         }
         async with self._create_curl_session(impersonate="chrome124") as session:
-            content = await self.fetch_content_by_url(session, problem["link"])
-        if not content:
+            detail = await self.fetch_detail_by_url(session, problem["link"])
+            contest_problems = await self.fetch_contest_problems(contest_id, session)
+        if not detail:
             return False
-        problem["content"] = content
-        return self.problems_db.update_problem(problem)
+        metadata = next(
+            (
+                candidate
+                for candidate in contest_problems
+                if candidate.get("problem_index") == index
+            ),
+            None,
+        )
+        preferred_fields = ["content"]
+        normalized_title = self._normalize_problem_title(
+            detail.get("title", ""), problem["problem_index"]
+        )
+        if normalized_title:
+            problem["title"] = normalized_title
+            preferred_fields.append("title")
+        elif prefer_source_details:
+            problem["title"] = None
+        problem["content"] = detail["content"]
+        if metadata and metadata.get("tags"):
+            problem["tags"] = metadata["tags"]
+            if prefer_source_details:
+                preferred_fields.append("tags")
+        update_kwargs = {}
+        if prefer_source_details:
+            update_kwargs["prefer_incoming_fields"] = preferred_fields
+        return self.problems_db.update_problem(problem, **update_kwargs)
 
     async def fetch_single_contest(self, contest_id: int) -> int:
         async with self._create_curl_session(impersonate="chrome124") as session:

@@ -56,12 +56,22 @@ def _normalize_similar_questions(values):
     return normalized
 
 
+def _has_non_empty_value(value):
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, set, dict)):
+        return bool(value)
+    return True
+
+
 def _prefer_non_empty(new_value, existing_value):
+    if _has_non_empty_value(new_value):
+        return new_value
     if isinstance(new_value, list):
-        return new_value if new_value else (existing_value or [])
-    if new_value in (None, ""):
-        return existing_value
-    return new_value
+        return existing_value or []
+    return existing_value
 
 
 class SettingsDatabaseManager:
@@ -554,7 +564,7 @@ class ProblemsDatabaseManager:
         finally:
             conn.close()
 
-    def update_problem(self, problem, force_update=False):
+    def update_problem(self, problem, force_update=False, prefer_incoming_fields=None):
         """
         Insert or update single problem data.
 
@@ -562,6 +572,9 @@ class ProblemsDatabaseManager:
             problem (dict): problem data, must contain id or slug field for identification
             force_update (bool, optional): force update all fields. If False, empty values will not overwrite
                                        existing data. Default is False.
+            prefer_incoming_fields (iterable, optional): non-empty incoming fields
+                                      that should replace existing values while
+                                      preserving the default merge for other fields.
 
         Returns:
             bool: True if update succeeded, False otherwise
@@ -582,6 +595,7 @@ class ProblemsDatabaseManager:
         problem["similar_questions"] = _normalize_similar_questions(
             problem.get("similar_questions")
         )
+        preferred_fields = set(prefer_incoming_fields or ())
 
         # If not force update, get existing data and merge
         if not force_update:
@@ -590,8 +604,13 @@ class ProblemsDatabaseManager:
                 for key in existing_problem:
                     if key == "id":
                         continue
+                    incoming_value = problem.get(key)
+                    if key in preferred_fields and _has_non_empty_value(
+                        incoming_value
+                    ):
+                        continue
                     problem[key] = _prefer_non_empty(
-                        problem.get(key), existing_problem.get(key)
+                        incoming_value, existing_problem.get(key)
                     )
 
                 problem["tags"] = _normalize_json_string_list(problem.get("tags"))
@@ -672,6 +691,30 @@ class ProblemsDatabaseManager:
             )
             return problem
         return None
+
+    def get_numeric_problem_id_by_slug(self, source, slug):
+        normalized_source = str(source or "").strip()
+        normalized_slug = str(slug or "").strip()
+        if not normalized_source or not normalized_slug:
+            return None
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT id FROM problems WHERE source = ? AND slug = ?",
+                (normalized_source, normalized_slug),
+            )
+            numeric_ids = [
+                problem_id
+                for (raw_problem_id,) in cursor.fetchall()
+                if (problem_id := str(raw_problem_id or "").strip()).isdigit()
+            ]
+            if not numeric_ids:
+                return None
+            return min(numeric_ids, key=lambda value: (int(value), len(value), value))
+        finally:
+            conn.close()
 
     def get_problem_contents(self, source: str) -> list[tuple[str, str]]:
         """Get (id, content) pairs for problems with content."""

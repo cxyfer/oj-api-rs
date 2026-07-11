@@ -160,6 +160,10 @@ class LeetCodeClient(BaseCrawler):
             return str(int(normalized))
         return normalized
 
+    @staticmethod
+    def _is_missing_text(value):
+        return value is None or (isinstance(value, str) and not value.strip())
+
     async def _fetch_problemset_ratings(self):
         try:
             ratings = await self.fetch_ratings()
@@ -477,13 +481,17 @@ class LeetCodeClient(BaseCrawler):
                     )
                     return None
 
-    async def get_problem(self, problem_id=None, slug=None, domain=None):
+    async def get_problem(
+        self, problem_id=None, slug=None, domain=None, prefer_source_details=False
+    ):
         """
         Fetch problem information by ID or slug
 
         Args:
             problem_id (str): LeetCode problem ID
             slug (str): LeetCode problem slug
+            domain (str): LeetCode domain to use for detail retrieval
+            prefer_source_details (bool): replace stored text with non-empty details
 
         Returns:
             dict: Problem information if found, None otherwise
@@ -513,7 +521,11 @@ class LeetCodeClient(BaseCrawler):
         logger.debug(
             f"Problem {problem_id_for_log} found in database: {problem['rating']}"
         )
-        if problem["slug"] and (not problem.get("tags") or not problem.get("content")):
+        if problem["slug"] and (
+            prefer_source_details
+            or not problem.get("tags")
+            or self._is_missing_text(problem.get("content"))
+        ):
             logger.debug(
                 f"Problem {problem_id_for_log} still not have detail information, "
                 "fetching problem detail from LeetCode API..."
@@ -523,7 +535,17 @@ class LeetCodeClient(BaseCrawler):
             )
             if problem_detail:
                 for key, value in problem_detail.items():
-                    problem[key] = problem.get(key, value) or value
+                    if (
+                        key in ("title", "title_cn", "content", "content_cn")
+                        and not self._is_missing_text(value)
+                        and (
+                            prefer_source_details
+                            or self._is_missing_text(problem.get(key))
+                        )
+                    ):
+                        problem[key] = value
+                    else:
+                        problem[key] = problem.get(key, value) or value
                 self.problems_db.update_problem(problem)
 
         if not problem["rating"]:
