@@ -1,3 +1,63 @@
+.home-shell {
+    isolation: isolate;
+    background:
+        linear-gradient(180deg, transparent 0 20%, rgba(83, 224, 232, 0.018) 48%, transparent 76%),
+        var(--ink);
+}
+
+.home-shell::before,
+.home-shell::after {
+    content: "";
+    position: fixed;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.home-shell::before {
+    inset: 0;
+    opacity: 0.88;
+    background-image:
+        linear-gradient(rgba(243, 241, 234, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(243, 241, 234, 0.03) 1px, transparent 1px),
+        radial-gradient(circle at 18% 22%, rgba(83, 224, 232, 0.62) 0 1px, transparent 2px),
+        radial-gradient(circle at 72% 38%, rgba(255, 106, 85, 0.52) 0 1px, transparent 2px),
+        radial-gradient(circle at 42% 74%, rgba(199, 244, 91, 0.48) 0 1px, transparent 2px),
+        radial-gradient(circle at 88% 84%, rgba(83, 224, 232, 0.5) 0 1px, transparent 2px);
+    background-size: 96px 96px, 96px 96px, 420px 420px, 520px 520px, 460px 460px, 600px 600px;
+    mask-image: linear-gradient(to bottom, transparent, black 12%, black 92%, transparent);
+}
+
+.home-shell::after {
+    inset: -18vmax;
+    opacity: 0.54;
+    background:
+        linear-gradient(112deg, transparent 0 46%, rgba(83, 224, 232, 0.2) 46.05%, transparent 46.16%),
+        linear-gradient(68deg, transparent 0 61%, rgba(255, 106, 85, 0.16) 61.05%, transparent 61.16%);
+    animation: observatory-field-route 18s ease-in-out infinite alternate;
+}
+
+.home-wrap {
+    z-index: 1;
+}
+
+@keyframes observatory-field-route {
+    from {
+        transform: translate3d(-3.5%, 2%, 0);
+    }
+    to {
+        transform: translate3d(3.5%, -2%, 0);
+    }
+}
+
+@keyframes observatory-signal-scan {
+    from {
+        transform: translateX(-112%);
+    }
+    to {
+        transform: translateX(212%);
+    }
+}
+
 .observatory-hero {
     position: relative;
     display: grid;
@@ -386,6 +446,23 @@
     text-decoration: none;
 }
 
+[data-motion-section] {
+    position: relative;
+}
+
+[data-motion-section]::before {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    top: -1px;
+    left: 0;
+    width: min(260px, 46%);
+    height: 2px;
+    pointer-events: none;
+    background: linear-gradient(90deg, var(--cyan), rgba(83, 224, 232, 0.36) 58%, transparent);
+    transform-origin: left;
+}
+
 .narrative-section,
 .integration-section,
 .access-section,
@@ -435,14 +512,39 @@
 }
 
 .source-orbit span {
+    position: relative;
     min-width: 0;
     padding: 16px;
+    overflow: hidden;
     border-right: 1px solid var(--line);
     border-bottom: 1px solid var(--line);
     color: var(--paper);
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.72rem;
     overflow-wrap: anywhere;
+    transition: color 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+
+.source-orbit span::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 4px;
+    height: 4px;
+    background: var(--cyan);
+    opacity: 0.24;
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.source-orbit span::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 54%;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(83, 224, 232, 0.24), transparent);
+    transform: translateX(-112%);
 }
 
 .capability-list {
@@ -454,12 +556,29 @@
 }
 
 .capability-list li {
+    position: relative;
     display: grid;
     grid-template-columns: 44px 1fr auto;
     align-items: start;
     gap: 20px;
     padding: 24px 0;
+    overflow: hidden;
     border-bottom: 1px solid var(--line);
+    transition: background 180ms ease;
+}
+
+.capability-list li::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    left: 0;
+    height: 2px;
+    pointer-events: none;
+    background: linear-gradient(90deg, var(--coral), var(--cyan), transparent 72%);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 240ms ease;
 }
 
 .capability-number {
@@ -493,12 +612,25 @@
 }
 
 .endpoint-row {
+    position: relative;
     display: grid;
     grid-template-columns: 70px minmax(220px, 0.75fr) minmax(220px, 1fr) 34px;
     align-items: center;
     gap: 24px;
     min-height: 122px;
+    overflow: hidden;
     border-bottom: 1px solid var(--line);
+    transition: background 180ms ease;
+}
+
+.endpoint-row::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 42%;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(83, 224, 232, 0.22), transparent);
+    transform: translateX(-112%);
 }
 
 .method-tag {
@@ -550,6 +682,7 @@
 
 .integration-console {
     min-width: 0;
+    transition: box-shadow 220ms ease, transform 220ms ease;
 }
 
 .surface-switcher {
@@ -652,6 +785,11 @@
     text-align: left;
 }
 
+.auth-matrix tbody tr {
+    background: linear-gradient(90deg, transparent, rgba(83, 224, 232, 0));
+    transition: background 180ms ease;
+}
+
 .auth-matrix th {
     color: var(--muted);
     font-family: 'IBM Plex Mono', monospace;
@@ -674,11 +812,32 @@
 }
 
 .final-command {
+    position: relative;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: end;
     gap: 40px;
     padding: 112px 0 72px;
+}
+
+.final-command::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 52px;
+    left: 0;
+    z-index: 0;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(83, 224, 232, 0.56) 72%, var(--cyan));
+    transform: scaleX(0.28);
+    transform-origin: right;
+    transition: transform 360ms ease;
+}
+
+.final-command > * {
+    position: relative;
+    z-index: 1;
 }
 
 .final-command .section-kicker {
@@ -689,6 +848,122 @@
 .final-command h2 {
     max-width: 17ch;
     font-size: 3.25rem;
+}
+
+.endpoint-row:focus-within {
+    background: rgba(83, 224, 232, 0.075);
+}
+
+.endpoint-row:focus-within::after {
+    animation: observatory-signal-scan 560ms ease-out both;
+}
+
+.integration-console:focus-within {
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 1px rgba(83, 224, 232, 0.52), 14px 14px 0 rgba(83, 224, 232, 0.075);
+}
+
+.final-command:focus-within::after {
+    transform: scaleX(1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .source-orbit span:hover {
+        border-color: rgba(83, 224, 232, 0.7);
+        background: rgba(83, 224, 232, 0.09);
+        color: var(--cyan);
+    }
+
+    .source-orbit span:hover::before {
+        opacity: 1;
+        transform: scale(2);
+    }
+
+    .source-orbit span:hover::after,
+    .endpoint-row:hover::after {
+        animation: observatory-signal-scan 560ms ease-out both;
+    }
+
+    .capability-list li:hover {
+        background: linear-gradient(90deg, rgba(255, 106, 85, 0.1), rgba(83, 224, 232, 0.035) 48%, transparent 72%);
+    }
+
+    .capability-list li:hover::after {
+        transform: scaleX(1);
+    }
+
+    .endpoint-row:hover {
+        background: rgba(83, 224, 232, 0.075);
+    }
+
+    .integration-console:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0 0 1px rgba(83, 224, 232, 0.48), 14px 14px 0 rgba(83, 224, 232, 0.075);
+    }
+
+    .auth-matrix tbody tr:hover {
+        background: linear-gradient(90deg, rgba(199, 244, 91, 0.11), rgba(83, 224, 232, 0.06));
+    }
+
+    .final-command:hover::after {
+        transform: scaleX(1);
+    }
+}
+
+@keyframes observatory-section-reveal {
+    from {
+        opacity: 0.18;
+        transform: translateY(48px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes observatory-rule-reveal {
+    from {
+        opacity: 0;
+        transform: scaleX(0);
+    }
+    to {
+        opacity: 1;
+        transform: scaleX(1);
+    }
+}
+
+@keyframes observatory-item-reveal {
+    from {
+        opacity: 0.12;
+        transform: translateY(28px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@supports (animation-timeline: view()) {
+    [data-motion-section] {
+        animation: observatory-section-reveal 1ms linear both;
+        animation-timeline: view();
+        animation-range: entry 0% cover 38%;
+    }
+
+    [data-motion-section]::before {
+        animation: observatory-rule-reveal 1ms linear both;
+        animation-timeline: view();
+        animation-range: entry 0% cover 42%;
+    }
+
+    .source-orbit span,
+    .capability-list li,
+    .endpoint-row,
+    .auth-matrix tbody tr {
+        animation: observatory-item-reveal 1ms linear both;
+        animation-timeline: view();
+        animation-range: entry 0% cover 32%;
+    }
 }
 
 @media (max-width: 1000px) {
@@ -712,6 +987,10 @@
 }
 
 @media (max-width: 760px) {
+    .home-shell::after {
+        animation: none;
+    }
+
     .observatory-hero {
         grid-template-columns: 1fr;
         grid-template-rows: auto auto auto auto;
@@ -836,6 +1115,24 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .home-shell::before,
+    .home-shell::after,
+    [data-motion-section],
+    [data-motion-section]::before,
+    .source-orbit span,
+    .source-orbit span::before,
+    .source-orbit span::after,
+    .capability-list li,
+    .capability-list li::after,
+    .endpoint-row,
+    .endpoint-row::after,
+    .integration-console,
+    .auth-matrix tbody tr,
+    .final-command::after {
+        animation: none;
+        transition: none;
+    }
+
     .scene-canvas,
     .fallback-scene,
     .command {

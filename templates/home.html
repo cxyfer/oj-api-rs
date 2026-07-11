@@ -157,7 +157,7 @@
     </a>
 </section>
 
-<section class="narrative-section problem-space" id="problem-space" aria-labelledby="problem-space-title">
+<section class="narrative-section problem-space" id="problem-space" aria-labelledby="problem-space-title" data-motion-section>
     <div class="section-index" aria-hidden="true">01 / UNIFY</div>
     <div class="narrative-heading">
         <p class="section-kicker" data-i18n="home.space.kicker">One problem space</p>
@@ -167,20 +167,20 @@
         <p data-i18n="home.space.lead">OJ API normalizes fragmented judges into one coherent problem layer, preserving source identity while making every record addressable through the same mental model.</p>
         <div class="source-orbit" aria-label="Supported sources">
             {% for source in docs.supported_sources %}
-            <span>{{ source }}</span>
+            <span style="--motion-order: {{ loop.index0 }}">{{ source }}</span>
             {% endfor %}
         </div>
     </div>
 </section>
 
-<section class="narrative-section capabilities" id="capabilities" aria-labelledby="capabilities-title">
+<section class="narrative-section capabilities" id="capabilities" aria-labelledby="capabilities-title" data-motion-section>
     <div class="section-index" aria-hidden="true">02 / INTELLIGENCE</div>
     <div class="narrative-heading">
         <p class="section-kicker" data-i18n="home.capabilities.kicker">Core intelligence</p>
         <h2 id="capabilities-title" data-i18n="home.capabilities.title">Four operations. One connected system.</h2>
     </div>
     <ol class="capability-list">
-        <li>
+        <li style="--motion-order: 0">
             <span class="capability-number">01</span>
             <div>
                 <h3 data-i18n="home.capabilities.resolve.title">Resolve</h3>
@@ -188,7 +188,7 @@
             </div>
             <code>/api/v1/resolve/*</code>
         </li>
-        <li>
+        <li style="--motion-order: 1">
             <span class="capability-number">02</span>
             <div>
                 <h3 data-i18n="home.capabilities.retrieve.title">Retrieve</h3>
@@ -196,7 +196,7 @@
             </div>
             <code>/api/v1/problems/*</code>
         </li>
-        <li>
+        <li style="--motion-order: 2">
             <span class="capability-number">03</span>
             <div>
                 <h3 data-i18n="home.capabilities.relate.title">Relate</h3>
@@ -204,7 +204,7 @@
             </div>
             <code>/api/v1/similar</code>
         </li>
-        <li>
+        <li style="--motion-order: 3">
             <span class="capability-number">04</span>
             <div>
                 <h3 data-i18n="home.capabilities.connect.title">Connect</h3>
@@ -215,7 +215,7 @@
     </ol>
 </section>
 
-<section class="narrative-section endpoint-section" aria-labelledby="endpoint-title">
+<section class="narrative-section endpoint-section" aria-labelledby="endpoint-title" data-motion-section>
     <div class="section-index" aria-hidden="true">03 / SURFACES</div>
     <div class="narrative-heading">
         <p class="section-kicker" data-i18n="home.featured.kicker">Selected endpoints</p>
@@ -223,7 +223,7 @@
     </div>
     <div class="endpoint-list">
         {% for card in docs.homepage_cards %}
-        <article class="endpoint-row">
+        <article class="endpoint-row" style="--motion-order: {{ loop.index0 }}">
             <span class="method-tag">{{ card.method }}</span>
             <div class="endpoint-summary">
                 <h3 data-i18n="home.featured.card_{{ loop.index }}_title">{{ card.title }}</h3>
@@ -236,7 +236,7 @@
     </div>
 </section>
 
-<section class="integration-section" aria-labelledby="integration-title">
+<section class="integration-section" aria-labelledby="integration-title" data-motion-section>
     <div class="integration-copy">
         <p class="section-kicker" data-i18n="home.integrations.kicker">Two integration surfaces</p>
         <h2 id="integration-title" data-i18n="home.integrations.title">Built for software. Native to agents.</h2>
@@ -272,7 +272,7 @@
     </div>
 </section>
 
-<section class="access-section" aria-labelledby="auth-matrix-title">
+<section class="access-section" aria-labelledby="auth-matrix-title" data-motion-section>
     <div class="access-heading">
         <p class="section-kicker" data-i18n="home.auth.kicker">Authentication</p>
         <h2 id="auth-matrix-title" data-i18n="home.auth.title">One switch. Explicit access rules.</h2>
@@ -288,17 +288,17 @@
                 </tr>
             </thead>
             <tbody>
-                <tr><td><code>/</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-public" data-i18n="home.auth.public">Public</td></tr>
-                <tr><td><code>/health</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-public" data-i18n="home.auth.public">Public</td></tr>
-                <tr><td><code>/api/v1/*</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-protected" data-i18n="home.auth.protected">Protected</td></tr>
-                <tr><td><code>/status</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-protected" data-i18n="home.auth.protected">Protected</td></tr>
-                <tr><td><code>/mcp</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-protected" data-i18n="home.auth.protected">Protected</td></tr>
+                <tr style="--motion-order: 0"><td><code>/</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-public" data-i18n="home.auth.public">Public</td></tr>
+                <tr style="--motion-order: 1"><td><code>/health</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-public" data-i18n="home.auth.public">Public</td></tr>
+                <tr style="--motion-order: 2"><td><code>/api/v1/*</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-protected" data-i18n="home.auth.protected">Protected</td></tr>
+                <tr style="--motion-order: 3"><td><code>/status</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-protected" data-i18n="home.auth.protected">Protected</td></tr>
+                <tr style="--motion-order: 4"><td><code>/mcp</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-protected" data-i18n="home.auth.protected">Protected</td></tr>
             </tbody>
         </table>
     </div>
 </section>
 
-<section class="final-command" aria-labelledby="final-command-title">
+<section class="final-command" aria-labelledby="final-command-title" data-motion-section>
     <p class="section-kicker" data-i18n="home.final_cta.kicker">Enter the system</p>
     <h2 id="final-command-title" data-i18n="home.final_cta.title">Build against the entire problem space.</h2>
     <a class="command command-primary" href="{{ docs_path }}" data-i18n="home.final_cta.action">Explore the API</a>

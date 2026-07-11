@@ -905,6 +905,66 @@ mod tests {
     }
 
     #[test]
+    fn homepage_ambient_motion_is_bounded_and_accessible() {
+        let home_html = HomeTemplate {
+            total_problems: 42,
+            token_auth_enabled: true,
+            version: "0.3.2-test",
+            docs: docs_registry(),
+            docs_path: DOCS_PATH,
+            mcp_docs_path: MCP_DOCS_PATH,
+        }
+        .render()
+        .expect("home template should render");
+
+        assert_eq!(home_html.matches("data-motion-section").count(), 6);
+        assert_eq!(home_html.matches("--motion-order:").count(), 17);
+
+        let home_css = include_str!("../static/home.css");
+        for marker in [
+            ".home-shell::before",
+            ".home-shell::after",
+            "@keyframes observatory-field-route",
+            "@keyframes observatory-signal-scan",
+            "@supports (animation-timeline: view())",
+            "animation-timeline: view()",
+            "[data-motion-section]",
+            "@media (hover: hover) and (pointer: fine)",
+            ".source-orbit span:hover",
+            ".capability-list li:hover",
+            ".endpoint-row:focus-within",
+            ".integration-console:focus-within",
+            ".auth-matrix tbody tr:hover",
+            ".final-command:focus-within",
+        ] {
+            assert!(
+                home_css.contains(marker),
+                "missing ambient motion marker {marker}"
+            );
+        }
+
+        let reduced_motion = home_css
+            .split_once("@media (prefers-reduced-motion: reduce) {")
+            .map(|(_, block)| block)
+            .expect("reduced-motion media block should exist");
+        for marker in [
+            ".home-shell::before",
+            ".home-shell::after",
+            "[data-motion-section]",
+            ".source-orbit span::after",
+            ".capability-list li::after",
+            ".endpoint-row::after",
+        ] {
+            assert!(
+                reduced_motion.contains(marker),
+                "reduced-motion block must include {marker}"
+            );
+        }
+        assert!(reduced_motion.contains("animation: none;"));
+        assert!(reduced_motion.contains("transition: none;"));
+    }
+
+    #[test]
     fn homepage_fallback_is_declarative_animated_and_bounded() {
         fn css_block<'a>(source: &'a str, marker: &str) -> Option<&'a str> {
             let marker_start = source.find(marker)?;

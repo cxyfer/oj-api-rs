@@ -42,3 +42,5 @@ Entries are workspace records, not authoritative runtime decisions.
 | 2026-07-11 | artifact | docs/aegis/work/2026-07-11-observatory-animated-fallback/evidence-bundle-draft-final-browser-performance.json | 2026-07-11-observatory-animated-fallback evidence final-browser-performance |
 | 2026-07-11 | artifact | docs/aegis/work/2026-07-11-observatory-animated-fallback/gate-input-pack.json | 2026-07-11-observatory-animated-fallback gate input pack |
 | 2026-07-11 | work | docs/aegis/work/2026-07-11-observatory-animated-fallback/proof-bundle.md | 2026-07-11-observatory-animated-fallback proof bundle |
+| 2026-07-12 | spec | docs/aegis/specs/2026-07-12-homepage-ambient-motion-brief.md | Homepage Ambient Motion Spec Brief |
+| 2026-07-12 | plan | docs/aegis/plans/2026-07-12-homepage-ambient-motion.md | Homepage Ambient Motion Implementation Plan |
