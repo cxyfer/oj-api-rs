@@ -19,7 +19,7 @@ The enrichment decision must observe the database before the curated snapshot is
 - Changing the database schema, Rust API, scheduler, configuration, or crawler CLI flags.
 - Broadening the ordinary Codeforces single-problem input grammar to accept stored `GYM` identifiers.
 - Running enrichment when only one of title or content is blank.
-- Replacing non-blank existing title or content values.
+- Replacing non-blank existing title or content values outside an explicit daily-enrichment source-precedence call.
 - Adding a new generic crawler abstraction or parallel enrichment queue.
 
 ## Decisions
@@ -69,7 +69,7 @@ Codeforces tags are not present in the problem statement HTML. The single-proble
 
 ### Prefer fetched source details without clearing curated metadata
 
-Daily enrichment explicitly marks non-empty source-fetched detail fields as preferred during the existing database merge. Codeforces replaces fetched `title`, `content`, and non-empty API `tags`; when API tags are missing or empty, `tags` are not marked preferred and stored curated tags remain as the fallback. AtCoder and Luogu replace fetched `title` and `content`; LeetCode retains its existing blank-text replacement behavior. Other fields still use the normal non-empty merge, so a source response that omits rating, difficulty, or tags does not erase values supplied by Sheep or 0x3f.
+Daily enrichment explicitly marks non-empty source-fetched detail fields as preferred during the existing database merge. Codeforces replaces fetched `title`, `content`, and non-empty API `tags`; when API tags are missing or empty, `tags` are not marked preferred and stored curated tags remain as the fallback. AtCoder and Luogu replace fetched `title` and `content`; LeetCode opts into the same title/content precedence only for daily enrichment while ordinary detail lookups retain blank-text replacement behavior. Other fields still use the normal non-empty merge, so a source response that omits rating, difficulty, or tags does not erase values supplied by Sheep or 0x3f.
 
 AtCoder obtains the official title from its existing contest task-list parser when daily enrichment requests source precedence, then fetches the statement from the explicit contest/task path. Direct single-problem CLI calls keep their prior merge behavior unless the coordinator opts into source precedence.
 
@@ -77,7 +77,7 @@ Forcing the entire fetched problem row to overwrite the snapshot was rejected be
 
 ### Treat whitespace-only LeetCode details as missing
 
-LeetCode detail retrieval treats whitespace-only text fields as missing, fetches detail when content is blank even if tags are present, and replaces only blank text values with non-blank fetched values. This lets eligible sparse rows become usable without overwriting richer stored text.
+LeetCode detail retrieval treats whitespace-only text fields as missing and fetches detail when content is blank even if tags are present. Ordinary lookups replace only blank text values, while daily enrichment explicitly prefers non-blank source title/content so curated snapshot text is replaced without clearing fields omitted by the response.
 
 ### Run enrichment sequentially and best-effort
 

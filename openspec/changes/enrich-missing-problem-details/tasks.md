@@ -26,3 +26,6 @@
 - [x] 4.1 Resolve LeetCode slugs to a local numeric ID before candidate selection and storage, retain the slug fallback, and enrich by the exact stored ID
 - [x] 4.2 Prefer non-empty Codeforces API tags while preserving stored tags as the fallback when metadata is missing or empty
 - [x] 4.3 Add regression coverage for LeetCode numeric/fallback identities and Codeforces tag precedence/preservation, then rerun focused and repository verification
+- [x] 4.4 Prefer a Codeforces title only when statement parsing yields a non-empty normalized title
+- [x] 4.5 Reject whitespace-only strings and empty collections as preferred incoming database values
+- [x] 4.6 Opt LeetCode daily enrichment into non-empty source title/content precedence while preserving ordinary lookup behavior

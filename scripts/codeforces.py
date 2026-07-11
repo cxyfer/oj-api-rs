@@ -558,12 +558,16 @@ class CodeforcesClient(BaseCrawler):
             ),
             None,
         )
-        if detail.get("title"):
-            problem["title"] = self._normalize_problem_title(
-                detail["title"], problem["problem_index"]
-            )
+        preferred_fields = ["content"]
+        normalized_title = self._normalize_problem_title(
+            detail.get("title", ""), problem["problem_index"]
+        )
+        if normalized_title:
+            problem["title"] = normalized_title
+            preferred_fields.append("title")
+        elif prefer_source_details:
+            problem["title"] = None
         problem["content"] = detail["content"]
-        preferred_fields = ["title", "content"]
         if metadata and metadata.get("tags"):
             problem["tags"] = metadata["tags"]
             if prefer_source_details:

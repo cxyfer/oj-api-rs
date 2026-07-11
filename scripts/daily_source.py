@@ -538,7 +538,9 @@ class DailySourceClient(BaseCrawler):
                 else "com"
             )
             result = await LeetCodeClient(domain=domain, **client_args).get_problem(
-                problem_id=problem_id, domain=domain
+                problem_id=problem_id,
+                domain=domain,
+                prefer_source_details=True,
             )
             return bool(result)
         return False

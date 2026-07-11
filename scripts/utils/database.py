@@ -56,12 +56,22 @@ def _normalize_similar_questions(values):
     return normalized
 
 
+def _has_non_empty_value(value):
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, set, dict)):
+        return bool(value)
+    return True
+
+
 def _prefer_non_empty(new_value, existing_value):
+    if _has_non_empty_value(new_value):
+        return new_value
     if isinstance(new_value, list):
-        return new_value if new_value else (existing_value or [])
-    if new_value in (None, ""):
-        return existing_value
-    return new_value
+        return existing_value or []
+    return existing_value
 
 
 class SettingsDatabaseManager:
@@ -595,7 +605,9 @@ class ProblemsDatabaseManager:
                     if key == "id":
                         continue
                     incoming_value = problem.get(key)
-                    if key in preferred_fields and incoming_value not in (None, ""):
+                    if key in preferred_fields and _has_non_empty_value(
+                        incoming_value
+                    ):
                         continue
                     problem[key] = _prefer_non_empty(
                         incoming_value, existing_problem.get(key)

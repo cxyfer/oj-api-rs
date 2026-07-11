@@ -178,7 +178,8 @@ class DailySourceEnrichmentTests(unittest.TestCase):
         )
         snapshot_states = []
 
-        async def get_problem(*, problem_id, domain):
+        async def get_problem(*, problem_id, domain, prefer_source_details):
+            self.assertTrue(prefer_source_details)
             snapshot_states.append(
                 (
                     client.problems_db.get_problem(id="two-sum", source="leetcode")
@@ -205,7 +206,7 @@ class DailySourceEnrichmentTests(unittest.TestCase):
             domain="cn", data_dir=str(client.data_dir), db_path=self.db_path
         )
         leetcode_client.return_value.get_problem.assert_awaited_once_with(
-            problem_id="two-sum", domain="cn"
+            problem_id="two-sum", domain="cn", prefer_source_details=True
         )
         self.assertEqual(
             snapshot_states,
@@ -234,7 +235,8 @@ class DailySourceEnrichmentTests(unittest.TestCase):
         )
         problem["rating"] = 1700.0
 
-        async def get_problem(*, problem_id, domain):
+        async def get_problem(*, problem_id, domain, prefer_source_details):
+            self.assertTrue(prefer_source_details)
             return {"id": problem_id, "domain": domain}
 
         with patch.object(daily_source, "LeetCodeClient") as leetcode_client:
@@ -251,7 +253,7 @@ class DailySourceEnrichmentTests(unittest.TestCase):
             )
 
         leetcode_client.return_value.get_problem.assert_awaited_once_with(
-            problem_id="1", domain="com"
+            problem_id="1", domain="com", prefer_source_details=True
         )
         self.assertEqual(
             self._daily_rows(),
@@ -442,6 +444,99 @@ class DailySourceEnrichmentTests(unittest.TestCase):
         self.assertIsNotNone(stored)
         self.assertTrue(stored["title"].strip())
         self.assertTrue(stored["content"].strip())
+
+    def test_leetcode_source_details_replace_curated_snapshot_text(self):
+        problems_db = ProblemsDatabaseManager(self.db_path)
+        problem = self._problem(
+            "leetcode",
+            "1",
+            slug="two-sum",
+            title="Daily title",
+            content="Daily summary",
+            tags=["Array"],
+        )
+        problem["rating"] = 1700.0
+        self.assertTrue(problems_db.update_problem(problem, force_update=True))
+
+        client = object.__new__(LeetCodeClient)
+        client.problems_db = problems_db
+        client.fetch_problem_detail = AsyncMock(
+            return_value={
+                "title": "Two Sum",
+                "content": "<p>Find the pair.</p>",
+                "tags": ["Array", "Hash Table"],
+            }
+        )
+        client.get_problem_rating = AsyncMock()
+
+        self.assertIsNotNone(
+            asyncio.run(
+                client.get_problem(
+                    problem_id="1",
+                    domain="com",
+                    prefer_source_details=True,
+                )
+            )
+        )
+
+        client.fetch_problem_detail.assert_awaited_once_with("two-sum", domain="com")
+        client.get_problem_rating.assert_not_awaited()
+        stored = problems_db.get_problem(id="1", source="leetcode")
+        self.assertEqual(stored["title"], "Two Sum")
+        self.assertEqual(stored["content"], "<p>Find the pair.</p>")
+
+    def test_leetcode_complete_stored_text_is_preserved_by_default(self):
+        problems_db = ProblemsDatabaseManager(self.db_path)
+        problem = self._problem(
+            "leetcode",
+            "1",
+            slug="two-sum",
+            title="Stored title",
+            content="Stored content",
+            tags=["Array"],
+        )
+        problem["rating"] = 1700.0
+        self.assertTrue(problems_db.update_problem(problem, force_update=True))
+
+        client = object.__new__(LeetCodeClient)
+        client.problems_db = problems_db
+        client.fetch_problem_detail = AsyncMock()
+        client.get_problem_rating = AsyncMock()
+
+        result = asyncio.run(client.get_problem(problem_id="1", domain="com"))
+
+        client.fetch_problem_detail.assert_not_awaited()
+        client.get_problem_rating.assert_not_awaited()
+        self.assertEqual(result["title"], "Stored title")
+        self.assertEqual(result["content"], "Stored content")
+
+    def test_preferred_fields_reject_blank_strings_and_empty_lists(self):
+        problems_db = ProblemsDatabaseManager(self.db_path)
+        existing = self._problem(
+            "codeforces",
+            "343C",
+            title="Curated title",
+            content="Stored content",
+            tags=["binary search"],
+        )
+        existing["paid_only"] = 1
+        self.assertTrue(problems_db.update_problem(existing, force_update=True))
+
+        incoming = existing.copy()
+        incoming["title"] = " \t"
+        incoming["tags"] = []
+        incoming["paid_only"] = 0
+        self.assertTrue(
+            problems_db.update_problem(
+                incoming,
+                prefer_incoming_fields=("title", "tags", "paid_only"),
+            )
+        )
+
+        stored = problems_db.get_problem(id="343C", source="codeforces")
+        self.assertEqual(stored["title"], "Curated title")
+        self.assertEqual(stored["tags"], ["binary search"])
+        self.assertEqual(stored["paid_only"], 0)
 
     def _client(self):
         client = DailySourceClient.__new__(DailySourceClient)
