@@ -21,3 +21,8 @@ Entries are workspace records, not authoritative runtime decisions.
 | 2026-07-10 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-baseline-tests.json | 2026-07-10-algorithmic-observatory evidence baseline-tests |
 | 2026-07-10 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/resume-state-hint.json | 2026-07-10-algorithmic-observatory resume state hint |
 | 2026-07-10 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-task-1-assets.json | 2026-07-10-algorithmic-observatory evidence task-1-assets |
+| 2026-07-10 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-tasks-2-to-5.json | 2026-07-10-algorithmic-observatory evidence tasks-2-to-5 |
+| 2026-07-11 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-task-8-worker-runtime.json | 2026-07-10-algorithmic-observatory evidence task-8-worker-runtime |
+| 2026-07-11 | adr | docs/aegis/adr/ADR-0001-homepage-threejs-worker-boundary.md | ADR-0001 - Keep the homepage Three.js runtime in a module Worker |
+| 2026-07-11 | artifact | docs/aegis/work/2026-07-10-algorithmic-observatory/gate-input-pack.json | 2026-07-10-algorithmic-observatory gate input pack |
+| 2026-07-11 | work | docs/aegis/work/2026-07-10-algorithmic-observatory/proof-bundle.md | 2026-07-10-algorithmic-observatory proof bundle |

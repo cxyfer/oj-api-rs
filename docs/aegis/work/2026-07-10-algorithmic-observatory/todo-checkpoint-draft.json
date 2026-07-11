@@ -1,21 +1,16 @@
 {
   "schemaVersion": "aegis.schema.v0",
   "taskId": "2026-07-10-algorithmic-observatory",
-  "currentTodo": "Retire lingering presentation references and perform live browser verification.",
+  "currentTodo": "None; implementation is a verified completion candidate awaiting user-directed integration.",
   "completedTodos": [
-    "Verified clean baseline.",
-    "Split public page asset owners.",
-    "Built and localized the semantic homepage.",
-    "Added the MIT-licensed guided Three.js scene.",
-    "Redesigned the MCP reference work surface."
+    "Final independent review approved; fresh 209-test, clippy, static, retirement, browser, bundle, and workspace checks pass."
   ],
-  "activeSlice": "Tasks 6-7: negative retirement scan and runtime visual/performance evidence.",
+  "activeSlice": "Final review and completion verification.",
   "evidenceRefs": [
-    "docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-baseline-tests.json",
-    "docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-task-1-assets.json",
-    "docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-tasks-2-to-5.json"
+    "docs/aegis/work/2026-07-10-algorithmic-observatory/90-evidence.md",
+    "docs/aegis/work/2026-07-10-algorithmic-observatory/proof-bundle.md"
   ],
   "blockedOn": null,
-  "nextStep": "Commit MCP slice, add retirement negative test, then start the local server for Playwright.",
-  "updatedAt": "2026-07-10"
+  "nextStep": "User-directed commit, PR, or integration handling.",
+  "updatedAt": "2026-07-11"
 }

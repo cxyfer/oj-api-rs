@@ -8,11 +8,14 @@ all public runtime contracts.
 **Architecture:** Keep Axum + Askama as the rendering boundary and the existing
 Rust registry as the only source for endpoint, source, and MCP tool metadata.
 Split the mixed public presentation layer into shared shell, homepage, and MCP
-owners. Load a pinned self-hosted Three.js ESM runtime only from the homepage;
-the scene reads source labels rendered into the DOM and owns no product registry.
+owners. Keep the main-thread scene module as a DOM/i18n/event bridge and load a
+pinned self-hosted Three.js ESM runtime only inside a homepage module Worker
+using `OffscreenCanvas`; the worker reads source labels supplied by the bridge
+and owns no product registry or DOM copy.
 
 **Tech Stack:** Rust 2021, Axum 0.8, Askama 0.12, static HTML/CSS/ES modules,
-Three.js `0.180.0`, project i18n JSON, Chromium, and Playwright browser checks.
+Three.js `0.180.0`, module Worker, `OffscreenCanvas`, project i18n JSON,
+Chromium, and Playwright browser checks.
 
 **Baseline/Authority Refs:**
 
@@ -26,21 +29,25 @@ Three.js `0.180.0`, project i18n JSON, Chromium, and Playwright browser checks.
 **Compatibility Boundary:** Keep `/`, `/docs/mcp`, `/docs`, `/docs/api`,
 `/openapi.json`, API routes, MCP transport, auth semantics, registry values,
 fragment IDs, and the `en`/`zh-TW`/`zh-CN` locale set stable. `/docs` remains
-Scalar-owned. Do not add a frontend framework, bundler, API endpoint, fallback
-theme, or duplicated source/tool registry.
+Scalar-owned. Do not add a frontend framework, production bundler, API endpoint,
+fallback theme, duplicated source/tool registry, or main-thread Three.js
+compatibility renderer.
 
 **Verification:** Focused Rust template/router tests, full `cargo test`,
 `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`,
 locale JSON validation, static asset checks, a live local server, Chromium
 screenshots at desktop/tablet/mobile viewports, canvas-pixel checks, reduced
 motion and WebGL-fallback checks, MCP deep-link/copy interactions, console and
-overflow inspection, and confirmation that `/docs` still renders Scalar.
+overflow inspection, Worker-only Three.js network/runtime checks, Fast 3G plus
+4x CPU main-thread metrics, and confirmation that `/docs` still renders Scalar.
 
 ## Aegis Visibility
 
 Planning is necessary because this work adds a WebGL lifecycle owner, retires a
 mixed stylesheet, touches three localized presentation surfaces, and requires
-visual evidence beyond ordinary Rust tests.
+visual evidence beyond ordinary Rust tests. Task 8 additionally moves the
+renderer across a main-thread/Worker boundary after throttled evidence proved
+the main-thread runtime exceeded the approved long-task budget.
 
 ## Plan Basis
 
@@ -50,6 +57,9 @@ visual evidence beyond ordinary Rust tests.
   already 959 lines.
 - Fact: `static/home.css` currently mixes homepage and reference-page styles.
 - Fact: Chromium and Node/npm are available in the environment.
+- Fact: the `390x844` Fast 3G plus 4x CPU profile measured LCP `864ms`, CLS
+  `0.033`, and a `1019ms` scene-attributable main-thread long task after the
+  tree-shaken subset bundle; node-count reduction cannot remove module parsing.
 - Assumption: the server can start with the repository's local development
   configuration; if not, use `config.toml.example` to create a temporary config
   under `/tmp` and set `CONFIG_PATH` without editing the repository.
@@ -68,8 +78,8 @@ Requirement Ready Check:
 - Requirement source refs: approved Aegis design and updated homepage OpenSpec.
 - Goals and scope refs: plan header and approved design Sections 1, 3, and 5.
 - User / scenario refs: developers, competitive programmers, and AI agents.
-- Requirement item refs: Tasks 1 through 7.
-- Acceptance / verification criteria refs: Task 7 and approved design Section 16.
+- Requirement item refs: Tasks 1 through 8.
+- Acceptance / verification criteria refs: Tasks 7-8 and approved design Section 16.
 - Open blocker questions: none.
 - Decision: ready.
 
@@ -79,8 +89,9 @@ Requirement Ready Check:
   MCP reference cannot be produced by documentation or configuration alone.
 - No-change / non-code option: retain the current Bento HTML and CSS.
 - Why code change is necessary: the approved layout, WebGL lifecycle, adaptive
-  motion, copy controls, and responsive MCP structure require new browser and
-  template behavior.
+  motion, copy controls, responsive MCP structure, and main-thread long-task
+  budget require new browser and template behavior. Deferring or further
+  minifying the renderer does not remove its main-thread parse/evaluate task.
 - Minimum change boundary: public Askama templates, page-specific CSS and JS,
   locale JSON, static vendor runtime, wiring-only render assertions in
   `src/home.rs`, and browser-based verification evidence.
@@ -92,9 +103,12 @@ Requirement Ready Check:
 
 - `static/site.css`: public shell, tokens, typography, code, focus, and shared controls.
 - `static/mcp.css`: MCP reference layout and responsive behavior.
-- `static/home-scene.js`: Three.js scene lifecycle and guided interaction.
+- `static/home-scene.js`: main-thread scene DOM/i18n/event/Worker bridge.
+- `static/home-scene-worker.js`: Worker-owned Three.js scene lifecycle,
+  rendering, raycasting, animation, and pixel sampling.
 - `static/mcp.js`: MCP deep-link and copy-control behavior.
-- `static/vendor/three.module.min.js`: pinned Three.js runtime.
+- `static/vendor/three.home.min.js`: pinned, self-contained, tree-shaken
+  Three.js revision 180 runtime loaded only by the Worker.
 - `static/vendor/THREE-LICENSE.txt`: upstream MIT license and pinned version note.
 
 **Modify:**
@@ -344,6 +358,10 @@ after implementation: Rust coverage and JSON parsing pass.
 
 ## Task 4: Vendor Three.js and Implement the Guided Spatial Intelligence Map
 
+Task 4 records the original main-thread implementation. Task 8 supersedes its
+runtime owner and vendor loading path after throttled evidence exposed the
+main-thread long-task defect; its product behavior and scene semantics remain required.
+
 **Files:**
 
 - Create: `static/vendor/three.module.min.js`
@@ -588,11 +606,131 @@ local URL, normally `http://127.0.0.1:7856`.
   concrete fixes and any checked execution evidence in this plan:
   `rtk git add docs/aegis/plans/2026-07-10-algorithmic-observatory-implementation.md templates static src/home.rs && rtk git commit -m "🧪 test(home): verify observatory experience"`.
 
+## Task 8: Move the Three.js Runtime Off the Main Thread
+
+**Files:**
+
+- Create: `static/home-scene-worker.js`
+- Create: `static/vendor/three.home.min.js`
+- Modify: `static/home-scene.js`
+- Modify: `src/home.rs`
+- Delete after replacement verification: `static/vendor/three.module.min.js`
+- Delete after replacement verification: `static/vendor/three.core.min.js`
+- Delete after bundle verification: `static/vendor/three.home.entry.js`
+
+**Why:** The approved mobile Fast 3G plus 4x CPU profile measured a `1019ms`
+main-thread long task after the self-contained Three.js subset loaded. Detailed
+instrumentation showed renderer creation, scene build, first render, and pixel
+sampling still execute with module evaluation on the main thread. Reducing node
+counts or deferring the same import cannot fix this bug class.
+
+**Change Necessity:** A documentation-only change would leave the performance
+contract false. Further minification reduced bytes by `25.4%` but did not bring
+the long task below `200ms`. The minimum sufficient boundary is a narrow
+main-thread DOM bridge plus one module Worker that owns Three.js and the
+transferred `OffscreenCanvas`.
+
+**Impact/Compatibility:** Routes, Rust registry data, locales, visible HTML,
+Scalar, MCP, auth, scene budgets, inspector copy, and dataset names remain
+stable. Unsupported Worker, OffscreenCanvas, canvas transfer, or WebGL selects
+the existing CSS fallback; no main-thread Three.js compatibility path is kept.
+
+**Repair Track:**
+
+- Root cause: the main thread parses/evaluates the Three.js WebGLRenderer and
+  executes scene initialization in the same runtime boundary.
+- Canonical owners: `static/home-scene.js` for DOM/i18n/events/observers and
+  `static/home-scene-worker.js` for Three.js/rendering/raycast/animation.
+- Minimal stable repair: transfer the existing canvas once, move the current
+  scene owner into the Worker, and exchange normalized structured messages.
+- Compatibility: preserve inspector metadata, click pin/blank clear, hover
+  precedence, CTA guard, frame-count datasets, adaptive motion, and CSS fallback.
+- Verification: focused contracts, full checks, browser interaction evidence,
+  Worker-only network evidence, and the identical throttled profile.
+
+**Retirement Track:**
+
+- Old owner: main-thread Three.js import/render lifecycle in `home-scene.js`.
+- Old vendor path: `three.module.min.js -> three.core.min.js`.
+- Active status: superseded only after Worker runtime and performance evidence pass.
+- Deletion trigger: Worker canvas is nonblank; desktop/mobile/reduced-motion and
+  fallback checks pass; the throttled profile has no scene-attributable
+  main-thread long task above `200ms`.
+- Retained compatibility path: none. Unsupported worker capability uses CSS,
+  not the retired main-thread renderer.
+
+**Worker Message Contract:**
+
+- Main to worker `init`: transferred canvas, registry-derived `sourceNames`,
+  width, height, DPR cap inputs, mobile flag, and reduced-motion flag.
+- Main to worker `resize`: width, height, and current DPR cap inputs.
+- Main to worker `pointer`: normalized x/y plus inside state.
+- Main to worker `select`: normalized x/y or clear selection.
+- Main to worker `rendering`: visible and document-hidden state.
+- Worker to main `ready`: nonblank status and initial frame count.
+- Worker to main `frame`: bounded frame-count updates used by pause/resume tests.
+- Worker to main `hover` and `selection`: raw illustrative metadata only; main
+  thread formats localized inspector text and owns canvas datasets.
+- Worker to main `failure`: initialization/runtime failure reason; main activates
+  the deterministic CSS fallback and terminates the Worker.
+
+**Verification commands:**
+
+```bash
+rtk cargo test home::tests::homepage_scene_has_bounded_accessible_contract -- --exact
+rtk cargo test home::tests::homepage_scene_vendor_is_self_contained_and_retires_full_distribution -- --exact
+rtk node --check static/home-scene.js
+rtk node --check static/home-scene-worker.js
+rtk node --check static/vendor/three.home.min.js
+rtk cargo fmt --check
+rtk cargo clippy --all-targets --all-features -- -D warnings
+rtk cargo test
+rtk jq empty static/i18n/en.json static/i18n/zh-TW.json static/i18n/zh-CN.json
+rtk git diff --check
+rtk wc -c static/vendor/three.home.min.js static/home-scene.js static/home-scene-worker.js
+rtk rg -n 'three\.module\.min\.js|three\.core\.min\.js|three\.home\.entry\.js|import .*three\.home' static src templates
+```
+
+- [ ] **Write test:** Expand
+  `homepage_scene_has_bounded_accessible_contract` so `home-scene.js` must use
+  `transferControlToOffscreen`, construct a module Worker for
+  `/static/home-scene-worker.js`, handle `ready`, `frame`, `hover`, `selection`,
+  and `failure`, and contain neither a Three.js import nor `new THREE`.
+  Assert the Worker imports `/static/vendor/three.home.min.js`, owns the existing
+  DPR/node/observer-independent render markers, and consumes `init`, `resize`,
+  `pointer`, `select`, and `rendering` messages. Keep the vendor retirement test
+  requiring a self-contained bundle and absence of both full-distribution files.
+- [ ] **Verify RED:** Run both exact tests. Confirm the bridge/Worker ownership
+  test fails because `home-scene.js` still imports Three.js and the retirement
+  test fails only because old vendor files remain.
+- [ ] **Minimal code:** Move all Three.js construction, raycasting, animation,
+  adaptive quality, reduced-motion static rendering, and pixel sampling into
+  `home-scene-worker.js`. Keep DOM lookup, source extraction, i18n formatting,
+  interactive-control filtering, normalized pointer/click dispatch, datasets,
+  `ResizeObserver`, `IntersectionObserver`, visibility forwarding, Worker error
+  handling, and CSS fallback in `home-scene.js`. Transfer the canvas once with
+  `transferControlToOffscreen()`. On unsupported capability or worker failure,
+  terminate the Worker and call the sole CSS fallback without importing Three.js.
+  Do not add a second source registry, main-thread renderer, remote asset,
+  post-processing path, or production bundler. After live replacement evidence,
+  delete `three.module.min.js`, `three.core.min.js`, and the temporary entry.
+- [ ] **Verify GREEN:** Run every command above. Start the local server in the
+  WSL-approved network context. Re-run desktop `1440x1000`, tablet `1024x768`,
+  mobile `390x844`, zh-TW active inspector, problem/pulse pin, blank clear, CTA
+  guard, stationary-pointer pulse refresh, offscreen/document pause, reduced
+  motion, forced worker/WebGL failure, MCP/Scalar asset isolation, and screenshots.
+  Under `390x844`, CDP Fast 3G (`150ms`, `200000` B/s down, `93750` B/s up) plus
+  4x CPU, require LCP <= `2500ms`, CLS <= `0.1`, no failed requests, a nonblank
+  ready canvas, and no scene-attributable main-thread long task > `200ms`.
+- [ ] **Commit:**
+  `rtk git add docs/aegis static/home-scene.js static/home-scene-worker.js static/vendor/three.home.min.js static/vendor/THREE-LICENSE.txt static/i18n src/home.rs && rtk git add -u static/vendor && rtk git commit -m "⚡️ perf(home): move scene rendering to worker"`.
+
 ## Retirement Decision
 
 - Path: delete-first.
 - Retired behavior: Bento layout, glass-card homepage wall, generic MCP card
-  grid, Playfair font, and inline MCP behavior.
+  grid, Playfair font, inline MCP behavior, main-thread Three.js rendering, and
+  the full-distribution Three.js module chain.
 - Preserved behavior: public route access, registry-driven content, auth truth,
   locales, fragment IDs, examples, origin rewriting, and Scalar API docs.
 - Compat exception: none.
@@ -601,7 +739,8 @@ local URL, normally `http://127.0.0.1:7856`.
 Verification Plan:
 - Main-path check: live `/` and `/docs/mcp` complete their approved workflows.
 - Lingering-reference check: negative Rust test and `rg` find no old owner.
-- Negative check: Three.js does not load outside `/`; WebGL failure does not remove content.
+- Negative check: Three.js loads only in the homepage Worker; it does not load
+  on the homepage main thread, MCP, or Scalar; Worker/WebGL failure does not remove content.
 - Boundary check: Scalar, redirect, API, MCP transport, auth, and registry tests remain green.
 
 ## Risks and Rollback Surface
@@ -610,6 +749,10 @@ Verification Plan:
   do not replace the runtime with an unpinned CDN import.
 - WebGL may be blank on software-rendered Chromium: use the CSS fallback only
   as the unsupported-WebGL path, not as evidence that the scene works.
+- Module Worker or OffscreenCanvas may be unavailable: activate the existing CSS
+  fallback and complete HTML; do not restore the retired main-thread renderer.
+- Worker message drift may break inspector or lifecycle behavior: keep the
+  message kinds explicit in focused tests and verify every interaction live.
 - Locale expansion may overflow compact controls: allow wrapping and stable
   height rather than shrinking type with viewport width.
 - A scene performance defect may require lowering node/edge budgets; it must not
@@ -619,8 +762,8 @@ Verification Plan:
 
 ## ADR and Baseline Sync Signal
 
-- Preserve the approved ADR signal for the pinned Three.js dependency and
-  presentation owner split.
+- Preserve the approved ADR signal for the pinned Three.js dependency,
+  presentation owner split, and main-thread/Worker rendering boundary.
 - At completion, evaluate whether verified implementation matches the design
   closely enough to backfill an ADR. Do not create an accepted ADR from this plan alone.
 - Update the baseline only if verification proves a durable owner boundary that
@@ -634,21 +777,27 @@ Verification Plan:
   Scalar and runtime contracts stay out of scope.
 - Baseline Lock: approved Aegis design, homepage OpenSpec, current router and registry owners.
 - Approved Behavior: guided Three.js hero, curated narrative, API primary CTA,
-  dense MCP reference, adaptive motion, and complete HTML fallback.
+  dense MCP reference, adaptive motion, Worker-owned rendering, and complete
+  HTML/CSS fallback.
 - Owner / Contract Constraints: Rust registry canonical; browser modules enhance
-  only; Three.js homepage-only; `src/home.rs` wiring-only.
+  only; main thread owns DOM/i18n/observers; Worker owns Three.js; Three.js is
+  homepage-Worker-only; `src/home.rs` remains wiring-only.
 - Compatibility Boundary: routes, auth, locales, fragments, metadata, examples,
   and Scalar remain stable.
-- Retirement Boundary: remove old Bento/card-wall/inline owners; no compatibility fallback.
+- Retirement Boundary: remove old Bento/card-wall/inline owners, main-thread
+  renderer, full Three.js distribution, and temporary bundle entry; no renderer
+  compatibility fallback.
 - Task Batches: asset boundaries; semantic homepage; localization; scene; MCP;
-  retirement; full verification.
+  retirement; full verification; Worker performance migration.
 - Test Obligations: RED/GREEN render assertions per task plus live visual,
   canvas, interaction, accessibility, performance, and Scalar checks.
-- Review Gates: inspect after semantic homepage, scene, MCP, and final evidence.
+- Review Gates: inspect after semantic homepage, scene, MCP, Worker ownership,
+  and final performance evidence.
 - Drift / Rewind Rules: if a task requires a backend endpoint, duplicate registry,
   frontend framework, remote production asset, or Scalar edit, stop and return
   to the approved design instead of expanding scope.
 - Evidence Required Before Completion: command results, screenshots, nonblank
-  canvas proof, interaction checks, network/console inspection, and clean git diff.
+  worker canvas proof, interaction checks, Worker-only Three.js network evidence,
+  throttled main-thread metrics, fallback evidence, and clean git diff.
 - Advisory Boundary: method-pack execution guidance only; not GateDecision,
   PolicySnapshot, or completion authority.

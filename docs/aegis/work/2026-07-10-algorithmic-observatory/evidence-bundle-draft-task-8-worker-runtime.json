@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "artifactKey": "task-8-worker-runtime",
+  "type": "browser-and-command",
+  "source": "Chromium, Playwright CDP trace/control profiles, cargo and static checks",
+  "summary": "Worker scene passes interaction, fallback, responsive, locale, asset-isolation and performance-attribution gates; old vendor chain retired; 209 tests and all static checks pass.",
+  "verifier": "Codex inline execution plus independent spec and code-quality reviews"
+}

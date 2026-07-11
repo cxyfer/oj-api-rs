@@ -63,6 +63,12 @@ and static assets as implementation evidence.
 - `src/main.rs` owns Scalar `/docs`; the homepage must not duplicate that owner.
 - `src/home.rs` owns public page render context and the Rust documentation registry.
 - Three.js is a homepage-only presentation dependency and must not enter API or MCP runtime logic.
+- `static/home-scene.js` owns homepage DOM discovery, localization, input filtering,
+  observers, datasets, and module Worker lifecycle; it does not import Three.js.
+- `static/home-scene-worker.js` is the sole Three.js runtime owner and renders to a
+  transferred `OffscreenCanvas` using the self-contained `three.home.min.js` bundle.
+- Unsupported Worker, OffscreenCanvas, or WebGL capability and runtime WebGL
+  failure select the deterministic CSS fallback; no main-thread renderer is retained.
 - The existing documentation registry remains the source for featured endpoints and MCP tools.
 
 ### 5.2 Architecture Non-negotiables
@@ -87,13 +93,19 @@ and static assets as implementation evidence.
 - MCP reference document structure -> `templates/docs_mcp.html`.
 - Shared public shell -> `templates/docs_base.html` and shared public CSS.
 - Localization -> `static/i18n/en.json`, `zh-TW.json`, and `zh-CN.json`.
+- Homepage scene bridge -> `static/home-scene.js`.
+- Homepage Three.js runtime -> `static/home-scene-worker.js` and
+  `static/vendor/three.home.min.js`.
+- Worker boundary rationale ->
+  `docs/aegis/adr/ADR-0001-homepage-threejs-worker-boundary.md`.
 
 ## 7. Current State and Risks
 
-- The current public stylesheet mixes homepage and MCP reference responsibilities.
 - `src/home.rs` is already a large maintained source file, so changes should stay wiring-only.
-- A WebGL hero can harm load time, battery use, and readability without explicit budgets.
-- The existing OpenSpec still names the superseded Bento direction until updated.
+- A throttled profile still contains a non-scene main-thread Layout long task;
+  its cause is outside the Worker migration and remains a separate performance follow-up.
+- The one-time full-buffer `readPixels` operation remains Worker-only but can
+  cost hundreds of milliseconds under throttling.
 
 ## 8. Alignment Use
 

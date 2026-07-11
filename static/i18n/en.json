@@ -243,6 +243,10 @@
       "primary_cta": "Explore the API",
       "secondary_cta": "MCP for Agents",
       "inspector_idle": "Mapping semantic relationships across sources",
+      "inspector_access_path": "access path",
+      "inspector_core_to": "core to",
+      "inspector_similarity": "similarity",
+      "inspector_illustrative": "illustrative",
       "continue": "Enter the problem space"
     },
     "stats": {

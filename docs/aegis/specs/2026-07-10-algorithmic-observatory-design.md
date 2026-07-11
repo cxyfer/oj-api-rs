@@ -63,7 +63,8 @@ ImpactStatementDraft:
 - Affected layers: public Askama templates, public CSS, homepage-only browser JS,
   localization JSON, homepage/MCP render tests, and public docs requirements.
 - Owners: existing public page templates and Rust documentation registry;
-  one new homepage scene module owns WebGL behavior.
+  a main-thread scene bridge owns DOM integration and a dedicated Worker owns
+  WebGL behavior.
 - Invariants: route paths, Scalar ownership, endpoint registry, MCP tool names,
   auth semantics, localization set, and public access remain stable.
 - Compatibility: `/docs/api` continues to redirect permanently to `/docs`.
@@ -133,6 +134,24 @@ resolution, retrieval, and MCP/API access paths.
 - Illustrative problem nodes and scores must be clearly presented as a visual
   model, not live search results.
 
+### 8.4 Worker Runtime Boundary
+
+- Three.js module parsing, scene construction, raycasting, rendering, and pixel
+  sampling run in a dedicated module Worker using `OffscreenCanvas`.
+- The main-thread scene module owns DOM discovery, source-name extraction,
+  localization, pointer/control filtering, resize observation, visibility
+  observation, and worker lifecycle only.
+- The worker receives registry-derived source names and normalized pointer,
+  click, resize, visibility, and reduced-motion messages. It returns ready,
+  nonblank, frame-count, hover, selection, and failure messages containing only
+  illustrative scene metadata.
+- Hover and click selection remain observable through the existing HTML
+  inspector and canvas datasets; the worker does not own localized copy or DOM.
+- The main thread must not import Three.js or retain a second renderer path.
+- If module Worker, `OffscreenCanvas`, canvas transfer, or WebGL initialization
+  is unavailable, the page activates the existing deterministic CSS fallback
+  and retains complete HTML content. It does not load Three.js on the main thread.
+
 ## 9. Visual System
 
 - Graphite: `#07090b`.
@@ -169,11 +188,14 @@ resolution, retrieval, and MCP/API access paths.
 - Text and controls meet WCAG AA contrast.
 - `prefers-reduced-motion: reduce` renders one stable scene frame and disables
   nonessential transitions.
-- WebGL failure leaves the content fully readable over a deterministic CSS background.
+- Worker, OffscreenCanvas, or WebGL failure leaves the content fully readable
+  over a deterministic CSS background.
 
 ## 12. Performance Budget
 
 - Three.js is pinned, self-hosted, and loaded only by the homepage.
+- Three.js is loaded only inside the scene Worker; the main thread must not parse
+  or evaluate the Three.js runtime.
 - Pixel ratio cap: `1.5` desktop and `1.25` mobile.
 - Scene budget: approximately 110 nodes desktop and 48 nodes mobile, with a
   bounded edge count and no post-processing pipeline.
@@ -182,6 +204,9 @@ resolution, retrieval, and MCP/API access paths.
 - The render loop pauses when the hero leaves the viewport or the document is hidden.
 - Quality reduces when sustained frame time exceeds budget.
 - HTML and critical CSS render before the scene becomes interactive.
+- Under the recorded `390x844` Fast 3G plus 4x CPU profile, LCP remains at or
+  below `2.5s`, CLS remains at or below `0.1`, and no main-thread long task above
+  `200ms` is attributable to scene bootstrap, interaction bridging, or fallback.
 - No raster hero image is required; the domain-specific scene is the primary visual asset.
 
 ## 13. Ownership and File Boundaries
@@ -192,19 +217,24 @@ resolution, retrieval, and MCP/API access paths.
 - `static/site.css`: shared public shell and design tokens.
 - `static/home.css`: homepage-only composition and scene overlays.
 - `static/mcp.css`: MCP-only reference styling.
-- `static/home-scene.js`: Three.js scene lifecycle and guided interaction.
-- `static/vendor/three.module.min.js`: pinned third-party runtime with license notice.
+- `static/home-scene.js`: main-thread DOM, i18n, event, observer, dataset, and
+  Worker lifecycle bridge; it does not import Three.js.
+- `static/home-scene-worker.js`: canonical Three.js scene, rendering, raycast,
+  animation, adaptive-quality, and pixel-sampling owner.
+- `static/vendor/three.home.min.js`: pinned, self-contained, tree-shaken Three.js
+  revision 180 runtime loaded only by the Worker, with license notice.
 - Localization JSON: visible translatable copy only.
 - `src/home.rs`: wiring-only template data and render assertions.
 
 Existence Check:
-- Proposed new surface: homepage scene module, vendor runtime, shared/site split,
-  and MCP stylesheet.
+- Proposed new surface: homepage scene bridge, scene Worker, vendor runtime,
+  shared/site split, and MCP stylesheet.
 - Existing owner / reuse candidate: mixed `static/home.css` and template-local scripts.
 - Why existing surface is insufficient: WebGL has a distinct lifecycle, while
   the current stylesheet already mixes homepage and reference-page responsibilities.
-- Creation proof: separate page loading prevents Three.js from reaching Scalar
-  or MCP pages and keeps CSS owners cohesive.
+- Creation proof: the Worker is required to keep the pinned Three.js runtime off
+  the main thread; page-specific loading prevents it from reaching Scalar or MCP
+  pages and keeps CSS owners cohesive.
 - Entropy / retirement impact: old Bento selectors and superseded shared rules
   are removed in the same change; no parallel theme remains.
 - Decision: add-with-proof.
@@ -213,23 +243,28 @@ Existence Check:
 
 Complexity Budget:
 - Artifact class: source and maintained presentation artifacts.
-- Target files / artifacts: `src/home.rs`, public templates, public CSS, scene JS, i18n.
+- Target files / artifacts: `src/home.rs`, public templates, public CSS, scene
+  bridge/Worker JS, and i18n.
 - Current pressure: `src/home.rs` is 959 lines and `static/home.css` is 619 lines
   with mixed responsibilities.
 - Projected post-change pressure: adding in place would push the stylesheet near
   or beyond strong pressure while adding a new responsibility to a large Rust owner.
 - Budget result: at-risk without the proposed split; within-budget with it.
 - Planned governance: keep Rust changes wiring-only, split presentation owners,
-  and isolate WebGL lifecycle in one module.
+  and isolate WebGL lifecycle in the Worker while the main thread remains a
+  narrow bridge.
 
 Plan-Time Complexity Check:
-- Better file boundary: shared shell, homepage, MCP, and scene behavior each have
-  one named owner.
-- Recommendation: extract shared CSS, repurpose `home.css`, add MCP and scene owners.
+- Better file boundary: shared shell, homepage, MCP, main-thread scene bridge,
+  and Worker rendering each have one named owner.
+- Recommendation: extract shared CSS, repurpose `home.css`, and add separate MCP,
+  scene bridge, and Worker rendering owners.
 
 Architecture Integrity Lens:
-- Invariant: one canonical owner for route metadata and one owner for WebGL behavior.
-- Canonical owner / contract: Rust registry for endpoint/tool data; scene module for rendering.
+- Invariant: one canonical owner for route metadata, one main-thread bridge, and
+  one Worker owner for WebGL behavior.
+- Canonical owner / contract: Rust registry for endpoint/tool data;
+  `home-scene.js` for DOM bridging; `home-scene-worker.js` for rendering.
 - Responsibility overlap: prohibited between scene data and the Rust registry.
 - Higher-level simplification: DOM-rendered registry values bridge Rust and JS
   without a new JSON endpoint.
@@ -241,11 +276,14 @@ Architecture Integrity Lens:
 
 Anti-Entropy Declaration:
 - Deletion Class: code-retirement.
-- Old Path/Object: Bento homepage layout selectors and superseded mixed CSS rules.
-- New Canonical Owner: Algorithmic Observatory homepage and separated public styles.
+- Old Path/Object: Bento homepage layout selectors, superseded mixed CSS rules,
+  and main-thread Three.js renderer/import paths.
+- New Canonical Owner: Algorithmic Observatory homepage, separated public
+  styles, main-thread scene bridge, and Worker renderer.
 - Expected Preserved Behavior: public routes, localized content, auth guidance,
   featured endpoints, examples, fragment links, and responsive access.
-- Expected Retired Behavior: Bento first-screen composition and glass-card wall styling.
+- Expected Retired Behavior: Bento first-screen composition, glass-card wall
+  styling, and main-thread Three.js parsing/rendering.
 - External Boundary Touched: no.
 - Source-of-Truth Data Risk: none.
 - User Confirmation Required: no.
@@ -281,6 +319,8 @@ Baseline Role Alignment:
   visible hint of following content without overlap.
 - Node hover/click, pointer parallax, authored camera movement, pause/resume,
   reduced-motion, and WebGL fallback behave as specified.
+- Worker messages preserve hover/click datasets and localized inspector output;
+  interactive hero controls do not trigger background selection.
 - MCP reference rows, navigation, details, and code blocks remain readable at all target sizes.
 
 ### Performance and Quality
@@ -290,14 +330,21 @@ Baseline Role Alignment:
 - Use Playwright screenshots at representative desktop, tablet, and mobile viewports.
 - Perform canvas-pixel checks to prove the WebGL scene is not blank.
 - Inspect overflow, console errors, network loading, reduced motion, and scene pause behavior.
+- Confirm Three.js is requested by the Worker only, never evaluated on the main
+  thread, and absent from MCP and Scalar pages.
+- Verify Worker/OffscreenCanvas initialization failure selects the CSS fallback
+  without attempting a main-thread Three.js compatibility path.
 - Measure page weight and runtime performance against the budgets in Section 12.
 
 ## 17. ADR Signal
 
-- Signal: yes, because the design introduces a pinned Three.js dependency and
-  separates public presentation ownership.
-- Alternatives: Canvas 2D, CSS-only visualization, and Three.js/WebGL.
-- Chosen direction: Three.js with guided exploration and homepage-only loading.
+- Signal: yes, because the design introduces a pinned Three.js dependency,
+  separates public presentation ownership, and moves the renderer across a
+  main-thread/Worker boundary.
+- Alternatives: main-thread Three.js, mobile CSS-only fallback, Canvas 2D, and
+  Three.js with Worker-owned OffscreenCanvas.
+- Chosen direction: Worker-owned Three.js with guided exploration,
+  homepage-only loading, and CSS fallback when the worker runtime is unavailable.
 - Expected completion question: whether the implemented dependency and owner
   boundaries merit an ADR backfill after verification.
 

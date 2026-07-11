@@ -243,6 +243,10 @@
       "primary_cta": "探索 API",
       "secondary_cta": "Agents 专用 MCP",
       "inspector_idle": "正在描绘跨来源的语义关联",
+      "inspector_access_path": "访问路径",
+      "inspector_core_to": "核心连接至",
+      "inspector_similarity": "相似度",
+      "inspector_illustrative": "示意",
       "continue": "进入题目空间"
     },
     "stats": {

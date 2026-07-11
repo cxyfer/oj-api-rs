@@ -540,7 +540,13 @@
     }
 
     .scene-shell::after {
-        background: linear-gradient(0deg, var(--ink) 0%, rgba(7, 9, 11, 0.45) 72%, transparent);
+        background: linear-gradient(
+            180deg,
+            var(--ink) 0%,
+            rgba(7, 9, 11, 0.96) 48%,
+            rgba(7, 9, 11, 0.7) 73%,
+            var(--ink) 100%
+        );
     }
 
     .hero-copy {

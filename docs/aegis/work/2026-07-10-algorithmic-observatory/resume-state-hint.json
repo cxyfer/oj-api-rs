@@ -2,13 +2,9 @@
   "schemaVersion": "aegis.schema.v0",
   "taskId": "2026-07-10-algorithmic-observatory",
   "lastCheckpointRef": "docs/aegis/work/2026-07-10-algorithmic-observatory/todo-checkpoint-draft.json",
-  "resumeInstruction": "Read Tasks 6-7 and latest drift check; implementation tests are green but visual evidence is still pending.",
+  "resumeInstruction": "Implementation is verified; resume only for user-directed integration or the documented residual performance follow-ups.",
   "knownPartialWork": [
-    "Verified clean baseline.",
-    "Split public page asset owners.",
-    "Built and localized the semantic homepage.",
-    "Added the MIT-licensed guided Three.js scene.",
-    "Redesigned the MCP reference work surface."
+    "Final independent review approved; fresh 209-test, clippy, static, retirement, browser, bundle, and workspace checks pass."
   ],
   "mustReadBeforeContinuing": [
     "docs/aegis/work/2026-07-10-algorithmic-observatory/10-intent.md",
@@ -16,6 +12,6 @@
     "docs/aegis/work/2026-07-10-algorithmic-observatory/todo-checkpoint-draft.json"
   ],
   "unsafeToAssume": [
-    "Do not claim the canvas is nonblank or layouts are responsive until browser screenshots and pixel checks pass."
+    "The non-scene Layout long task is caused by the Worker scene."
   ]
 }

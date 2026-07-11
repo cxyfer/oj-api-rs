@@ -12,16 +12,6 @@
     --lime: #c7f45b;
     --content: 1240px;
 
-    /* Compatibility aliases while MCP completes its own redesign. */
-    --home-bg: var(--ink);
-    --home-panel: rgba(243, 241, 234, 0.045);
-    --home-line: var(--line);
-    --home-text: var(--paper);
-    --home-muted: var(--muted);
-    --home-accent: var(--coral);
-    --home-accent-2: var(--cyan);
-    --home-accent-3: var(--paper);
-    --home-shadow: none;
 }
 
 * {

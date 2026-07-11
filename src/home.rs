@@ -791,19 +791,103 @@ mod tests {
 
         let scene_module = include_str!("../static/home-scene.js");
         for marker in [
-            "three.module.min.js",
+            "transferControlToOffscreen",
+            "new Worker('/static/home-scene-worker.js', { type: 'module' })",
+            "type: 'init'",
+            "type: 'resize'",
+            "type: 'pointer'",
+            "type: 'select'",
+            "type: 'rendering'",
+            "case 'ready'",
+            "case 'frame'",
+            "case 'hover'",
+            "case 'selection'",
+            "case 'failure'",
+            "message.nonblank !== true || message.pixelStatus !== 'nonblank'",
+            "resetInteractionState();",
             "IntersectionObserver",
             "visibilitychange",
             "prefers-reduced-motion",
-            "MAX_DESKTOP_DPR = 1.5",
-            "MAX_MOBILE_DPR = 1.25",
             "is-webgl-fallback",
+            "problemTitle",
+            "canvas.dataset.selectedSource",
+            "hero.addEventListener('click'",
+            "metadata.accessPath",
+            "pointerInside",
+            "INTERACTIVE_SELECTOR",
+            "closest(INTERACTIVE_SELECTOR)",
+            "window.i18n.t",
+            "languageChanged",
+            "home.hero.inspector_idle",
         ] {
             assert!(
                 scene_module.contains(marker),
                 "missing scene marker {marker}"
             );
         }
+        assert!(!scene_module.contains("three.home.min.js"));
+        assert!(!scene_module.contains("new THREE"));
+
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let worker_module = std::fs::read_to_string(root.join("static/home-scene-worker.js"))
+            .expect("homepage scene worker module should be readable");
+        for marker in [
+            "from '/static/vendor/three.home.min.js'",
+            "case 'init'",
+            "case 'resize'",
+            "case 'pointer'",
+            "case 'select'",
+            "case 'rendering'",
+            "type: 'ready'",
+            "type: 'frame'",
+            "type: 'hover'",
+            "type: 'selection'",
+            "type: 'failure'",
+            "MAX_DESKTOP_DPR = 1.5",
+            "MAX_MOBILE_DPR = 1.25",
+            "DESKTOP_NODE_COUNT = 110",
+            "MOBILE_NODE_COUNT = 48",
+            "requestAnimationFrame",
+            "readPixels",
+            "FRAME_REPORT_INTERVAL_MS = 250",
+            "time - lastFrameReportTime < FRAME_REPORT_INTERVAL_MS",
+            "reportFrame(time, frameCount === 1)",
+            "return 'nonblank'",
+            "return 'blank'",
+            "return 'unknown'",
+            "pixelStatus !== 'nonblank'",
+            "webglcontextlost",
+            "postFailureOnce('webgl context lost')",
+            "if (!reducedMotion) updatePointerTarget()",
+            "if (reducedMotion) return",
+            "problemMetadata",
+            "raycaster.params.Points.threshold",
+            "intersection.index",
+            "selectedTarget",
+            "MAX_CONTROLLED_PULSES",
+            "createControlledPulses",
+            "controlledPulses.map((pulse) => pulse.userData.pulseHitTarget)",
+            "refreshHoveredTarget",
+            "if (!forceStatic && pointerInside) refreshHoveredTarget()",
+            "pulseHitTarget",
+            "intersectObjects(raycastTargets, false, intersections)",
+        ] {
+            assert!(
+                worker_module.contains(marker),
+                "missing scene worker marker {marker}"
+            );
+        }
+        assert_eq!(
+            worker_module.matches("type: 'frame'").count(),
+            1,
+            "frame reporting must stay behind the bounded reportFrame gate"
+        );
+        assert_eq!(
+            worker_module.matches("renderFrame(").count(),
+            4,
+            "reduced-motion interactions must raycast without rendering a new frame"
+        );
+        assert!(!worker_module.contains("if (reducedMotion) renderFrame"));
 
         let mcp_html = McpDocsTemplate {
             docs: docs_registry(),
@@ -816,6 +900,42 @@ mod tests {
         .expect("mcp docs template should render");
         assert!(!mcp_html.contains("three.module.min.js"));
         assert!(!mcp_html.contains("home-scene.js"));
+    }
+
+    #[test]
+    fn homepage_scene_vendor_is_self_contained_and_retires_full_distribution() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let worker_module = std::fs::read_to_string(root.join("static/home-scene-worker.js"))
+            .expect("homepage scene worker module should be readable");
+        assert!(worker_module.contains("from '/static/vendor/three.home.min.js'"));
+
+        let bundle_path = root.join("static/vendor/three.home.min.js");
+        let bundle = std::fs::read_to_string(&bundle_path)
+            .expect("tree-shaken homepage Three.js bundle should exist");
+        for external_reference in [
+            "three.core.min.js",
+            "three.module.min.js",
+            "from\"http",
+            "from'http",
+            "from\"/",
+            "from'/",
+        ] {
+            assert!(
+                !bundle.contains(external_reference),
+                "homepage Three.js bundle must be self-contained: {external_reference}"
+            );
+        }
+
+        for retired in [
+            "three.module.min.js",
+            "three.core.min.js",
+            "three.home.entry.js",
+        ] {
+            assert!(
+                !root.join("static/vendor").join(retired).exists(),
+                "retired full Three.js distribution remains: {retired}"
+            );
+        }
     }
 
     #[tokio::test]
@@ -1010,6 +1130,10 @@ mod tests {
                 "/home/hero/category",
                 "/home/hero/statement",
                 "/home/hero/primary_cta",
+                "/home/hero/inspector_access_path",
+                "/home/hero/inspector_core_to",
+                "/home/hero/inspector_similarity",
+                "/home/hero/inspector_illustrative",
                 "/home/space/title",
                 "/home/capabilities/resolve/title",
                 "/home/capabilities/retrieve/title",
@@ -1081,6 +1205,39 @@ mod tests {
         assert_eq!(mcp_html.matches("class=\"reference-details\"").count(), 7);
         assert!(!mcp_html.contains("<details class=\"reference-details\" open>"));
         assert_eq!(mcp_html.matches("<summary>").count(), 7);
+    }
+
+    #[test]
+    fn public_templates_do_not_reference_retired_presentation() {
+        let public_sources = [
+            include_str!("../templates/docs_base.html"),
+            include_str!("../templates/home.html"),
+            include_str!("../templates/docs_mcp.html"),
+            include_str!("../static/site.css"),
+            include_str!("../static/home.css"),
+            include_str!("../static/mcp.css"),
+            include_str!("../static/mcp.js"),
+        ];
+
+        for retired in [
+            "bento-",
+            "Playfair Display",
+            "panel reference-card",
+            "function openByHash",
+            "--home-",
+        ] {
+            assert!(
+                public_sources
+                    .iter()
+                    .all(|source| !source.contains(retired)),
+                "retired presentation reference remains: {retired}"
+            );
+        }
+
+        let shared_shell = include_str!("../templates/docs_base.html");
+        assert!(shared_shell.contains("/static/i18n.js"));
+        assert!(shared_shell.contains("block page_styles"));
+        assert!(shared_shell.contains("block page_scripts"));
     }
 
     #[tokio::test]

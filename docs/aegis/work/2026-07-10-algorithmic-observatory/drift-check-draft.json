@@ -5,11 +5,11 @@
   "baselineRefs": [
     "docs/aegis/specs/2026-07-10-algorithmic-observatory-design.md"
   ],
-  "scopeStatus": "Tasks 2-5 stayed within homepage, MCP, public assets, locales, and render tests.",
-  "compatStatus": "Rust registry, auth rows, fragments, redirect, and full tests remain green; live Scalar and browser interaction still need verification.",
-  "retirementStatus": "Bento homepage and inline MCP owner retired; final negative scan and browser evidence pending.",
+  "scopeStatus": "Task 8 stayed within approved bridge, Worker, vendor, tests, and work records.",
+  "compatStatus": "Routes, registry, locales, inspector datasets, Scalar, MCP, auth, responsive layout, and CSS fallback remain aligned.",
+  "retirementStatus": "Main-thread Three.js owner and old full-distribution vendor chain removed with negative scan and retirement test.",
   "newRiskSignals": [
-    "WebGL scene and responsive composition require live Playwright evidence before completion."
+    "Non-scene throttled Layout long task remains a separate follow-up; Worker pixel proof still reads the full buffer once."
   ],
-  "decision": "needs-verification"
+  "decision": "continue"
 }

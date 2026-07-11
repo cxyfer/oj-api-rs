@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "baselineRefs": [
+    "docs/aegis/specs/2026-07-10-algorithmic-observatory-design.md"
+  ],
+  "impactStatement": "docs/aegis/work/2026-07-10-algorithmic-observatory/impact-statement-draft.json",
+  "compatPlan": "No API, MCP transport, OpenAPI, database, auth, crawler, admin, or Scalar behavior changes.",
+  "retirementPlan": "Main-thread Three.js owner and old full-distribution vendor chain removed with negative scan and retirement test.",
+  "evidenceBundle": [
+    "docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-baseline-tests.json",
+    "docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-task-1-assets.json",
+    "docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-task-8-worker-runtime.json",
+    "docs/aegis/work/2026-07-10-algorithmic-observatory/evidence-bundle-draft-tasks-2-to-5.json"
+  ]
+}
