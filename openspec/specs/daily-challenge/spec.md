@@ -57,6 +57,8 @@ The system SHALL return daily challenges via `GET /api/v1/daily?domain={com|cn}&
 ### Requirement: Daily challenge date validation
 The system SHALL validate the `date` parameter format as `YYYY-MM-DD` and enforce range `[2020-04-01, domain-aware today]`. For `domain=cn`, "today" SHALL be computed using UTC+8. For `domain=com`, "today" SHALL be computed using UTC.
 
+Additional daily sources SHALL only be available from their first published date and on their publishing weekdays: `0x3f` from `2022-04-08` on Monday through Friday, and `sheep` from `2024-02-26` on Monday through Saturday. An unavailable additional-source date SHALL return HTTP 404 without reading the database or starting a fallback crawler. Scheduled additional-source refreshes SHALL skip unavailable UTC+8 dates.
+
 #### Scenario: Date before lower bound
 - **WHEN** client sends `GET /api/v1/daily?domain=com&date=2019-01-01`
 - **THEN** system returns HTTP 400 with error detail indicating date must be >= 2020-04-01
@@ -76,6 +78,11 @@ The system SHALL validate the `date` parameter format as `YYYY-MM-DD` and enforc
 #### Scenario: Invalid calendar date
 - **WHEN** client sends `GET /api/v1/daily?domain=com&date=2024-02-30`
 - **THEN** system returns HTTP 400 with error detail indicating invalid date
+
+#### Scenario: Additional source unavailable date
+- **WHEN** client requests `GET /api/v1/daily?source=sheep&date=2026-06-07` or `GET /api/v1/daily?source=0x3f&date=2026-06-06`
+- **THEN** the system returns HTTP 404
+- **AND** does not register or start a fallback crawler job
 
 ### Requirement: Daily challenge domain validation
 The system SHALL only accept `com` or `cn` as valid domain values, validated via the `LeetCodeDomain` enum. The `source` parameter SHALL only accept supported daily source values. If both `domain` and `source` are provided, the system SHALL allow matching LeetCode pairs and SHALL return HTTP 400 for conflicts or for pairing a LeetCode-only `domain` with a non-LeetCode `source`.
@@ -97,7 +104,7 @@ The system SHALL only accept `com` or `cn` as valid domain values, validated via
 - **THEN** system returns HTTP 400 with error detail indicating domain and source conflict
 
 ### Requirement: Daily challenge not found
-The system SHALL return HTTP 404 only when no usable daily challenge record exists in the DB AND no fallback behavior applies. A daily row with malformed JSON, malformed problem refs, or no resolvable problems SHALL be treated as unusable. When fallback behavior applies, the system SHALL return HTTP 202 instead. LeetCode sources SHALL keep spawning the LeetCode fallback crawler. Configured additional daily sources SHALL spawn the dedicated daily-source fallback crawler from the API handler. Additional daily sources that cannot be fetched because required configuration is missing SHALL return HTTP 202 with an ingestion-required response and SHALL NOT write an empty daily row.
+The system SHALL return HTTP 404 when an additional daily source is unavailable for the requested date, or when no usable daily challenge record exists in the DB AND no fallback behavior applies. A daily row with malformed JSON, malformed problem refs, or no resolvable problems SHALL be treated as unusable. When fallback behavior applies, the system SHALL return HTTP 202 instead. LeetCode sources SHALL keep spawning the LeetCode fallback crawler. Configured additional daily sources SHALL spawn the dedicated daily-source fallback crawler from the API handler. Additional daily sources that cannot be fetched because required configuration is missing SHALL return HTTP 202 with an ingestion-required response and SHALL NOT write an empty daily row.
 
 #### Scenario: No data, fallback triggered (com)
 - **WHEN** client sends `GET /api/v1/daily?domain=com&date=2024-06-15` and no DB record exists and no fallback is running

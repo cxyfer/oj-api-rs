@@ -343,6 +343,51 @@ async fn daily_endpoint_rejects_domain_with_codeforces_source() {
 }
 
 #[tokio::test]
+async fn daily_endpoint_rejects_unavailable_additional_source_dates_without_jobs() {
+    let (app, guard, state) = common::build_test_app_with_state_and_config(Config::default());
+    seed_daily_problem_with_source(
+        guard.db_path(),
+        "codeforces",
+        "1930A",
+        "1930A",
+        Some("Maximise The Score"),
+        None,
+        Some("Codeforces hint"),
+        None,
+        &[],
+    );
+    seed_daily_row(
+        guard.db_path(),
+        "2026-06-07",
+        "sheep",
+        &["codeforces:1930A"],
+    );
+
+    for (source, date) in [
+        ("sheep", "2024-02-25"),
+        ("sheep", "2026-06-07"),
+        ("0x3f", "2022-04-07"),
+        ("0x3f", "2026-06-06"),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/v1/daily?source={source}&date={date}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND, "{source} {date}");
+    }
+
+    assert!(state.daily_fallback.lock().await.is_empty());
+    assert!(state.crawler_jobs.lock().await.is_empty());
+}
+
+#[tokio::test]
 async fn daily_endpoint_missing_0x3f_source_without_token_returns_ingestion_required_without_job() {
     let mut config = Config::default();
     config.daily_sources.tencent_docs.token_env = "  ".to_string();
