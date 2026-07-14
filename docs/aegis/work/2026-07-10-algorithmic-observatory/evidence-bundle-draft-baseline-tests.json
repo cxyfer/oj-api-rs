@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "artifactKey": "baseline-tests",
+  "type": "command",
+  "source": "rtk cargo fmt --check; rtk cargo test; aegis-workspace.py check",
+  "summary": "Clean baseline: formatting passed, 204 tests passed across 6 suites, workspace check passed.",
+  "verifier": "Codex inline execution"
+}

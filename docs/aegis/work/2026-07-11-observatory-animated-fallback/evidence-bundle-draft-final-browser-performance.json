@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "artifactKey": "final-browser-performance",
+  "type": "browser-command-trace",
+  "source": "Playwright responsive/failure/reduced-motion harness, Fast 3G plus 4x CPU CDP profile, scene-disabled control, and full Rust/static checks",
+  "summary": "All Worker and fallback states passed at 1440x1000, 1024x768, and 390x844; reduced motion was pixel-stable; LCP was 1096/1012 ms, CLS 0.0329, and scene-attributable long-task increments were 149/83 ms; 211 tests passed.",
+  "verifier": "Codex inline execution plus independent spec and quality reviews"
+}

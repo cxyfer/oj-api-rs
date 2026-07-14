@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "requestedOutcome": "Implement the approved visually faithful SVG and CSS fallback for unavailable Worker WebGL.",
+  "goal": "Preserve observatory visual identity across WebGL-incompatible browsers without main-thread Three.js or a JavaScript animation loop.",
+  "successEvidence": [
+    "Forced fallback screenshots show the core, hubs, network, and moving route pulses at desktop, tablet, and mobile; reduced motion is static; performance and regression checks pass."
+  ],
+  "stopCondition": "Done when source tests, two-stage review, live fallback/full-scene browser checks, performance attribution, ADR amendment, and workspace verification pass; otherwise report blocked, needs-verification, or scope-exceeded.",
+  "nonGoals": [
+    "No Canvas 2D, main-thread Three.js, new dependency, live problem data, hover/click fallback, or API/database work."
+  ],
+  "scope": "Homepage fallback SVG structure, CSS animation, normalized diagnostic codes, render assertions, live browser verification, and Aegis alignment records.",
+  "changeKinds": [
+    "compatibility"
+  ],
+  "riskHints": [
+    "Fallback animation could accidentally run behind the successful scene, add main-thread paint pressure, obscure mobile copy, or create a duplicate renderer owner."
+  ]
+}

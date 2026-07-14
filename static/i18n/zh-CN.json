@@ -237,9 +237,17 @@
       "mcp_docs": "MCP 文档"
     },
     "hero": {
-      "eyebrow": "公开 API 文档",
-      "title": "通过单一整合 API 访问程序竞赛题目数据。",
-      "lead": "查询题目数据、获取每日挑战、搜索相似题目，并通过 MCP 连接工具客户端，不必再在零散的数据来源之间切换。"
+      "category": "题目智能基础设施",
+      "statement": "所有评测平台，一个题目空间。",
+      "lead": "为开发者、竞赛用户与 AI agents 构建共享智能层，以一致方式解析、获取、关联与连接算法题目。",
+      "primary_cta": "探索 API",
+      "secondary_cta": "Agents 专用 MCP",
+      "inspector_idle": "正在描绘跨来源的语义关联",
+      "inspector_access_path": "访问路径",
+      "inspector_core_to": "核心连接至",
+      "inspector_similarity": "相似度",
+      "inspector_illustrative": "示意",
+      "continue": "进入题目空间"
     },
     "stats": {
       "problems_label": "已索引题目",
@@ -248,8 +256,8 @@
     },
     "auth": {
       "kicker": "验证方式",
-      "title": "双状态访问规则",
-      "lead": "文档页面始终公开；API、status 与 MCP 是否需要凭证，取决于部署时是否启用 token auth。",
+      "title": "一个开关，明确的访问规则。",
+      "lead": "公开文档始终开放；API、status 与 MCP 则遵循部署环境的 token policy。",
       "route": "路径",
       "mode_disabled": "验证关闭",
       "mode_enabled": "验证开启",
@@ -259,8 +267,34 @@
       "current_enabled": "已启用 token auth",
       "current_disabled": "已关闭 token auth"
     },
+    "space": {
+      "kicker": "单一题目空间",
+      "title": "算法不应被平台边界切割。",
+      "lead": "OJ API 将分散的评测平台标准化为一致的题目层；保留来源身份，同时让每条记录都能用同一套心智模型访问。"
+    },
+    "capabilities": {
+      "kicker": "核心智能",
+      "title": "四项操作，一个互联系统。",
+      "resolve": {
+        "title": "解析",
+        "body": "将 URL、slug 与标识符转换成具体题目记录。"
+      },
+      "retrieve": {
+        "title": "获取",
+        "body": "跨所有支持来源读取标准化题目数据。"
+      },
+      "relate": {
+        "title": "关联",
+        "body": "通过语义相似度寻找概念相邻的题目。"
+      },
+      "connect": {
+        "title": "连接",
+        "body": "将相同智能提供给应用程序与 AI agents。"
+      }
+    },
     "featured": {
-      "view_details": "查看详情",
+      "kicker": "精选 endpoints",
+      "title": "先从定义产品价值的路径开始。",
       "card_1_title": "题目详情",
       "card_1_summary": "按平台来源与题目 ID 获取标准化题目数据。",
       "card_2_title": "每日挑战",
@@ -268,18 +302,18 @@
       "card_3_title": "相似搜索",
       "card_3_summary": "使用自由文本查询公开相似度索引中的相关题目。"
     },
-    "example": {
-      "kicker": "示例",
-      "title": "标准请求",
-      "lead": "先用单一题目详情请求确认验证状态、响应结构与 source key 用法。"
+    "integrations": {
+      "kicker": "两种集成界面",
+      "title": "为软件构建，原生支持 agents。",
+      "lead": "应用程序可使用精确的 HTTP contracts，也能通过 Streamable HTTP MCP 将相同能力公开为工具。",
+      "mode_label": "集成模式",
+      "rest": "REST API",
+      "mcp": "MCP 工具"
     },
-    "links": {
-      "api_kicker": "HTTP API",
-      "api_title": "HTTP API 参考",
-      "api_body": "查看全部十个公开 HTTP 路由的路径、验证规则、输入、响应结构与示例。",
-      "mcp_kicker": "MCP",
-      "mcp_title": "MCP 参考",
-      "mcp_body": "查看 transport 指南、工具摘要，以及五个 MCP 工具的使用示例。"
+    "final_cta": {
+      "kicker": "进入系统",
+      "title": "面向完整题目空间开始构建。",
+      "action": "探索 API"
     }
   },
   "docs_api": {
@@ -407,6 +441,11 @@
       "examples": "示例",
       "examples_lead": "先用一个连接配置示例和一个 JSON-RPC 请求，确认认证、transport 与 tool name 是否正确。"
     },
+    "flow": {
+      "client": "Agent 客户端",
+      "server": "Streamable HTTP",
+      "tools": "OJ API 工具"
+    },
     "labels": {
       "auth": "认证",
       "example": "示例",
@@ -418,6 +457,11 @@
     },
     "details": {
       "summary": "展开详情"
+    },
+    "copy": {
+      "copy": "复制",
+      "copied": "已复制",
+      "failed": "复制失败"
     },
     "transport_cards": {
       "mcp_post": {

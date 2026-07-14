@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "artifactKey": "task-1-assets",
+  "type": "command",
+  "source": "rtk cargo test home::tests; rtk cargo test; rtk cargo fmt --check; rtk git diff --check",
+  "summary": "Asset ownership slice passed: 15 home tests, 206 full tests, formatting and diff checks; CSS split into site 161 lines, home 243 lines, MCP 204 lines.",
+  "verifier": "Codex inline execution"
+}

@@ -237,9 +237,17 @@
       "mcp_docs": "MCP Docs"
     },
     "hero": {
-      "eyebrow": "Public API documentation",
-      "title": "Access coding problem data through one unified API.",
-      "lead": "Query problem records, fetch daily challenges, search similar problems, and connect tool clients through MCP without switching between fragmented data sources."
+      "category": "Problem Intelligence Infrastructure",
+      "statement": "Every judge. One problem space.",
+      "lead": "A shared intelligence layer for developers, competitors, and AI agents to resolve, retrieve, relate, and connect algorithmic problems.",
+      "primary_cta": "Explore the API",
+      "secondary_cta": "MCP for Agents",
+      "inspector_idle": "Mapping semantic relationships across sources",
+      "inspector_access_path": "access path",
+      "inspector_core_to": "core to",
+      "inspector_similarity": "similarity",
+      "inspector_illustrative": "illustrative",
+      "continue": "Enter the problem space"
     },
     "stats": {
       "problems_label": "Indexed problems",
@@ -248,8 +256,8 @@
     },
     "auth": {
       "kicker": "Authentication",
-      "title": "Dual-state access rules",
-      "lead": "The docs pages stay public. API, status, and MCP access depend on whether token auth is enabled for this deployment.",
+      "title": "One switch. Explicit access rules.",
+      "lead": "Public documentation stays open. API, status, and MCP access follow the deployment token policy.",
       "route": "Route",
       "mode_disabled": "Auth Disabled",
       "mode_enabled": "Auth Enabled",
@@ -259,8 +267,34 @@
       "current_enabled": "Token auth enabled",
       "current_disabled": "Token auth disabled"
     },
+    "space": {
+      "kicker": "One problem space",
+      "title": "Algorithms should not stop at platform boundaries.",
+      "lead": "OJ API normalizes fragmented judges into one coherent problem layer, preserving source identity while making every record addressable through the same mental model."
+    },
+    "capabilities": {
+      "kicker": "Core intelligence",
+      "title": "Four operations. One connected system.",
+      "resolve": {
+        "title": "Resolve",
+        "body": "Turn URLs, slugs, and identifiers into concrete problem records."
+      },
+      "retrieve": {
+        "title": "Retrieve",
+        "body": "Read normalized problem data across every supported source."
+      },
+      "relate": {
+        "title": "Relate",
+        "body": "Find conceptually adjacent problems through semantic similarity."
+      },
+      "connect": {
+        "title": "Connect",
+        "body": "Expose the same intelligence to applications and AI agents."
+      }
+    },
     "featured": {
-      "view_details": "View details",
+      "kicker": "Selected endpoints",
+      "title": "Start with the paths that define the product.",
       "card_1_title": "Problem detail",
       "card_1_summary": "Fetch a normalized problem record by platform source and problem ID.",
       "card_2_title": "Daily challenge",
@@ -268,18 +302,18 @@
       "card_3_title": "Similar search",
       "card_3_summary": "Search related problems by free-text query against the public similarity index."
     },
-    "example": {
-      "kicker": "Example",
-      "title": "Canonical request",
-      "lead": "Start with a single problem-detail request to confirm auth, response shape, and source-key usage."
+    "integrations": {
+      "kicker": "Two integration surfaces",
+      "title": "Built for software. Native to agents.",
+      "lead": "Use precise HTTP contracts in applications or expose the same capabilities as tools through Streamable HTTP MCP.",
+      "mode_label": "Integration mode",
+      "rest": "REST API",
+      "mcp": "MCP Tools"
     },
-    "links": {
-      "api_kicker": "HTTP API",
-      "api_title": "HTTP API Reference",
-      "api_body": "Review all ten public HTTP routes with paths, auth rules, inputs, response shapes, and examples.",
-      "mcp_kicker": "MCP",
-      "mcp_title": "MCP Reference",
-      "mcp_body": "See transport guidance, tool summaries, and examples for the five exposed MCP tools."
+    "final_cta": {
+      "kicker": "Enter the system",
+      "title": "Build against the entire problem space.",
+      "action": "Explore the API"
     }
   },
   "docs_api": {
@@ -407,6 +441,11 @@
       "examples": "Examples",
       "examples_lead": "Start with one connection snippet and one JSON-RPC request to verify auth, transport, and tool naming."
     },
+    "flow": {
+      "client": "Agent client",
+      "server": "Streamable HTTP",
+      "tools": "OJ API tools"
+    },
     "labels": {
       "auth": "Auth",
       "example": "Example",
@@ -418,6 +457,11 @@
     },
     "details": {
       "summary": "Expand details"
+    },
+    "copy": {
+      "copy": "Copy",
+      "copied": "Copied",
+      "failed": "Copy failed"
     },
     "transport_cards": {
       "mcp_post": {

@@ -1,5 +1,11 @@
 {% extends "docs_base.html" %}
 
+{% block title %}OJ API - Problem Intelligence Infrastructure{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="/static/home.css">
+{% endblock %}
+
 {% block nav %}
 <a href="#overview" data-i18n="home.nav.overview">Overview</a>
 <a href="{{ docs_path }}" data-i18n="home.nav.api_docs">API Docs</a>
@@ -7,112 +13,298 @@
 {% endblock %}
 
 {% block content %}
-<section class="bento-grid" id="overview">
-    <section class="bento-item bento-hero panel">
-        <div class="section-kicker" data-i18n="home.hero.eyebrow">Public API documentation</div>
-        <h1 data-i18n="home.hero.title">Access coding problem data through one unified API.</h1>
-        <p class="hero-lead" data-i18n="home.hero.lead">Query problem records, fetch daily challenges, search similar problems, and connect tool clients through MCP without switching between fragmented data sources.</p>
-        <dl class="hero-stats" aria-label="Homepage summary stats">
-            <div class="stat-card">
-                <dt data-i18n="home.stats.problems_label">Indexed problems</dt>
-                <dd>{{ total_problems }}</dd>
-            </div>
-            <div class="stat-card">
-                <dt data-i18n="home.stats.sources_label">Core sources</dt>
-                <dd>{{ docs.supported_sources.len() }}</dd>
-            </div>
-            <div class="stat-card">
-                <dt data-i18n="home.stats.version_label">Version</dt>
-                <dd>v{{ version }}</dd>
-            </div>
-        </dl>
-    </section>
+<section class="observatory-hero" id="overview" aria-labelledby="hero-title">
+    <div class="scene-shell" aria-hidden="true">
+        <div class="scene-fallback">
+            <svg class="fallback-scene" data-fallback-scene aria-hidden="true" focusable="false" viewBox="0 0 1440 804" preserveAspectRatio="xMidYMid slice">
+                <g class="fallback-network">
+                    <path class="fallback-edge fallback-edge-global" d="M570 360 L850 400 L940 245 M850 400 L1145 455 M850 400 L925 660 M850 400 L590 625" />
+                    <path class="fallback-edge fallback-edge-global" d="M570 360 L940 245 L1145 455 L925 660 L590 625 Z" />
+                    <path class="fallback-edge" d="M570 360 L505 300 M570 360 L520 345 M570 360 L530 405 M570 360 L585 285 M570 360 L625 325 M570 360 L635 390" />
+                    <path class="fallback-edge" d="M940 245 L875 195 M940 245 L920 170 M940 245 L985 185 M940 245 L1010 235 M940 245 L990 290 M940 245 L905 310" />
+                    <path class="fallback-edge" d="M1145 455 L1080 400 M1145 455 L1120 375 M1145 455 L1190 395 M1145 455 L1220 455 M1145 455 L1195 520 M1145 455 L1110 535" />
+                    <path class="fallback-edge" d="M925 660 L860 610 M925 660 L900 585 M925 660 L965 595 M925 660 L1000 650 M925 660 L980 715 M925 660 L885 735" />
+                    <path class="fallback-edge" d="M590 625 L520 575 M590 625 L560 550 M590 625 L630 565 M590 625 L665 625 M590 625 L640 690 M590 625 L550 710" />
 
-    <section class="bento-item bento-auth panel" aria-labelledby="auth-matrix-title">
-        <div class="section-kicker" data-i18n="home.auth.kicker">Authentication</div>
-        <h2 id="auth-matrix-title" data-i18n="home.auth.title">Dual-state access rules</h2>
-        <p class="section-lead" data-i18n="home.auth.lead">The docs pages stay public. API, status, and MCP access depend on whether token auth is enabled for this deployment.</p>
-        <div class="auth-table-wrapper">
-            <table class="auth-matrix">
-                <thead>
-                    <tr>
-                        <th data-i18n="home.auth.route">Route</th>
-                        <th data-i18n="home.auth.mode_disabled">Auth Disabled</th>
-                        <th data-i18n="home.auth.mode_enabled">Auth Enabled</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><code>/</code></td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                    </tr>
-                    <tr>
-                        <td><code>/health</code></td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                    </tr>
-                    <tr>
-                        <td><code>/api/v1/*</code></td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                        <td class="status-protected" data-i18n="home.auth.protected">Protected</td>
-                    </tr>
-                    <tr>
-                        <td><code>/status</code></td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                        <td class="status-protected" data-i18n="home.auth.protected">Protected</td>
-                    </tr>
-                    <tr>
-                        <td><code>/mcp</code></td>
-                        <td class="status-public" data-i18n="home.auth.public">Public</td>
-                        <td class="status-protected" data-i18n="home.auth.protected">Protected</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        <div class="auth-status-footer">
-            <span data-i18n="home.auth.current_label">Current deployment</span>
-            <span class="status-badge {% if token_auth_enabled %}badge-enabled{% else %}badge-disabled{% endif %}" data-i18n="home.auth.current_{% if token_auth_enabled %}enabled{% else %}disabled{% endif %}">{% if token_auth_enabled %}Token auth enabled{% else %}Token auth disabled{% endif %}</span>
-        </div>
-    </section>
+                    <path class="fallback-route" data-fallback-route d="M505 300 Q680 210 850 400" />
+                    <path class="fallback-route" data-fallback-route d="M920 170 Q1060 260 1145 455" />
+                    <path class="fallback-route" data-fallback-route d="M1220 455 Q1100 590 925 660" />
+                    <path class="fallback-route" data-fallback-route d="M885 735 Q710 720 590 625" />
+                </g>
 
-    {% for card in docs.homepage_cards %}
-    <article class="bento-item bento-featured panel">
-        <div class="featured-header">
-            <h2 data-i18n="home.featured.card_{{ loop.index }}_title">{{ card.title }}</h2>
-            <span class="method-tag">{{ card.method }}</span>
-        </div>
-        <div class="featured-path"><code>{{ card.path }}</code></div>
-        <p class="featured-summary" data-i18n="home.featured.card_{{ loop.index }}_summary">{{ card.summary }}</p>
-        <a href="{{ card.docs_href }}" class="featured-link" data-i18n="home.featured.view_details">View details</a>
-    </article>
-    {% endfor %}
+                <g class="fallback-core" data-fallback-core>
+                    <ellipse class="fallback-orbit fallback-orbit-a" cx="850" cy="400" rx="124" ry="52" />
+                    <ellipse class="fallback-orbit fallback-orbit-b" cx="850" cy="400" rx="82" ry="145" />
+                    <path class="fallback-core-face" d="M850 315 L925 360 L908 446 L850 490 L782 447 L770 358 Z" />
+                    <path class="fallback-core-wire" d="M850 315 L850 400 L925 360 M850 400 L908 446 M850 400 L850 490 M850 400 L782 447 M850 400 L770 358 M770 358 L908 446 M925 360 L782 447" />
+                    <circle class="fallback-core-center" cx="850" cy="400" r="12" />
+                </g>
 
-    <section class="bento-item bento-example panel">
-        <div class="section-kicker" data-i18n="home.example.kicker">Example</div>
-        <h2 data-i18n="home.example.title">Canonical request</h2>
-        <p class="section-lead" data-i18n="home.example.lead">Start with a single problem-detail request to confirm auth, response shape, and source-key usage.</p>
-        <pre class="code-block"><code>curl \
-  -H "Authorization: Bearer &lt;token&gt;" \
-  "http://127.0.0.1:7856/api/v1/problems/leetcode/1"</code></pre>
-    </section>
+                <g class="fallback-hub fallback-hub-cyan" data-fallback-hub style="--fallback-delay: -1.4s;">
+                    <circle class="fallback-hub-ring" cx="570" cy="360" r="30" />
+                    <circle class="fallback-hub-ring fallback-hub-ring-inner" cx="570" cy="360" r="18" />
+                    <circle class="fallback-hub-center" cx="570" cy="360" r="5" />
+                </g>
+                <g class="fallback-hub fallback-hub-coral" data-fallback-hub style="--fallback-delay: -3.2s;">
+                    <circle class="fallback-hub-ring" cx="940" cy="245" r="30" />
+                    <circle class="fallback-hub-ring fallback-hub-ring-inner" cx="940" cy="245" r="18" />
+                    <circle class="fallback-hub-center" cx="940" cy="245" r="5" />
+                </g>
+                <g class="fallback-hub fallback-hub-lime" data-fallback-hub style="--fallback-delay: -5.1s;">
+                    <circle class="fallback-hub-ring" cx="1145" cy="455" r="30" />
+                    <circle class="fallback-hub-ring fallback-hub-ring-inner" cx="1145" cy="455" r="18" />
+                    <circle class="fallback-hub-center" cx="1145" cy="455" r="5" />
+                </g>
+                <g class="fallback-hub fallback-hub-paper" data-fallback-hub style="--fallback-delay: -2.3s;">
+                    <circle class="fallback-hub-ring" cx="925" cy="660" r="30" />
+                    <circle class="fallback-hub-ring fallback-hub-ring-inner" cx="925" cy="660" r="18" />
+                    <circle class="fallback-hub-center" cx="925" cy="660" r="5" />
+                </g>
+                <g class="fallback-hub fallback-hub-blue" data-fallback-hub style="--fallback-delay: -4.4s;">
+                    <circle class="fallback-hub-ring" cx="590" cy="625" r="30" />
+                    <circle class="fallback-hub-ring fallback-hub-ring-inner" cx="590" cy="625" r="18" />
+                    <circle class="fallback-hub-center" cx="590" cy="625" r="5" />
+                </g>
 
-    <a href="{{ docs_path }}" class="bento-item bento-link panel link-api">
-        <div class="link-content">
-            <div class="section-kicker" data-i18n="home.links.api_kicker">HTTP API</div>
-            <h2 data-i18n="home.links.api_title">HTTP API Reference</h2>
-            <p data-i18n="home.links.api_body">Review all ten public HTTP routes with paths, auth rules, inputs, response shapes, and examples.</p>
-        </div>
-        <div class="link-icon" aria-hidden="true">→</div>
-    </a>
+                <g class="fallback-nodes">
+                    <circle class="fallback-node fallback-node-cyan" data-fallback-node cx="505" cy="300" r="4" />
+                    <circle class="fallback-node fallback-node-cyan" data-fallback-node cx="520" cy="345" r="3" />
+                    <circle class="fallback-node fallback-node-cyan" data-fallback-node cx="530" cy="405" r="4" />
+                    <circle class="fallback-node fallback-node-cyan" data-fallback-node cx="585" cy="285" r="3" />
+                    <circle class="fallback-node fallback-node-cyan" data-fallback-node cx="625" cy="325" r="4" />
+                    <circle class="fallback-node fallback-node-cyan" data-fallback-node cx="635" cy="390" r="3" />
+                    <circle class="fallback-node fallback-node-coral" data-fallback-node cx="875" cy="195" r="4" />
+                    <circle class="fallback-node fallback-node-coral" data-fallback-node cx="920" cy="170" r="3" />
+                    <circle class="fallback-node fallback-node-coral" data-fallback-node cx="985" cy="185" r="4" />
+                    <circle class="fallback-node fallback-node-coral" data-fallback-node cx="1010" cy="235" r="3" />
+                    <circle class="fallback-node fallback-node-coral" data-fallback-node cx="990" cy="290" r="4" />
+                    <circle class="fallback-node fallback-node-coral" data-fallback-node cx="905" cy="310" r="3" />
+                    <circle class="fallback-node fallback-node-lime" data-fallback-node cx="1080" cy="400" r="4" />
+                    <circle class="fallback-node fallback-node-lime" data-fallback-node cx="1120" cy="375" r="3" />
+                    <circle class="fallback-node fallback-node-lime" data-fallback-node cx="1190" cy="395" r="4" />
+                    <circle class="fallback-node fallback-node-lime" data-fallback-node cx="1220" cy="455" r="3" />
+                    <circle class="fallback-node fallback-node-lime" data-fallback-node cx="1195" cy="520" r="4" />
+                    <circle class="fallback-node fallback-node-lime" data-fallback-node cx="1110" cy="535" r="3" />
+                    <circle class="fallback-node fallback-node-paper" data-fallback-node cx="860" cy="610" r="4" />
+                    <circle class="fallback-node fallback-node-paper" data-fallback-node cx="900" cy="585" r="3" />
+                    <circle class="fallback-node fallback-node-paper" data-fallback-node cx="965" cy="595" r="4" />
+                    <circle class="fallback-node fallback-node-paper" data-fallback-node cx="1000" cy="650" r="3" />
+                    <circle class="fallback-node fallback-node-paper" data-fallback-node cx="980" cy="715" r="4" />
+                    <circle class="fallback-node fallback-node-paper" data-fallback-node cx="885" cy="735" r="3" />
+                    <circle class="fallback-node fallback-node-blue" data-fallback-node cx="520" cy="575" r="4" />
+                    <circle class="fallback-node fallback-node-blue" data-fallback-node cx="560" cy="550" r="3" />
+                    <circle class="fallback-node fallback-node-blue" data-fallback-node cx="630" cy="565" r="4" />
+                    <circle class="fallback-node fallback-node-blue" data-fallback-node cx="665" cy="625" r="3" />
+                    <circle class="fallback-node fallback-node-blue" data-fallback-node cx="640" cy="690" r="4" />
+                    <circle class="fallback-node fallback-node-blue" data-fallback-node cx="550" cy="710" r="3" />
+                </g>
 
-    <a href="{{ mcp_docs_path }}" class="bento-item bento-link panel link-mcp">
-        <div class="link-content">
-            <div class="section-kicker" data-i18n="home.links.mcp_kicker">MCP</div>
-            <h2 data-i18n="home.links.mcp_title">MCP Reference</h2>
-            <p data-i18n="home.links.mcp_body">See transport guidance, tool summaries, and examples for the five exposed MCP tools.</p>
+                <g class="fallback-pulses">
+                    <path class="fallback-pulse" data-fallback-pulse style="--fallback-duration: 6s; --fallback-delay: -1s;" d="M505 300 Q680 210 850 400" />
+                    <path class="fallback-pulse" data-fallback-pulse style="--fallback-duration: 7.5s; --fallback-delay: -3.5s;" d="M920 170 Q1060 260 1145 455" />
+                    <path class="fallback-pulse" data-fallback-pulse style="--fallback-duration: 9s; --fallback-delay: -5.8s;" d="M1220 455 Q1100 590 925 660" />
+                    <path class="fallback-pulse" data-fallback-pulse style="--fallback-duration: 10s; --fallback-delay: -7.2s;" d="M885 735 Q710 720 590 625" />
+                </g>
+            </svg>
         </div>
-        <div class="link-icon" aria-hidden="true">→</div>
+        <canvas class="scene-canvas" data-observatory-scene></canvas>
+    </div>
+
+    <ul class="scene-source-data" aria-label="Supported Online Judge sources">
+        {% for source in docs.supported_sources %}
+        <li data-source="{{ source }}">{{ source }}</li>
+        {% endfor %}
+    </ul>
+
+    <div class="hero-copy">
+        <p class="product-category" data-i18n="home.hero.category">Problem Intelligence Infrastructure</p>
+        <h1 id="hero-title">OJ API</h1>
+        <p class="hero-statement" data-i18n="home.hero.statement">Every judge. One problem space.</p>
+        <p class="hero-lead" data-i18n="home.hero.lead">A shared intelligence layer for developers, competitors, and AI agents to resolve, retrieve, relate, and connect algorithmic problems.</p>
+        <div class="hero-actions" aria-label="Primary actions">
+            <a class="command command-primary" href="{{ docs_path }}" data-i18n="home.hero.primary_cta">Explore the API</a>
+            <a class="command command-secondary" href="{{ mcp_docs_path }}" data-i18n="home.hero.secondary_cta">MCP for Agents</a>
+        </div>
+    </div>
+
+    <dl class="hero-metrics" aria-label="Deployment summary">
+        <div>
+            <dt data-i18n="home.stats.problems_label">Indexed problems</dt>
+            <dd>{{ total_problems }}</dd>
+        </div>
+        <div>
+            <dt data-i18n="home.stats.sources_label">Core sources</dt>
+            <dd>{{ docs.supported_sources.len() }}</dd>
+        </div>
+        <div>
+            <dt data-i18n="home.stats.version_label">Version</dt>
+            <dd>v{{ version }}</dd>
+        </div>
+        <div>
+            <dt data-i18n="home.auth.current_label">Current deployment</dt>
+            <dd class="metric-status {% if token_auth_enabled %}is-enabled{% else %}is-disabled{% endif %}" data-i18n="home.auth.current_{% if token_auth_enabled %}enabled{% else %}disabled{% endif %}">{% if token_auth_enabled %}Token auth enabled{% else %}Token auth disabled{% endif %}</dd>
+        </div>
+    </dl>
+
+    <div class="scene-inspector">
+        <span class="inspector-signal" aria-hidden="true"></span>
+        <span data-i18n="home.hero.inspector_idle">Mapping semantic relationships across sources</span>
+    </div>
+
+    <a class="hero-next" href="#problem-space" aria-label="Continue to product overview">
+        <span data-i18n="home.hero.continue">Enter the problem space</span>
+        <span aria-hidden="true">↓</span>
     </a>
 </section>
+
+<section class="narrative-section problem-space" id="problem-space" aria-labelledby="problem-space-title" data-motion-section>
+    <div class="section-index" aria-hidden="true">01 / UNIFY</div>
+    <div class="narrative-heading">
+        <p class="section-kicker" data-i18n="home.space.kicker">One problem space</p>
+        <h2 id="problem-space-title" data-i18n="home.space.title">Algorithms should not stop at platform boundaries.</h2>
+    </div>
+    <div class="narrative-body">
+        <p data-i18n="home.space.lead">OJ API normalizes fragmented judges into one coherent problem layer, preserving source identity while making every record addressable through the same mental model.</p>
+        <div class="source-orbit" aria-label="Supported sources">
+            {% for source in docs.supported_sources %}
+            <span style="--motion-order: {{ loop.index0 }}">{{ source }}</span>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="narrative-section capabilities" id="capabilities" aria-labelledby="capabilities-title" data-motion-section>
+    <div class="section-index" aria-hidden="true">02 / INTELLIGENCE</div>
+    <div class="narrative-heading">
+        <p class="section-kicker" data-i18n="home.capabilities.kicker">Core intelligence</p>
+        <h2 id="capabilities-title" data-i18n="home.capabilities.title">Four operations. One connected system.</h2>
+    </div>
+    <ol class="capability-list">
+        <li style="--motion-order: 0">
+            <span class="capability-number">01</span>
+            <div>
+                <h3 data-i18n="home.capabilities.resolve.title">Resolve</h3>
+                <p data-i18n="home.capabilities.resolve.body">Turn URLs, slugs, and identifiers into concrete problem records.</p>
+            </div>
+            <code>/api/v1/resolve/*</code>
+        </li>
+        <li style="--motion-order: 1">
+            <span class="capability-number">02</span>
+            <div>
+                <h3 data-i18n="home.capabilities.retrieve.title">Retrieve</h3>
+                <p data-i18n="home.capabilities.retrieve.body">Read normalized problem data across every supported source.</p>
+            </div>
+            <code>/api/v1/problems/*</code>
+        </li>
+        <li style="--motion-order: 2">
+            <span class="capability-number">03</span>
+            <div>
+                <h3 data-i18n="home.capabilities.relate.title">Relate</h3>
+                <p data-i18n="home.capabilities.relate.body">Find conceptually adjacent problems through semantic similarity.</p>
+            </div>
+            <code>/api/v1/similar</code>
+        </li>
+        <li style="--motion-order: 3">
+            <span class="capability-number">04</span>
+            <div>
+                <h3 data-i18n="home.capabilities.connect.title">Connect</h3>
+                <p data-i18n="home.capabilities.connect.body">Expose the same intelligence to applications and AI agents.</p>
+            </div>
+            <code>REST + MCP</code>
+        </li>
+    </ol>
+</section>
+
+<section class="narrative-section endpoint-section" aria-labelledby="endpoint-title" data-motion-section>
+    <div class="section-index" aria-hidden="true">03 / SURFACES</div>
+    <div class="narrative-heading">
+        <p class="section-kicker" data-i18n="home.featured.kicker">Selected endpoints</p>
+        <h2 id="endpoint-title" data-i18n="home.featured.title">Start with the paths that define the product.</h2>
+    </div>
+    <div class="endpoint-list">
+        {% for card in docs.homepage_cards %}
+        <article class="endpoint-row" style="--motion-order: {{ loop.index0 }}">
+            <span class="method-tag">{{ card.method }}</span>
+            <div class="endpoint-summary">
+                <h3 data-i18n="home.featured.card_{{ loop.index }}_title">{{ card.title }}</h3>
+                <p data-i18n="home.featured.card_{{ loop.index }}_summary">{{ card.summary }}</p>
+            </div>
+            <code>{{ card.path }}</code>
+            <a href="{{ card.docs_href }}" aria-label="View {{ card.title }} details">↗</a>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="integration-section" aria-labelledby="integration-title" data-motion-section>
+    <div class="integration-copy">
+        <p class="section-kicker" data-i18n="home.integrations.kicker">Two integration surfaces</p>
+        <h2 id="integration-title" data-i18n="home.integrations.title">Built for software. Native to agents.</h2>
+        <p data-i18n="home.integrations.lead">Use precise HTTP contracts in applications or expose the same capabilities as tools through Streamable HTTP MCP.</p>
+    </div>
+
+    <div class="integration-console">
+        <fieldset class="surface-switcher">
+            <legend class="visually-hidden" data-i18n="home.integrations.mode_label">Integration mode</legend>
+            <input type="radio" name="integration-surface" id="surface-rest" checked>
+            <label for="surface-rest" data-i18n="home.integrations.rest">REST API</label>
+            <input type="radio" name="integration-surface" id="surface-mcp">
+            <label for="surface-mcp" data-i18n="home.integrations.mcp">MCP Tools</label>
+
+            <div class="surface-panel surface-panel-rest">
+                <div class="code-meta"><span>GET</span><code>/api/v1/problems/leetcode/1</code></div>
+                <pre class="code-block"><code>curl \
+  -H "Authorization: Bearer &lt;token&gt;" \
+  "http://127.0.0.1:7856/api/v1/problems/leetcode/1"</code></pre>
+            </div>
+
+            <div class="surface-panel surface-panel-mcp">
+                <div class="code-meta"><span>TOOL</span><code>get_problem</code></div>
+                <pre class="code-block"><code>{
+  "name": "get_problem",
+  "arguments": {
+    "source": "leetcode",
+    "id": "1"
+  }
+}</code></pre>
+            </div>
+        </fieldset>
+    </div>
+</section>
+
+<section class="access-section" aria-labelledby="auth-matrix-title" data-motion-section>
+    <div class="access-heading">
+        <p class="section-kicker" data-i18n="home.auth.kicker">Authentication</p>
+        <h2 id="auth-matrix-title" data-i18n="home.auth.title">One switch. Explicit access rules.</h2>
+        <p data-i18n="home.auth.lead">Public documentation stays open. API, status, and MCP access follow the deployment token policy.</p>
+    </div>
+    <div class="auth-table-wrapper">
+        <table class="auth-matrix">
+            <thead>
+                <tr>
+                    <th data-i18n="home.auth.route">Route</th>
+                    <th data-i18n="home.auth.mode_disabled">Auth Disabled</th>
+                    <th data-i18n="home.auth.mode_enabled">Auth Enabled</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="--motion-order: 0"><td><code>/</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-public" data-i18n="home.auth.public">Public</td></tr>
+                <tr style="--motion-order: 1"><td><code>/health</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-public" data-i18n="home.auth.public">Public</td></tr>
+                <tr style="--motion-order: 2"><td><code>/api/v1/*</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-protected" data-i18n="home.auth.protected">Protected</td></tr>
+                <tr style="--motion-order: 3"><td><code>/status</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-protected" data-i18n="home.auth.protected">Protected</td></tr>
+                <tr style="--motion-order: 4"><td><code>/mcp</code></td><td class="status-public" data-i18n="home.auth.public">Public</td><td class="status-protected" data-i18n="home.auth.protected">Protected</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="final-command" aria-labelledby="final-command-title" data-motion-section>
+    <p class="section-kicker" data-i18n="home.final_cta.kicker">Enter the system</p>
+    <h2 id="final-command-title" data-i18n="home.final_cta.title">Build against the entire problem space.</h2>
+    <a class="command command-primary" href="{{ docs_path }}" data-i18n="home.final_cta.action">Explore the API</a>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script type="module" src="/static/home-scene.js"></script>
 {% endblock %}

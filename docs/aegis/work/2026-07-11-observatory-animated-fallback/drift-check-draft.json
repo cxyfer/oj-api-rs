@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-07-11-observatory-animated-fallback",
+  "taskIntentRef": "docs/aegis/work/2026-07-11-observatory-animated-fallback/task-intent-draft.json",
+  "baselineRefs": [
+    "docs/aegis/baseline/2026-07-10-initial-baseline.md"
+  ],
+  "scopeStatus": "Aligned with approved animated fallback spec and plan",
+  "compatStatus": "Worker-only Three.js, routes, registry, locales, MCP, Scalar, auth, and inspector behavior preserved",
+  "retirementStatus": "Two-line-only fallback superseded; no second renderer or compatibility alias retained",
+  "newRiskSignals": [
+    "Existing page-level initial Layout long task remains outside scene ownership"
+  ],
+  "decision": "continue"
+}

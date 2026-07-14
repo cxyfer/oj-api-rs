@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "artifactKey": "tasks-2-to-5",
+  "type": "command",
+  "source": "homepage and MCP focused tests; rtk cargo test; node --check home-scene.js and mcp.js; jq empty locales",
+  "summary": "Semantic homepage, locale parity, Three.js contract, and MCP work surface implemented; 207 Rust tests pass, JS syntax and locale JSON checks pass.",
+  "verifier": "Codex inline execution"
+}

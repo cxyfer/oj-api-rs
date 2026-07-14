@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-07-10-algorithmic-observatory",
+  "lastCheckpointRef": "docs/aegis/work/2026-07-10-algorithmic-observatory/todo-checkpoint-draft.json",
+  "resumeInstruction": "Implementation is verified; resume only for user-directed integration or the documented residual performance follow-ups.",
+  "knownPartialWork": [
+    "Final independent review approved; fresh 209-test, clippy, static, retirement, browser, bundle, and workspace checks pass."
+  ],
+  "mustReadBeforeContinuing": [
+    "docs/aegis/work/2026-07-10-algorithmic-observatory/10-intent.md",
+    "docs/aegis/work/2026-07-10-algorithmic-observatory/20-checkpoint.md",
+    "docs/aegis/work/2026-07-10-algorithmic-observatory/todo-checkpoint-draft.json"
+  ],
+  "unsafeToAssume": [
+    "The non-scene Layout long task is caused by the Worker scene."
+  ]
+}

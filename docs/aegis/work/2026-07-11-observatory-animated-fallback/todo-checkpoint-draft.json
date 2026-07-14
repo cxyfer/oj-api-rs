@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-07-11-observatory-animated-fallback",
+  "currentTodo": "Final independent review and evidence commit",
+  "completedTodos": [
+    "Task 1 source implementation and two-stage review",
+    "Responsive Worker/fallback/reduced-motion browser verification",
+    "Fast 3G plus 4x CPU differential performance verification"
+  ],
+  "activeSlice": "Durable closure and final verification",
+  "evidenceRefs": [
+    "docs/aegis/work/2026-07-11-observatory-animated-fallback/90-evidence.md"
+  ],
+  "blockedOn": null,
+  "nextStep": "Run workspace bundle/check, final independent review, and commit durable evidence",
+  "updatedAt": "2026-07-11"
+}

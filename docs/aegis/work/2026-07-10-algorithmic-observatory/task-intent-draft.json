@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "requestedOutcome": "Implement the approved Algorithmic Observatory homepage and MCP reference redesign.",
+  "goal": "Ship a world-class, performant homepage and MCP work surface without changing Scalar or public runtime contracts.",
+  "successEvidence": [
+    "Rust checks pass; desktop/mobile browser evidence is clean; WebGL canvas is nonblank and adaptive; Scalar remains unchanged."
+  ],
+  "stopCondition": "Done when all plan tasks and verification evidence pass; otherwise stop as blocked, needs-verification, or scope-exceeded.",
+  "nonGoals": [
+    "No frontend framework, live homepage search, new marketing page, or backend endpoint."
+  ],
+  "scope": "Public homepage, MCP reference, shared public assets, locales, render tests, and browser verification.",
+  "changeKinds": [
+    "feature"
+  ],
+  "riskHints": [
+    "WebGL performance, CSS owner split, localization overflow, stale Bento retirement."
+  ]
+}

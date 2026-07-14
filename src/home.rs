@@ -567,7 +567,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_public_homepage_with_protected_api_badge() {
+    fn renders_algorithmic_observatory_homepage() {
         let html = HomeTemplate {
             total_problems: 42,
             token_auth_enabled: true,
@@ -579,7 +579,12 @@ mod tests {
         .render()
         .expect("home template should render");
 
-        assert!(html.contains("Access coding problem data through one unified API."));
+        assert!(html.contains("OJ API"));
+        assert!(html.contains("Every judge. One problem space."));
+        assert!(html.contains("Problem Intelligence Infrastructure"));
+        assert!(html.contains("scene-shell"));
+        assert!(html.contains("scene-source-data"));
+        assert!(html.contains("data-source=\"leetcode\""));
         assert!(html.contains("Token auth enabled"));
         assert!(html.contains("/api/v1/problems/{source}/{id}"));
         assert!(html.contains("/api/v1/daily"));
@@ -589,6 +594,12 @@ mod tests {
         assert!(html.contains("/docs#tag/daily"));
         assert!(html.contains("/docs#tag/similar"));
         assert!(html.contains("/docs/mcp"));
+        assert!(html.contains("/api/v1/problems/leetcode/1"));
+        for route in ["/", "/health", "/api/v1/*", "/status", "/mcp"] {
+            assert!(html.contains(route));
+        }
+        assert!(!html.contains("bento-grid"));
+        assert!(!html.contains("Playfair Display"));
         assert!(!html.contains("Dashboard"));
     }
 
@@ -633,10 +644,10 @@ mod tests {
             .await
             .expect("body should be readable");
         let html = String::from_utf8(body.to_vec()).expect("homepage should be utf-8");
-        assert!(html.contains("Access coding problem data through one unified API."));
-        assert!(html.contains("Dual-state access rules"));
-        assert!(html.contains("HTTP API Reference"));
-        assert!(html.contains("MCP Reference"));
+        assert!(html.contains("Every judge. One problem space."));
+        assert!(html.contains("One switch. Explicit access rules."));
+        assert!(html.contains("Explore the API"));
+        assert!(html.contains("MCP for Agents"));
         assert!(!html.contains("Dashboard"));
         assert!(!html.contains("/admin/"));
     }
@@ -725,6 +736,834 @@ mod tests {
     }
 
     #[test]
+    fn public_pages_load_only_their_owned_assets() {
+        let home_html = HomeTemplate {
+            total_problems: 42,
+            token_auth_enabled: true,
+            version: "0.3.2-test",
+            docs: docs_registry(),
+            docs_path: DOCS_PATH,
+            mcp_docs_path: MCP_DOCS_PATH,
+        }
+        .render()
+        .expect("home template should render");
+
+        assert!(home_html.contains("/static/site.css"));
+        assert!(home_html.contains("/static/home.css"));
+        assert!(home_html.contains("/static/home-scene.js"));
+
+        let mcp_html = McpDocsTemplate {
+            docs: docs_registry(),
+            version: "0.3.2-test",
+            home_path: "/",
+            docs_path: DOCS_PATH,
+            token_auth_enabled: true,
+        }
+        .render()
+        .expect("mcp docs template should render");
+
+        assert!(mcp_html.contains("/static/site.css"));
+        assert!(mcp_html.contains("/static/mcp.css"));
+        assert!(mcp_html.contains("/static/mcp.js"));
+        assert!(!mcp_html.contains("three.module.min.js"));
+        assert!(!mcp_html.contains("home-scene.js"));
+    }
+
+    #[test]
+    fn reviewer_regressions_have_bounded_contracts() {
+        let home_template = include_str!("../templates/home.html");
+        assert!(home_template.contains("href=\"#overview\""));
+
+        let site_css = include_str!("../static/site.css");
+        assert!(site_css.contains("@media (prefers-reduced-motion: reduce)"));
+        assert!(site_css.contains("scroll-behavior: auto;"));
+        assert!(site_css.contains("-webkit-mask-image:"));
+
+        let home_css = include_str!("../static/home.css");
+        assert!(home_css.contains("-webkit-mask-image:"));
+
+        let mcp_script = include_str!("../static/mcp.js");
+        assert!(mcp_script.contains("window.clearTimeout(button._copyTimeout)"));
+        assert!(mcp_script.contains("button._copyTimeout = window.setTimeout"));
+
+        let worker = include_str!("../static/home-scene-worker.js");
+        assert!(worker.contains("const sampleWidth = Math.min(100, width)"));
+        assert!(worker.contains("const sampleHeight = Math.min(100, height)"));
+        assert!(!worker.contains("new Uint8Array(width * height * 4)"));
+    }
+
+    #[test]
+    fn mcp_copy_feedback_timer_is_owned_by_latest_result() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mcp_script = root.join("static/mcp.js");
+        let harness = r#"
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const feedback = { textContent: '' };
+const label = { textContent: 'Copy' };
+const target = { textContent: 'example request' };
+let clickListener;
+let clipboardCall = 0;
+let now = 0;
+let nextTimerId = 1;
+const timers = new Map();
+
+const button = {
+    dataset: { copyTarget: 'example' },
+    querySelector() { return label; },
+    addEventListener(type, listener) {
+        if (type === 'click') clickListener = listener;
+    },
+};
+
+const document = {
+    querySelector(selector) {
+        return selector === '.copy-feedback' ? feedback : null;
+    },
+    querySelectorAll(selector) {
+        return selector === '[data-copy-target]' ? [button] : [];
+    },
+    getElementById(id) {
+        return id === 'example' ? target : null;
+    },
+    addEventListener() {},
+};
+
+const window = {
+    isSecureContext: true,
+    addEventListener() {},
+    setTimeout(callback, delay) {
+        const id = nextTimerId++;
+        timers.set(id, { callback, due: now + delay });
+        return id;
+    },
+    clearTimeout(id) {
+        timers.delete(id);
+    },
+};
+
+const navigator = {
+    clipboard: {
+        writeText() {
+            clipboardCall += 1;
+            if (clipboardCall <= 3) return Promise.resolve();
+            return Promise.reject(new Error('clipboard unavailable'));
+        },
+    },
+};
+
+function advance(milliseconds) {
+    now += milliseconds;
+    while (true) {
+        const dueTimer = [...timers.entries()]
+            .filter(([, timer]) => timer.due <= now)
+            .sort((left, right) => left[1].due - right[1].due)[0];
+        if (!dueTimer) return;
+        const [id, timer] = dueTimer;
+        timers.delete(id);
+        timer.callback();
+    }
+}
+
+vm.runInNewContext(source, { document, navigator, window });
+assert.equal(typeof clickListener, 'function');
+
+(async () => {
+    await clickListener();
+    assert.equal(label.textContent, 'Copied');
+    assert.equal(feedback.textContent, 'Copied');
+
+    advance(1000);
+    await clickListener();
+    assert.equal(label.textContent, 'Copied');
+    assert.equal(feedback.textContent, 'Copied');
+    advance(800);
+    assert.equal(label.textContent, 'Copied');
+    assert.equal(feedback.textContent, 'Copied');
+    advance(1000);
+    assert.equal(label.textContent, 'Copy');
+    assert.equal(feedback.textContent, '');
+
+    await clickListener();
+    advance(1000);
+    await clickListener();
+    assert.equal(label.textContent, 'Copy');
+    assert.equal(feedback.textContent, 'Copy failed');
+
+    advance(800);
+    assert.equal(feedback.textContent, 'Copy failed');
+    advance(1000);
+    assert.equal(feedback.textContent, '');
+})().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+});
+"#;
+
+        let output = match std::process::Command::new("node")
+            .arg("-e")
+            .arg(harness)
+            .arg(&mcp_script)
+            .output()
+        {
+            Ok(output) => output,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                eprintln!("skipping MCP copy timer harness: node is not installed");
+                return;
+            }
+            Err(error) => panic!("failed to execute MCP copy timer harness: {error}"),
+        };
+
+        assert!(
+            output.status.success(),
+            "MCP copy timer harness failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[test]
+    fn homepage_scene_has_bounded_accessible_contract() {
+        let home_html = HomeTemplate {
+            total_problems: 42,
+            token_auth_enabled: true,
+            version: "0.3.2-test",
+            docs: docs_registry(),
+            docs_path: DOCS_PATH,
+            mcp_docs_path: MCP_DOCS_PATH,
+        }
+        .render()
+        .expect("home template should render");
+
+        assert!(home_html.contains("class=\"scene-shell\" aria-hidden=\"true\""));
+        assert!(home_html.contains("class=\"scene-inspector\""));
+        assert!(!home_html.contains("class=\"scene-inspector\" aria-live"));
+        assert!(home_html.contains("type=\"module\" src=\"/static/home-scene.js\""));
+        for source in docs_registry().supported_sources {
+            assert!(home_html.contains(&format!("data-source=\"{source}\"")));
+        }
+
+        let scene_module = include_str!("../static/home-scene.js");
+        for marker in [
+            "transferControlToOffscreen",
+            "new Worker('/static/home-scene-worker.js', { type: 'module' })",
+            "type: 'init'",
+            "type: 'resize'",
+            "type: 'pointer'",
+            "type: 'select'",
+            "type: 'rendering'",
+            "case 'ready'",
+            "case 'frame'",
+            "case 'hover'",
+            "case 'selection'",
+            "case 'failure'",
+            "message.nonblank !== true || message.pixelStatus !== 'nonblank'",
+            "resetInteractionState();",
+            "IntersectionObserver",
+            "visibilitychange",
+            "prefers-reduced-motion",
+            "is-webgl-fallback",
+            "problemTitle",
+            "canvas.dataset.selectedSource",
+            "hero.addEventListener('click'",
+            "metadata.accessPath",
+            "pointerInside",
+            "INTERACTIVE_SELECTOR",
+            "closest(INTERACTIVE_SELECTOR)",
+            "window.i18n.t",
+            "languageChanged",
+            "home.hero.inspector_idle",
+        ] {
+            assert!(
+                scene_module.contains(marker),
+                "missing scene marker {marker}"
+            );
+        }
+        assert!(!scene_module.contains("three.home.min.js"));
+        assert!(!scene_module.contains("new THREE"));
+
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let worker_module = std::fs::read_to_string(root.join("static/home-scene-worker.js"))
+            .expect("homepage scene worker module should be readable");
+        for marker in [
+            "from '/static/vendor/three.home.min.js'",
+            "case 'init'",
+            "case 'resize'",
+            "case 'pointer'",
+            "case 'select'",
+            "case 'rendering'",
+            "type: 'ready'",
+            "type: 'frame'",
+            "type: 'hover'",
+            "type: 'selection'",
+            "type: 'failure'",
+            "MAX_DESKTOP_DPR = 1.5",
+            "MAX_MOBILE_DPR = 1.25",
+            "DESKTOP_NODE_COUNT = 110",
+            "MOBILE_NODE_COUNT = 48",
+            "requestAnimationFrame",
+            "readPixels",
+            "FRAME_REPORT_INTERVAL_MS = 250",
+            "time - lastFrameReportTime < FRAME_REPORT_INTERVAL_MS",
+            "reportFrame(time, frameCount === 1)",
+            "return 'nonblank'",
+            "return 'blank'",
+            "return 'unknown'",
+            "pixelStatus !== 'nonblank'",
+            "webglcontextlost",
+            "postFailureOnce('webgl context lost')",
+            "if (!reducedMotion) updatePointerTarget()",
+            "if (reducedMotion) return",
+            "problemMetadata",
+            "raycaster.params.Points.threshold",
+            "raycaster.layers.enable(INTERACTION_LAYER)",
+            "intersection.index",
+            "selectedTarget",
+            "MAX_CONTROLLED_PULSES",
+            "createControlledPulses",
+            "controlledPulses.map((pulse) => pulse.userData.pulseHitTarget)",
+            "refreshHoveredTarget",
+            "if (!forceStatic && pointerInside) refreshHoveredTarget()",
+            "pulseHitTarget",
+            "pulseHitTarget.layers.set(INTERACTION_LAYER)",
+            "intersectObjects(raycastTargets, false, intersections)",
+        ] {
+            assert!(
+                worker_module.contains(marker),
+                "missing scene worker marker {marker}"
+            );
+        }
+        assert_eq!(
+            worker_module.matches("type: 'frame'").count(),
+            1,
+            "frame reporting must stay behind the bounded reportFrame gate"
+        );
+        assert_eq!(
+            worker_module.matches("renderFrame(").count(),
+            4,
+            "reduced-motion interactions must raycast without rendering a new frame"
+        );
+        assert!(!worker_module.contains("if (reducedMotion) renderFrame"));
+
+        let mcp_html = McpDocsTemplate {
+            docs: docs_registry(),
+            version: "0.3.2-test",
+            home_path: "/",
+            docs_path: DOCS_PATH,
+            token_auth_enabled: true,
+        }
+        .render()
+        .expect("mcp docs template should render");
+        assert!(!mcp_html.contains("three.module.min.js"));
+        assert!(!mcp_html.contains("home-scene.js"));
+    }
+
+    #[test]
+    fn homepage_ambient_motion_is_bounded_and_accessible() {
+        let home_html = HomeTemplate {
+            total_problems: 42,
+            token_auth_enabled: true,
+            version: "0.3.2-test",
+            docs: docs_registry(),
+            docs_path: DOCS_PATH,
+            mcp_docs_path: MCP_DOCS_PATH,
+        }
+        .render()
+        .expect("home template should render");
+
+        assert_eq!(home_html.matches("data-motion-section").count(), 6);
+        assert_eq!(home_html.matches("--motion-order:").count(), 17);
+
+        let home_css = include_str!("../static/home.css");
+        for marker in [
+            ".home-shell::before",
+            ".home-shell::after",
+            "@keyframes observatory-field-route",
+            "@keyframes observatory-signal-scan",
+            "@supports (animation-timeline: view())",
+            "animation-timeline: view()",
+            "[data-motion-section]",
+            "@media (hover: hover) and (pointer: fine)",
+            ".source-orbit span:hover",
+            ".capability-list li:hover",
+            ".endpoint-row:focus-within",
+            ".integration-console:focus-within",
+            ".auth-matrix tbody tr:hover",
+            ".final-command:focus-within",
+        ] {
+            assert!(
+                home_css.contains(marker),
+                "missing ambient motion marker {marker}"
+            );
+        }
+
+        let reduced_motion = home_css
+            .split_once("@media (prefers-reduced-motion: reduce) {")
+            .map(|(_, block)| block)
+            .expect("reduced-motion media block should exist");
+        for marker in [
+            ".home-shell::before",
+            ".home-shell::after",
+            "[data-motion-section]",
+            ".source-orbit span::after",
+            ".capability-list li::after",
+            ".endpoint-row::after",
+        ] {
+            assert!(
+                reduced_motion.contains(marker),
+                "reduced-motion block must include {marker}"
+            );
+        }
+        assert!(reduced_motion.contains("animation: none;"));
+        assert!(reduced_motion.contains("transition: none;"));
+    }
+
+    #[test]
+    fn homepage_fallback_is_declarative_animated_and_bounded() {
+        fn css_block<'a>(source: &'a str, marker: &str) -> Option<&'a str> {
+            let marker_start = source.find(marker)?;
+            let opening_brace = marker_start + source[marker_start..].find('{')?;
+            let mut depth = 0usize;
+
+            for (offset, byte) in source.as_bytes()[opening_brace..].iter().enumerate() {
+                match *byte {
+                    b'{' => depth += 1,
+                    b'}' => {
+                        depth = depth.checked_sub(1)?;
+                        if depth == 0 {
+                            return Some(&source[marker_start..opening_brace + offset + 1]);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            None
+        }
+
+        let home_html = HomeTemplate {
+            total_problems: 42,
+            token_auth_enabled: true,
+            version: "0.3.2-test",
+            docs: docs_registry(),
+            docs_path: DOCS_PATH,
+            mcp_docs_path: MCP_DOCS_PATH,
+        }
+        .render()
+        .expect("home template should render");
+
+        assert!(home_html.contains(
+            "data-fallback-scene aria-hidden=\"true\" focusable=\"false\" viewBox=\"0 0 1440 804\" preserveAspectRatio=\"xMidYMid slice\""
+        ));
+        assert_eq!(home_html.matches("data-fallback-core").count(), 1);
+        assert_eq!(home_html.matches("data-fallback-hub").count(), 5);
+        assert_eq!(home_html.matches("data-fallback-node").count(), 30);
+        assert_eq!(home_html.matches("data-fallback-route").count(), 4);
+        assert_eq!(home_html.matches("data-fallback-pulse").count(), 4);
+        assert!(!home_html.contains("<animate"));
+
+        let fallback_css = include_str!("../static/home.css");
+        for marker in [
+            "@keyframes fallback-core-drift",
+            "@keyframes fallback-hub-breathe",
+            "@keyframes fallback-route-pulse",
+            "stroke-dasharray",
+            "stroke-dashoffset",
+        ] {
+            assert!(
+                fallback_css.contains(marker),
+                "missing fallback CSS marker {marker}"
+            );
+        }
+        assert_eq!(fallback_css.matches("@keyframes fallback-").count(), 3);
+        assert!(
+            fallback_css.contains(".scene-shell.is-ready .fallback-scene {\n    opacity: 0;\n}")
+        );
+        assert!(fallback_css
+            .contains(".scene-shell.is-webgl-fallback .fallback-scene {\n    opacity: 1;\n}"));
+        assert!(fallback_css
+            .contains("linear-gradient(120deg, transparent 0 65%, rgba(83, 224, 232, 0.06)"));
+        assert!(fallback_css
+            .contains("linear-gradient(32deg, transparent 0 72%, rgba(255, 106, 85, 0.05)"));
+        for selector in [".fallback-core", ".fallback-hub", ".fallback-pulse"] {
+            let rule_start = format!("{selector} {{");
+            let animation_rule = fallback_css
+                .match_indices(&rule_start)
+                .filter_map(|(index, _)| {
+                    let rule = &fallback_css[index..];
+                    rule.find("\n}").map(|end| &rule[..end])
+                })
+                .find(|rule| rule.contains("animation:"))
+                .unwrap_or_else(|| panic!("missing base animation rule for {selector}"));
+            assert!(
+                animation_rule.contains("animation-play-state: paused"),
+                "base animation must be paused for {selector}"
+            );
+        }
+        assert_eq!(
+            fallback_css
+                .matches("@media (prefers-reduced-motion: reduce) {")
+                .count(),
+            1
+        );
+        let reduced_motion = css_block(fallback_css, "@media (prefers-reduced-motion: reduce)")
+            .expect("reduced-motion media block should exist");
+        let reduced_animation_rule = css_block(reduced_motion, ".fallback-network,")
+            .expect("reduced-motion fallback animation rule should exist");
+        for selector in [
+            ".fallback-core",
+            ".fallback-hub",
+            ".fallback-node",
+            ".fallback-pulse",
+        ] {
+            assert!(
+                reduced_animation_rule.contains(selector),
+                "reduced-motion rule must include {selector}"
+            );
+        }
+        assert!(reduced_animation_rule.contains("animation: none;"));
+        assert_eq!(
+            fallback_css
+                .matches("animation-play-state: running")
+                .count(),
+            1
+        );
+        let running_rule = css_block(
+            fallback_css,
+            ".scene-shell.is-webgl-fallback .fallback-core,",
+        )
+        .expect("fallback running animation rule should exist");
+        for selector in [
+            ".scene-shell.is-webgl-fallback .fallback-core",
+            ".scene-shell.is-webgl-fallback .fallback-hub",
+            ".scene-shell.is-webgl-fallback .fallback-pulse",
+        ] {
+            assert!(running_rule.contains(selector));
+        }
+        assert_eq!(
+            running_rule
+                .matches(".scene-shell.is-webgl-fallback .fallback-")
+                .count(),
+            3
+        );
+        assert!(!running_rule.contains(".fallback-node"));
+        assert!(running_rule.contains("animation-play-state: running;"));
+        let node_rule = css_block(fallback_css, ".fallback-node {\n    opacity: 0.66;")
+            .expect("individual fallback node rule should exist");
+        assert!(!node_rule.contains("animation:"));
+        assert!(!node_rule.contains("animation-delay:"));
+        assert!(!node_rule.contains("transform"));
+        assert!(!fallback_css.contains("fallback-node-breathe"));
+
+        let scene_module = include_str!("../static/home-scene.js");
+        let failure_object = scene_module
+            .split("const SCENE_FAILURE = Object.freeze({\n")
+            .nth(1)
+            .and_then(|javascript| javascript.split("\n});").next())
+            .expect("SCENE_FAILURE object should exist");
+        let failure_entries: Vec<_> = failure_object.lines().map(str::trim).collect();
+        assert_eq!(
+            failure_entries,
+            vec![
+                "WORKER_UNSUPPORTED: 'worker-unsupported',",
+                "OFFSCREEN_UNSUPPORTED: 'offscreen-unsupported',",
+                "WORKER_LOAD: 'worker-load',",
+                "WORKER_MESSAGE: 'worker-message',",
+                "CANVAS_TRANSFER: 'canvas-transfer',",
+                "INVALID_READY: 'invalid-ready',",
+                "WORKER_RUNTIME: 'worker-runtime',",
+                "WEBGL_CONTEXT_LOST: 'webgl-context-lost',",
+            ],
+            "SCENE_FAILURE must contain exactly the eight bounded codes"
+        );
+        for code in [
+            "worker-unsupported",
+            "offscreen-unsupported",
+            "worker-load",
+            "worker-message",
+            "canvas-transfer",
+            "invalid-ready",
+            "worker-runtime",
+            "webgl-context-lost",
+        ] {
+            assert!(
+                scene_module.contains(code),
+                "missing bounded failure code {code}"
+            );
+            assert_eq!(
+                scene_module.matches(&format!("'{code}'")).count(),
+                1,
+                "failure code literal must have one canonical owner: {code}"
+            );
+        }
+        for marker in [
+            "const SCENE_FAILURE = Object.freeze({",
+            "const ALLOWED_SCENE_FAILURES = new Set(Object.values(SCENE_FAILURE))",
+            "activateWorkerFallback(reason = SCENE_FAILURE.WORKER_RUNTIME)",
+            "activateFallback(shell, canvas, reason)",
+            "function handleWorkerMessage(event) {\n        if (workerFailed) return;",
+            "const normalizedReason = ALLOWED_SCENE_FAILURES.has(reason)",
+            "targetCanvas.dataset.sceneFailure = normalizedReason",
+            "delete canvas.dataset.sceneFailure",
+            "worker.postMessage(message, transfer || []);\n        } catch {\n            activateWorkerFallback(SCENE_FAILURE.WORKER_MESSAGE);",
+            "message.nonblank !== true || message.pixelStatus !== 'nonblank'",
+            "activateWorkerFallback(SCENE_FAILURE.INVALID_READY);",
+            "message.reason === 'webgl context lost'\n                        ? SCENE_FAILURE.WEBGL_CONTEXT_LOST\n                        : SCENE_FAILURE.WORKER_RUNTIME",
+            "if (typeof Worker !== 'function') {\n        activateWorkerFallback(SCENE_FAILURE.WORKER_UNSUPPORTED);",
+            "typeof OffscreenCanvas !== 'function' ||\n        typeof canvas.transferControlToOffscreen !== 'function'\n    ) {\n        activateWorkerFallback(SCENE_FAILURE.OFFSCREEN_UNSUPPORTED);",
+            "worker = new Worker('/static/home-scene-worker.js', { type: 'module' });\n    } catch {\n        activateWorkerFallback(SCENE_FAILURE.WORKER_LOAD);",
+            "addEventListener('error', () => activateWorkerFallback(SCENE_FAILURE.WORKER_LOAD))",
+            "addEventListener('messageerror', () =>\n        activateWorkerFallback(SCENE_FAILURE.WORKER_MESSAGE)",
+            "offscreenCanvas = canvas.transferControlToOffscreen();\n    } catch {\n        activateWorkerFallback(SCENE_FAILURE.CANVAS_TRANSFER);",
+            "if (!shell || !hero) {\n        activateWorkerFallback(SCENE_FAILURE.WORKER_RUNTIME);",
+        ] {
+            assert!(
+                scene_module.contains(marker),
+                "missing fallback diagnostic marker {marker}"
+            );
+        }
+        assert_eq!(scene_module.matches("dataset.sceneFailure =").count(), 1);
+        assert!(!scene_module.contains("sceneFailure = message"));
+        assert!(!scene_module.contains("error.message"));
+        assert!(!scene_module.contains("error.stack"));
+
+        let fallback_contract = format!("{home_html}\n{fallback_css}\n{scene_module}");
+        for forbidden in [
+            "CanvasRenderingContext2D",
+            "getContext('2d')",
+            "getContext(\"2d\")",
+            "requestAnimationFrame",
+            "fetch(",
+        ] {
+            assert!(
+                !fallback_contract.contains(forbidden),
+                "fallback contract must not contain {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn homepage_scene_failure_is_terminal_in_executed_bridge() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let scene_module = root.join("static/home-scene.js");
+        let harness = r#"
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+
+const scenePath = process.argv[1];
+const source = fs.readFileSync(scenePath, 'utf8');
+const state = { worker: null };
+
+class ClassList {
+    constructor() {
+        this.values = new Set();
+    }
+
+    add(value) {
+        this.values.add(value);
+    }
+
+    remove(value) {
+        this.values.delete(value);
+    }
+
+    contains(value) {
+        return this.values.has(value);
+    }
+}
+
+class MockWorker {
+    constructor() {
+        this.listeners = {};
+        this.terminated = false;
+        state.worker = this;
+    }
+
+    addEventListener(type, listener) {
+        this.listeners[type] = listener;
+    }
+
+    postMessage() {}
+
+    terminate() {
+        this.terminated = true;
+    }
+}
+
+class MockObserver {
+    observe() {}
+}
+
+const shell = {
+    classList: new ClassList(),
+    clientWidth: 1200,
+    clientHeight: 700,
+};
+const hero = { addEventListener() {} };
+const inspector = { textContent: 'idle' };
+const canvas = {
+    dataset: {},
+    closest(selector) {
+        if (selector === '.scene-shell') return shell;
+        if (selector === '.observatory-hero') return hero;
+        return null;
+    },
+    getBoundingClientRect() {
+        return { left: 0, top: 0, width: 1200, height: 700 };
+    },
+    transferControlToOffscreen() {
+        return {};
+    },
+};
+const document = {
+    hidden: false,
+    querySelector(selector) {
+        if (selector === '[data-observatory-scene]') return canvas;
+        if (selector === '.scene-inspector span:last-child') return inspector;
+        return null;
+    },
+    querySelectorAll(selector) {
+        if (selector === '.scene-source-data [data-source]') {
+            return [{ dataset: { source: 'leetcode' } }];
+        }
+        return [];
+    },
+    addEventListener() {},
+};
+const window = {
+    devicePixelRatio: 1,
+    matchMedia() {
+        return { matches: false };
+    },
+};
+
+vm.runInNewContext(source, {
+    document,
+    window,
+    Worker: MockWorker,
+    OffscreenCanvas: function OffscreenCanvas() {},
+    IntersectionObserver: MockObserver,
+    ResizeObserver: MockObserver,
+});
+
+assert.ok(state.worker, 'scene bridge should create a worker');
+const dispatch = (data) => state.worker.listeners.message({ data });
+dispatch({ type: 'failure', reason: 'webgl initialization failed' });
+
+assert.equal(state.worker.terminated, true);
+assert.equal(canvas.dataset.sceneStatus, 'fallback');
+assert.equal(canvas.dataset.sceneNonblank, 'false');
+assert.equal(canvas.dataset.sceneFailure, 'worker-runtime');
+assert.equal(shell.classList.contains('is-webgl-fallback'), true);
+assert.equal(shell.classList.contains('is-ready'), false);
+
+const terminalDataset = { ...canvas.dataset };
+dispatch({ type: 'ready', nonblank: true, pixelStatus: 'nonblank', frameCount: 7 });
+dispatch({ type: 'frame', frameCount: 8 });
+dispatch({
+    type: 'selection',
+    identity: 'queued-selection',
+    metadata: {
+        source: 'leetcode',
+        problemTitle: 'Queued',
+        algorithm: 'graph',
+        similarity: 99,
+        accessPath: '/queued',
+    },
+});
+
+assert.deepEqual(canvas.dataset, terminalDataset);
+assert.equal(canvas.dataset.sceneStatus, 'fallback');
+assert.equal(canvas.dataset.sceneNonblank, 'false');
+assert.equal(canvas.dataset.sceneFailure, 'worker-runtime');
+assert.equal(shell.classList.contains('is-ready'), false);
+"#;
+
+        let output = match std::process::Command::new("node")
+            .arg("-e")
+            .arg(harness)
+            .arg(&scene_module)
+            .output()
+        {
+            Ok(output) => output,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                eprintln!("skipping homepage scene lifecycle harness: node is not installed");
+                return;
+            }
+            Err(error) => panic!("failed to execute homepage scene lifecycle harness: {error}"),
+        };
+
+        assert!(
+            output.status.success(),
+            "homepage scene lifecycle harness failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[test]
+    fn homepage_scene_vendor_is_self_contained_and_retires_full_distribution() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let worker_module = std::fs::read_to_string(root.join("static/home-scene-worker.js"))
+            .expect("homepage scene worker module should be readable");
+        assert!(worker_module.contains("from '/static/vendor/three.home.min.js'"));
+
+        let bundle_path = root.join("static/vendor/three.home.min.js");
+        let bundle = std::fs::read_to_string(&bundle_path)
+            .expect("tree-shaken homepage Three.js bundle should exist");
+        for external_reference in [
+            "three.core.min.js",
+            "three.module.min.js",
+            "from\"http",
+            "from'http",
+            "from\"/",
+            "from'/",
+        ] {
+            assert!(
+                !bundle.contains(external_reference),
+                "homepage Three.js bundle must be self-contained: {external_reference}"
+            );
+        }
+
+        for retired in [
+            "three.module.min.js",
+            "three.core.min.js",
+            "three.home.entry.js",
+        ] {
+            assert!(
+                !root.join("static/vendor").join(retired).exists(),
+                "retired full Three.js distribution remains: {retired}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn scalar_compatibility_path_remains_a_redirect() {
+        let state = test_state(false);
+        let app = Router::new().merge(public_router()).with_state(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(API_DOCS_PATH)
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+
+        assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(
+            response.headers().get(axum::http::header::LOCATION),
+            Some(&axum::http::HeaderValue::from_static(DOCS_PATH))
+        );
+    }
+
+    #[test]
     fn renders_api_docs_with_grouped_routes_and_collapsed_details() {
         let html = ApiDocsTemplate {
             docs: docs_registry(),
@@ -761,7 +1600,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_mcp_docs_with_transport_tools_and_examples() {
+    fn renders_mcp_work_surface_with_tools_and_examples() {
         let html = McpDocsTemplate {
             docs: docs_registry(),
             version: "0.3.2-test",
@@ -773,6 +1612,9 @@ mod tests {
         .expect("mcp docs template should render");
 
         assert!(html.contains("MCP Reference"));
+        assert!(html.contains("mcp-layout"));
+        assert!(html.contains("mcp-toc"));
+        assert!(html.contains("transport-flow"));
         assert!(html.contains("0.3.2-test"));
         assert!(html.contains("/mcp"));
         assert!(html.contains("resolve_problem"));
@@ -783,7 +1625,13 @@ mod tests {
         assert!(html.contains("streamable-http"));
         assert!(html.contains("tools/call"));
         assert!(html.contains("mcpServers.oj-api"));
-        assert_eq!(html.matches("class=\"panel reference-card\"").count(), 9);
+        assert_eq!(html.matches("class=\"mcp-reference-row").count(), 7);
+        assert_eq!(html.matches("class=\"reference-details\"").count(), 7);
+        assert_eq!(html.matches("data-copy-target=").count(), 2);
+        assert!(!html.contains("class=\"scene-inspector\" aria-live"));
+        assert!(html.contains("/static/mcp.js"));
+        assert!(!html.contains("panel reference-card"));
+        assert!(!html.contains("home-scene.js"));
         assert!(!html.contains("/admin/"));
     }
 
@@ -852,19 +1700,51 @@ mod tests {
 
     #[test]
     fn docs_locale_bundles_cover_public_pages() {
+        fn collect_paths(value: &serde_json::Value, prefix: &str, paths: &mut BTreeSet<String>) {
+            if let serde_json::Value::Object(map) = value {
+                for (key, child) in map {
+                    let path = format!("{prefix}/{key}");
+                    paths.insert(path.clone());
+                    collect_paths(child, &path, paths);
+                }
+            }
+        }
+
         let locales = [
-            include_str!("../static/i18n/en.json"),
-            include_str!("../static/i18n/zh-TW.json"),
-            include_str!("../static/i18n/zh-CN.json"),
+            ("en", include_str!("../static/i18n/en.json")),
+            ("zh-TW", include_str!("../static/i18n/zh-TW.json")),
+            ("zh-CN", include_str!("../static/i18n/zh-CN.json")),
         ];
 
-        for locale in locales {
-            let parsed: serde_json::Value =
-                serde_json::from_str(locale).expect("locale json should parse");
+        let parsed_locales: Vec<_> = locales
+            .iter()
+            .map(|(name, locale)| {
+                let parsed: serde_json::Value =
+                    serde_json::from_str(locale).expect("locale json should parse");
+                (*name, parsed)
+            })
+            .collect();
+
+        for (name, parsed) in &parsed_locales {
             for key in [
                 "/home/nav/overview",
                 "/home/nav/api_docs",
                 "/home/nav/mcp_docs",
+                "/home/hero/category",
+                "/home/hero/statement",
+                "/home/hero/primary_cta",
+                "/home/hero/inspector_access_path",
+                "/home/hero/inspector_core_to",
+                "/home/hero/inspector_similarity",
+                "/home/hero/inspector_illustrative",
+                "/home/space/title",
+                "/home/capabilities/resolve/title",
+                "/home/capabilities/retrieve/title",
+                "/home/capabilities/relate/title",
+                "/home/capabilities/connect/title",
+                "/home/integrations/rest",
+                "/home/integrations/mcp",
+                "/home/final_cta/title",
                 "/docs_api/hero/title",
                 "/docs_api/groups/problems",
                 "/docs_mcp/hero/title",
@@ -873,8 +1753,31 @@ mod tests {
                 "/docs_mcp/examples/connection_title",
                 "/docs_mcp/examples/request_title",
             ] {
-                assert!(parsed.pointer(key).is_some(), "missing locale key {key}");
+                assert!(
+                    parsed.pointer(key).is_some(),
+                    "missing locale key {key} in {name}"
+                );
             }
+        }
+
+        let mut expected_paths = BTreeSet::new();
+        for root in ["home", "docs_mcp"] {
+            collect_paths(
+                &parsed_locales[0].1[root],
+                &format!("/{root}"),
+                &mut expected_paths,
+            );
+        }
+
+        for (name, parsed) in parsed_locales.iter().skip(1) {
+            let mut actual_paths = BTreeSet::new();
+            for root in ["home", "docs_mcp"] {
+                collect_paths(&parsed[root], &format!("/{root}"), &mut actual_paths);
+            }
+            assert_eq!(
+                actual_paths, expected_paths,
+                "locale key mismatch for {name}"
+            );
         }
     }
 
@@ -905,6 +1808,39 @@ mod tests {
         assert_eq!(mcp_html.matches("class=\"reference-details\"").count(), 7);
         assert!(!mcp_html.contains("<details class=\"reference-details\" open>"));
         assert_eq!(mcp_html.matches("<summary>").count(), 7);
+    }
+
+    #[test]
+    fn public_templates_do_not_reference_retired_presentation() {
+        let public_sources = [
+            include_str!("../templates/docs_base.html"),
+            include_str!("../templates/home.html"),
+            include_str!("../templates/docs_mcp.html"),
+            include_str!("../static/site.css"),
+            include_str!("../static/home.css"),
+            include_str!("../static/mcp.css"),
+            include_str!("../static/mcp.js"),
+        ];
+
+        for retired in [
+            "bento-",
+            "Playfair Display",
+            "panel reference-card",
+            "function openByHash",
+            "--home-",
+        ] {
+            assert!(
+                public_sources
+                    .iter()
+                    .all(|source| !source.contains(retired)),
+                "retired presentation reference remains: {retired}"
+            );
+        }
+
+        let shared_shell = include_str!("../templates/docs_base.html");
+        assert!(shared_shell.contains("/static/i18n.js"));
+        assert!(shared_shell.contains("block page_styles"));
+        assert!(shared_shell.contains("block page_scripts"));
     }
 
     #[tokio::test]
