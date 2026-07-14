@@ -81,16 +81,23 @@ The crawler SHALL upsert minimal problem snapshots and write the compact daily r
 - **THEN** the crawler does not clear or replace those richer fields with empty or placeholder daily-source snapshot values
 
 ### Requirement: Additional daily source scheduled refresh
-The system SHALL refresh configured additional daily sources at UTC+8 08:00, 10:00, and 12:00 every day. Each refresh SHALL target the current UTC+8 date and SHALL avoid spawning duplicate source/date jobs when an equivalent job is already running.
+The system SHALL evaluate configured additional daily sources for refresh at UTC+8 08:00, 10:00, and 12:00 every day. Each eligible refresh SHALL target the current UTC+8 date and SHALL avoid spawning duplicate source/date jobs when an equivalent job is already running. The system SHALL skip a source when the current UTC+8 date is before its first published date or outside its publishing weekdays: `sheep` from `2024-02-26` on Monday through Saturday, and `0x3f` from `2022-04-08` on Monday through Friday.
 
 #### Scenario: Scheduled refresh launches Sheep
 - **WHEN** the server reaches UTC+8 08:00, 10:00, or 12:00
+- **AND** the current UTC+8 date is on or after `2024-02-26` and falls on Monday through Saturday
 - **THEN** the system launches a crawler job with `--daily-source sheep --date <utc8-today>` unless that source/date job is already running
 
 #### Scenario: Scheduled refresh launches 0x3f when token is configured
 - **WHEN** the server reaches UTC+8 08:00, 10:00, or 12:00
+- **AND** the current UTC+8 date is on or after `2022-04-08` and falls on Monday through Friday
 - **AND** a direct local Tencent Docs token or its configured environment-variable fallback resolves to a non-empty value
 - **THEN** the system launches a crawler job with `--daily-source 0x3f --date <utc8-today>` unless that source/date job is already running
+
+#### Scenario: Scheduled refresh skips unavailable source date
+- **WHEN** the server reaches UTC+8 08:00, 10:00, or 12:00
+- **AND** the current UTC+8 date is before the selected source's first published date or outside its publishing weekdays
+- **THEN** the system does not launch a scheduled job for that source and date
 
 #### Scenario: Scheduled refresh skips 0x3f when token is absent
 - **WHEN** the server reaches UTC+8 08:00, 10:00, or 12:00
