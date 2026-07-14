@@ -88,4 +88,3 @@ scene readiness.
   routes at `760px` and below.
 - Retirement: no old owner or compatibility path is retained; this extends the
   existing background grid and interaction rules in place.
-

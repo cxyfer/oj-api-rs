@@ -128,13 +128,13 @@ The system SHALL expose a public HTML reference page at `/docs/mcp` that documen
 - **WHEN** a user reviews `/docs/mcp`
 - **THEN** the page includes at least one connection/configuration example and one MCP request example
 
-### Requirement: Public docs pages support the existing locale set
-The homepage, API docs page, and MCP reference page SHALL support the existing locale set used by the project frontend (`en`, `zh-TW`, and `zh-CN`) for all visible non-technical guide copy.
+### Requirement: Localized guide pages support the existing locale set
+The homepage and MCP reference page SHALL support the existing locale set used by the project frontend (`en`, `zh-TW`, and `zh-CN`) for all visible non-technical guide copy. The Scalar-owned `/docs` page remains outside the shared frontend localization mechanism.
 
 #### Scenario: Default locale on first visit
-- **WHEN** a user opens `/`, `/docs`, or `/docs/mcp` with no saved language preference
+- **WHEN** a user opens `/` or `/docs/mcp` with no saved language preference
 - **THEN** the page renders using the default frontend locale behavior already established by the project
 
 #### Scenario: User switches docs-page language
 - **WHEN** a user changes the language using the shared frontend localization mechanism
-- **THEN** all translatable copy on `/`, `/docs`, and `/docs/mcp` updates using the selected locale among `en`, `zh-TW`, and `zh-CN`
+- **THEN** all translatable copy on `/` and `/docs/mcp` updates using the selected locale among `en`, `zh-TW`, and `zh-CN`

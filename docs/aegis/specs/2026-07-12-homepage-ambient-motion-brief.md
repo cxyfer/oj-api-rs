@@ -93,4 +93,3 @@ descendants exist.
 - Browser screenshots cover desktop and mobile, plus reduced-motion state.
 - Browser checks confirm no horizontal overflow and unchanged successful hero
   scene readiness.
-

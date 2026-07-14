@@ -793,6 +793,139 @@ mod tests {
     }
 
     #[test]
+    fn mcp_copy_feedback_timer_is_owned_by_latest_result() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mcp_script = root.join("static/mcp.js");
+        let harness = r#"
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const feedback = { textContent: '' };
+const label = { textContent: 'Copy' };
+const target = { textContent: 'example request' };
+let clickListener;
+let clipboardCall = 0;
+let now = 0;
+let nextTimerId = 1;
+const timers = new Map();
+
+const button = {
+    dataset: { copyTarget: 'example' },
+    querySelector() { return label; },
+    addEventListener(type, listener) {
+        if (type === 'click') clickListener = listener;
+    },
+};
+
+const document = {
+    querySelector(selector) {
+        return selector === '.copy-feedback' ? feedback : null;
+    },
+    querySelectorAll(selector) {
+        return selector === '[data-copy-target]' ? [button] : [];
+    },
+    getElementById(id) {
+        return id === 'example' ? target : null;
+    },
+    addEventListener() {},
+};
+
+const window = {
+    isSecureContext: true,
+    addEventListener() {},
+    setTimeout(callback, delay) {
+        const id = nextTimerId++;
+        timers.set(id, { callback, due: now + delay });
+        return id;
+    },
+    clearTimeout(id) {
+        timers.delete(id);
+    },
+};
+
+const navigator = {
+    clipboard: {
+        writeText() {
+            clipboardCall += 1;
+            if (clipboardCall <= 3) return Promise.resolve();
+            return Promise.reject(new Error('clipboard unavailable'));
+        },
+    },
+};
+
+function advance(milliseconds) {
+    now += milliseconds;
+    while (true) {
+        const dueTimer = [...timers.entries()]
+            .filter(([, timer]) => timer.due <= now)
+            .sort((left, right) => left[1].due - right[1].due)[0];
+        if (!dueTimer) return;
+        const [id, timer] = dueTimer;
+        timers.delete(id);
+        timer.callback();
+    }
+}
+
+vm.runInNewContext(source, { document, navigator, window });
+assert.equal(typeof clickListener, 'function');
+
+(async () => {
+    await clickListener();
+    assert.equal(label.textContent, 'Copied');
+    assert.equal(feedback.textContent, 'Copied');
+
+    advance(1000);
+    await clickListener();
+    assert.equal(label.textContent, 'Copied');
+    assert.equal(feedback.textContent, 'Copied');
+    advance(800);
+    assert.equal(label.textContent, 'Copied');
+    assert.equal(feedback.textContent, 'Copied');
+    advance(1000);
+    assert.equal(label.textContent, 'Copy');
+    assert.equal(feedback.textContent, '');
+
+    await clickListener();
+    advance(1000);
+    await clickListener();
+    assert.equal(label.textContent, 'Copy');
+    assert.equal(feedback.textContent, 'Copy failed');
+
+    advance(800);
+    assert.equal(feedback.textContent, 'Copy failed');
+    advance(1000);
+    assert.equal(feedback.textContent, '');
+})().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+});
+"#;
+
+        let output = match std::process::Command::new("node")
+            .arg("-e")
+            .arg(harness)
+            .arg(&mcp_script)
+            .output()
+        {
+            Ok(output) => output,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                eprintln!("skipping MCP copy timer harness: node is not installed");
+                return;
+            }
+            Err(error) => panic!("failed to execute MCP copy timer harness: {error}"),
+        };
+
+        assert!(
+            output.status.success(),
+            "MCP copy timer harness failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[test]
     fn homepage_scene_has_bounded_accessible_contract() {
         let home_html = HomeTemplate {
             total_problems: 42,

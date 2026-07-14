@@ -11,6 +11,19 @@
         return value === key ? fallback : value;
     }
 
+    function showFeedback(text) {
+        if (feedbackTimeout) {
+            window.clearTimeout(feedbackTimeout);
+            feedbackTimeout = undefined;
+        }
+        if (!feedback) return;
+        feedback.textContent = text;
+        feedbackTimeout = window.setTimeout(() => {
+            feedback.textContent = '';
+            feedbackTimeout = undefined;
+        }, 1800);
+    }
+
     function openReferenceFromHash() {
         const hash = window.location.hash;
         if (!hash || hash.length <= 1) return;
@@ -47,22 +60,21 @@
             await writeClipboard(target.textContent);
             const copiedText = translate('docs_mcp.copy.copied', 'Copied');
             if (label) label.textContent = copiedText;
-            if (feedback) feedback.textContent = copiedText;
 
             if (button._copyTimeout) window.clearTimeout(button._copyTimeout);
-            if (feedbackTimeout) window.clearTimeout(feedbackTimeout);
-
             button._copyTimeout = window.setTimeout(() => {
                 if (label) label.textContent = translate('docs_mcp.copy.copy', 'Copy');
                 delete button._copyTimeout;
             }, 1800);
-            feedbackTimeout = window.setTimeout(() => {
-                if (feedback) feedback.textContent = '';
-                feedbackTimeout = undefined;
-            }, 1800);
+            showFeedback(copiedText);
         } catch (error) {
             const failedText = translate('docs_mcp.copy.failed', 'Copy failed');
-            if (feedback) feedback.textContent = failedText;
+            if (button._copyTimeout) {
+                window.clearTimeout(button._copyTimeout);
+                delete button._copyTimeout;
+            }
+            if (label) label.textContent = translate('docs_mcp.copy.copy', 'Copy');
+            showFeedback(failedText);
         }
     }
 
