@@ -44,3 +44,7 @@ Entries are workspace records, not authoritative runtime decisions.
 | 2026-07-11 | work | docs/aegis/work/2026-07-11-observatory-animated-fallback/proof-bundle.md | 2026-07-11-observatory-animated-fallback proof bundle |
 | 2026-07-12 | spec | docs/aegis/specs/2026-07-12-homepage-ambient-motion-brief.md | Homepage Ambient Motion Spec Brief |
 | 2026-07-12 | plan | docs/aegis/plans/2026-07-12-homepage-ambient-motion.md | Homepage Ambient Motion Implementation Plan |
+| 2026-10-23 | plan | docs/aegis/plans/2026-10-23-release-automation.md | English Release Notes and RC Image Automation |
+| 2026-10-23 | work | docs/aegis/work/2026-10-23-release-automation/10-intent.md | Release Automation Intent |
+| 2026-10-23 | work | docs/aegis/work/2026-10-23-release-automation/20-checkpoint.md | Release Automation Checkpoint |
+| 2026-10-23 | work | docs/aegis/work/2026-10-23-release-automation/90-evidence.md | Release Automation Evidence |
