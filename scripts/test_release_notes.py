@@ -238,6 +238,8 @@ class ReleaseNotesTests(unittest.TestCase):
         self.tag("v0.1.0")
         self.pull(8)
         for subject in (
+            "release(v0.2.0): bump version and update changelog",
+            "release(v0.2.0-rc.1): bump version and update changelog (#8)",
             "🔖 release(v0.2.0-rc.1): bump version and update changelog",
             "🔖 release(v0.2.0): bump version and update changelog",
             "🔖 release(v0.2.0): bump version and update changelog (#8)",
@@ -261,6 +263,24 @@ class ReleaseNotesTests(unittest.TestCase):
         text = self.generate("v0.2.0")
         for subject in subjects:
             self.assertIn(subject, text)
+
+    def test_embedded_version_scoped_release_mentions_are_preserved(self):
+        self.tag("v0.1.0")
+        subjects = (
+            "docs: explain release(v1.2.3): bump version and update changelog",
+            "📝 docs: explain release(v1.2.3): bump version and update changelog",
+            "docs: explain 🔖 release(v1.2.3-rc.1): bump version and update changelog",
+        )
+        for subject in subjects:
+            self.commit(subject)
+        self.pull(9, title="Explain the release workflow")
+        self.commit(subjects[0] + " (#9)")
+        self.tag("v0.2.0")
+        text = self.generate("v0.2.0")
+        for subject in subjects:
+            self.assertIn(subject, text)
+        self.assertIn("Explain the release workflow", text)
+        self.assertEqual(len(self.calls), 1)
 
     def test_first_release_contributors_and_rc_warning(self):
         self.pull(2)

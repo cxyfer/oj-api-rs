@@ -14,11 +14,11 @@ TAG = re.compile(
 PR = re.compile(r"\(#([1-9]\d*)\)$|^Merge pull request #([1-9]\d*)\b")
 REPO = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9][A-Za-z0-9_.-]*")
 BUMP = re.compile(
-    r"\b(?:"
-    r"(?:chore|build|release)(?:\(release\))?:\s*"
+    r"(?:"
+    r"\b(?:chore|build|release)(?:\(release\))?:\s*"
     r"(?:bump (?:version )?(?:to )?|prepare |release )?"
     r"v?\d+\.\d+\.\d+(?:-rc\.\d+)?"
-    r"|release\(v\d+\.\d+\.\d+(?:-rc\.\d+)?\):\s*"
+    r"|^(?:🔖\s+)?release\(v\d+\.\d+\.\d+(?:-rc\.\d+)?\):\s*"
     r"bump version and update changelog"
     r")(?:\s+\(#\d+\))?$",
     re.IGNORECASE,
