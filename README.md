@@ -420,6 +420,10 @@ Legacy operation flags remain compatibility aliases for existing jobs: LeetCode 
 
 ## Development
 
+Versioned releases and release candidates build GHCR images and create English
+release-note drafts. See [RELEASING.md](RELEASING.md) for version preparation,
+image channels, notes checks, and publication commands.
+
 ### Rust
 
 ```bash
