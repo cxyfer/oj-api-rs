@@ -48,3 +48,4 @@ Entries are workspace records, not authoritative runtime decisions.
 | 2026-10-23 | work | docs/aegis/work/2026-10-23-release-automation/10-intent.md | Release Automation Intent |
 | 2026-10-23 | work | docs/aegis/work/2026-10-23-release-automation/20-checkpoint.md | Release Automation Checkpoint |
 | 2026-10-23 | work | docs/aegis/work/2026-10-23-release-automation/90-evidence.md | Release Automation Evidence |
+| 2026-10-23 | work | docs/aegis/work/2026-10-23-release-automation/99-reflection.md | Release Automation Reflection |

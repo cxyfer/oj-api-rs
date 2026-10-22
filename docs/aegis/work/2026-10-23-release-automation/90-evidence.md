@@ -21,5 +21,18 @@
   PRs #19–31 once, and retains direct commits.
 - Independent specification review passes after correcting the smoke test to
   require the runtime's expected empty-database HTTP 503 JSON and homepage 200.
-- Code-quality review and hosted image build are pending. No production tag,
-  registry image or GitHub release has been created by validation.
+- Independent code-quality review passes for `origin/dev...513f67e`.
+- PR #45 targets `dev`. Hosted run `39842825494` for `513f67e` succeeds and
+  accepts `queue: max`. Prepare passes the same 18 helper tests. Job
+  `120048226989` builds the actual Docker image, starts its container, verifies
+  the expected empty-database health JSON plus homepage, and exports the image.
+  The build job takes 5m04s; image compilation/build takes 4m01s.
+- Image artifact `oj-api-rs-validation-image`, ID `12454271640`, is available
+  with size 91,109,421 bytes and three-day retention. It contains a gzip Docker
+  archive for `docker load`. Hosted run and artifact metadata were read back
+  after completion; every validation step reports success.
+- No production tag, registry image or GitHub release has been created by
+  validation.
+- Boundary: actual tag-triggered GHCR push and GitHub draft creation are
+  implemented and reviewed but were deliberately not executed without a chosen
+  release version. PR validation skips both publishing jobs as intended.

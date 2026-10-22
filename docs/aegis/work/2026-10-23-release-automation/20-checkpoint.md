@@ -9,9 +9,13 @@
   site-packages. Live `v0.4.0` notes generation succeeded.
 - User confirmed RCs must never update `latest`; workflow consumes the helper's
   `is_latest_stable` output. Only exact RC images are pushed.
-- Specification review passes; code-quality review is running. Local Ruff,
+- Specification and code-quality reviews pass. Local Ruff,
   actionlint with ShellCheck, and diff checks pass. The only actionlint schema
   exception is documented GitHub `concurrency.queue: max` support.
-- Tasks: finish code review, commit/push/PR, and observe the hosted image build.
+- Implementation committed and pushed as `513f67e`; PR #45 targets `dev`.
+- Hosted run `39842825494` succeeds: prepare, actual image build, container
+  smoke test, and image export/upload all pass. The image artifact is
+  `oj-api-rs-validation-image` (ID `12454271640`, 91,109,421 bytes).
 - Drift: none; application and persistent state are outside scope.
-- Next: finish independent review and open the PR to run the hosted image build.
+- Ready for maintainer review in PR #45. The PR remains open; no release tag,
+  version bump, production image push, release publication, or merge occurred.
