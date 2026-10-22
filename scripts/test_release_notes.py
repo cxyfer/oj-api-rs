@@ -234,6 +234,34 @@ class ReleaseNotesTests(unittest.TestCase):
         self.assertIn("in [#3]", contributors)
         self.assertEqual(len(self.calls), 4)
 
+    def test_version_scoped_release_commits_are_excluded(self):
+        self.tag("v0.1.0")
+        self.pull(8)
+        for subject in (
+            "🔖 release(v0.2.0-rc.1): bump version and update changelog",
+            "🔖 release(v0.2.0): bump version and update changelog",
+            "🔖 release(v0.2.0): bump version and update changelog (#8)",
+        ):
+            self.commit(subject)
+        self.tag("v0.2.0")
+        text = self.generate("v0.2.0")
+        self.assertNotIn("🔖 release", text)
+        self.assertIn("No user-facing changes were recorded", text)
+        self.assertEqual(self.calls, [])
+
+    def test_version_scoped_release_changes_are_preserved(self):
+        self.tag("v0.1.0")
+        subjects = (
+            "🔖 release(v0.2.0): improve upgrade diagnostics",
+            "🔖 release(v0.2.0): bump version parser and update changelog",
+        )
+        for subject in subjects:
+            self.commit(subject)
+        self.tag("v0.2.0")
+        text = self.generate("v0.2.0")
+        for subject in subjects:
+            self.assertIn(subject, text)
+
     def test_first_release_contributors_and_rc_warning(self):
         self.pull(2)
         self.commit("improve feature (#2)")
