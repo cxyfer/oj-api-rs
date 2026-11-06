@@ -731,6 +731,7 @@ mod tests {
             token_auth_enabled: Arc::new(AtomicBool::new(auth_enabled)),
             admin_sessions: Arc::new(RwLock::new(HashMap::new())),
             config_path: None,
+            crawler_schedule: Default::default(),
         });
 
         let token = crate::db::tokens::create_token(&state.rw_pool, Some("mcp-test"))

@@ -121,6 +121,7 @@ mod tests {
             token_auth_enabled: Arc::new(AtomicBool::new(true)),
             admin_sessions: Arc::new(RwLock::new(HashMap::new())),
             config_path: None,
+            crawler_schedule: Default::default(),
         });
 
         (state, path)

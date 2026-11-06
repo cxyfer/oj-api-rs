@@ -8,11 +8,14 @@ pub mod admin;
 pub mod api;
 pub mod auth;
 pub mod config;
+pub(crate) mod crawler;
+pub mod crawler_schedule;
 pub mod db;
 pub mod detect;
 pub(crate) mod dynamic_problem;
 pub mod health;
 pub mod home;
+pub(crate) mod job;
 pub mod mcp;
 pub mod models;
 pub mod utils;
@@ -35,4 +38,5 @@ pub struct AppState {
     pub token_auth_enabled: Arc<AtomicBool>,
     pub admin_sessions: Arc<RwLock<HashMap<String, i64>>>,
     pub config_path: Option<String>,
+    pub crawler_schedule: crawler_schedule::ScheduleRuntime,
 }

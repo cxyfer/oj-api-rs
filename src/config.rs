@@ -45,6 +45,7 @@ impl Default for DatabaseConfig {
 #[serde(default)]
 pub struct CrawlerConfig {
     pub timeout_secs: u64,
+    pub default_timezone: String,
     #[serde(default)]
     pub per_source_timeout: HashMap<String, u64>,
 }
@@ -53,6 +54,7 @@ impl Default for CrawlerConfig {
     fn default() -> Self {
         Self {
             timeout_secs: 300,
+            default_timezone: "UTC".into(),
             per_source_timeout: HashMap::new(),
         }
     }
@@ -217,6 +219,10 @@ impl Config {
     }
 
     fn validate(&self) {
+        if crate::crawler_schedule::parse_timezone(&self.crawler.default_timezone).is_err() {
+            eprintln!("FATAL: crawler.default_timezone must be an IANA timezone");
+            std::process::exit(1);
+        }
         if self.server.admin_secret.is_empty() || self.server.admin_secret == "changeme" {
             eprintln!(
                 "WARNING: admin_secret is '{}' — change it before deploying to production",

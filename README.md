@@ -55,7 +55,7 @@ docker run -d --name oj-api-rs --restart unless-stopped \
 
 ## Configuration
 
-All settings are loaded from `config.toml` at the project root (overridable via `CONFIG_PATH` env var). See `config.toml.example` for all options and defaults.
+Server and crawler defaults are loaded from `config.toml` at the project root (overridable via `CONFIG_PATH` env var). See `config.toml.example` for all options and defaults.
 
 ```toml
 [server]
@@ -90,6 +90,7 @@ workers = 8
 
 [crawler]
 timeout_secs = 300
+default_timezone = "UTC"       # IANA timezone inherited by schedules without an override
 # user_agent = "Mozilla/5.0 (compatible; OJ-API-Bot/1.0)"
 # Supported proxy schemes: http://, https://, socks5://, socks5h://
 # socks5h:// resolves DNS through the proxy.
@@ -329,6 +330,48 @@ Accessible at `/admin/` with session-based authentication (HttpOnly cookie).
 - **Tokens** — Create/revoke API tokens, toggle bearer-token auth on/off globally
 - **Crawlers** — Trigger crawlers with per-source CLI arguments, view real-time status and stdout/stderr output, job history
 - **i18n** — Language switcher (zh-TW / zh-CN / en) in nav bar, preference persisted in localStorage
+
+### Per-source crawler schedules
+
+Open **Admin → Crawlers → Scheduled crawling** to independently configure
+LeetCode, AtCoder, Codeforces, Luogu, and SPOJ. Schedules are disabled initially.
+Basic mode offers hourly, every N hours, daily, weekly, and monthly controls;
+advanced mode accepts a five-field Cron expression and a JSON array of crawler
+arguments. Both modes save the same configuration. Unsupported custom
+expressions remain intact when switching modes until a basic preset is chosen.
+
+The timezone is an IANA name such as `UTC`, `Asia/Taipei`, or
+`America/New_York`. Leave it blank to inherit `crawler.default_timezone`, which
+defaults to `UTC`. The preview shows the next five occurrences in that timezone.
+
+Cron fields are `minute hour day-of-month month day-of-week`; Sunday is `0` or
+`7`. Lists, ranges, steps, and month/weekday names are supported. When both date
+and weekday are restricted, either may match. Fixed local times execute once
+at a fall-back overlap; a time missing during a spring-forward transition runs
+at the first valid local time after the gap. Monthly dates missing from a month
+are skipped. The preview exposes these timezone effects before saving.
+
+Changes take effect after **Save schedule**, survive service restarts in the
+existing SQLite database, and do not edit `config.toml`. Missed occurrences
+while the service is stopped are skipped. A running crawler for the same source
+causes a scheduled occurrence to be skipped and recorded; different sources can
+run concurrently. Scheduled jobs reuse crawler timeouts, logs, progress, and
+history, with trigger `scheduled`. Disabling prevents future runs and lets any
+current job finish. The existing cancel endpoint continues to cancel manual
+jobs only. Run one service process per data directory; schedules are not a
+distributed queue.
+
+Authenticated admin endpoints:
+
+- `GET /admin/api/crawler-schedules`: all five sources, effective timezones,
+  next occurrences, latest scheduled jobs, and skipped-launch events.
+- `PUT /admin/api/crawler-schedules`: update one source atomically using
+  `{"source":"leetcode","schedule":{"enabled":true,"cron":"30 3 * * *","timezone":"","args":["--sync-problemset"]}}`.
+- `POST /admin/api/crawler-schedules/preview`: validate the same payload and
+  return five future times without saving or launching a job.
+
+Diagnostics and the existing additional daily-source scheduler retain their
+separate behavior.
 
 ## Architecture
 

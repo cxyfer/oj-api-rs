@@ -18,6 +18,14 @@ pub fn admin_router() -> Router<Arc<AppState>> {
         .route("/admin/logout", post(handlers::logout));
 
     let protected = Router::new()
+        .route(
+            "/admin/api/crawler-schedules",
+            get(handlers::get_crawler_schedules).put(handlers::put_crawler_schedule),
+        )
+        .route(
+            "/admin/api/crawler-schedules/preview",
+            post(handlers::preview_crawler_schedule),
+        )
         .route("/admin/", get(pages::index))
         .route("/admin/problems", get(pages::problems_page))
         .route("/admin/tokens", get(pages::tokens_page))
