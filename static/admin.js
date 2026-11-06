@@ -542,9 +542,7 @@
                 updateStatusCard(runningJobs);
                 updateHistoryTable(mergeCrawlerJobs(runningJobs, data.history || []));
                 triggerBtn.disabled = hasManualRunningJob(runningJobs);
-                if (!runningJobs.length) {
-                    stopPolling();
-                }
+
             });
         }
 
@@ -561,11 +559,11 @@
                 card.innerHTML =
                     '<div class="status-header running" data-i18n="crawlers.status.running">' + i18n.t('crawlers.status.running') + ' ' + actions + '</div>' +
                     '<div class="status-details">' +
-                    '<span><strong data-i18n="crawlers.status.job">' + i18n.t('crawlers.status.job') + '</strong>: ' + job.job_id + '</span> ' +
-                    '<span><strong data-i18n="crawlers.status.source">' + i18n.t('crawlers.control.source') + '</strong>: ' + job.source + '</span> ' +
-                    '<span><strong data-i18n="crawlers.history_table.trigger">' + i18n.t('crawlers.history_table.trigger') + '</strong>: ' + job.trigger + '</span> ' +
-                    '<span><strong data-i18n="crawlers.status.args">' + i18n.t('crawlers.status.args') + '</strong>: ' + (job.args || []).join(' ') + '</span> ' +
-                    '<span><strong data-i18n="crawlers.status.started">' + i18n.t('crawlers.status.started') + '</strong>: ' + job.started_at + '</span>' +
+                    '<span><strong data-i18n="crawlers.status.job">' + i18n.t('crawlers.status.job') + '</strong>: ' + esc(job.job_id) + '</span> ' +
+                    '<span><strong data-i18n="crawlers.status.source">' + i18n.t('crawlers.control.source') + '</strong>: ' + esc(job.source) + '</span> ' +
+                    '<span><strong data-i18n="crawlers.history_table.trigger">' + i18n.t('crawlers.history_table.trigger') + '</strong>: ' + esc(job.trigger) + '</span> ' +
+                    '<span><strong data-i18n="crawlers.status.args">' + i18n.t('crawlers.status.args') + '</strong>: ' + esc((job.args || []).join(' ')) + '</span> ' +
+                    '<span><strong data-i18n="crawlers.status.started">' + i18n.t('crawlers.status.started') + '</strong>: ' + esc(job.started_at) + '</span>' +
                     '</div>';
             } else {
                 card.style.display = 'none';
@@ -691,10 +689,8 @@
         });
 
         // Auto-start polling if already running
-        var statusCard = document.getElementById('crawler-status-card');
-        if (statusCard && statusCard.style.display !== 'none') {
-            startPolling();
-        }
+        startPolling();
+        window.addEventListener('pagehide', stopPolling);
     }
 
     // Embeddings Page

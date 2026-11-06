@@ -49,3 +49,9 @@ Entries are workspace records, not authoritative runtime decisions.
 | 2026-10-23 | work | docs/aegis/work/2026-10-23-release-automation/20-checkpoint.md | Release Automation Checkpoint |
 | 2026-10-23 | work | docs/aegis/work/2026-10-23-release-automation/90-evidence.md | Release Automation Evidence |
 | 2026-10-23 | work | docs/aegis/work/2026-10-23-release-automation/99-reflection.md | Release Automation Reflection |
+| 2026-11-07 | spec | docs/aegis/specs/2026-11-07-crawler-schedules-design.md | Per-source Crawler Schedules Design |
+| 2026-11-07 | plan | docs/aegis/plans/2026-11-07-crawler-schedules.md | Per-source Crawler Schedules |
+| 2026-11-07 | work | docs/aegis/work/2026-11-07-crawler-schedules/10-intent.md | Per-source Crawler Schedules Intent |
+| 2026-11-07 | work | docs/aegis/work/2026-11-07-crawler-schedules/20-checkpoint.md | Per-source Crawler Schedules Checkpoint |
+| 2026-11-07 | work | docs/aegis/work/2026-11-07-crawler-schedules/90-evidence.md | Per-source Crawler Schedules Evidence |
+| 2026-11-07 | work | docs/aegis/work/2026-11-07-crawler-schedules/99-reflection.md | Per-source Crawler Schedules Reflection |

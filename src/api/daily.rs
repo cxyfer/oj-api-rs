@@ -558,9 +558,21 @@ async fn ensure_daily_fallback_running(
     date: &str,
     should_wait: bool,
 ) -> DailyFallbackLaunch {
+    let _launch_guard = state.crawler_schedule.launch.lock().await;
+    if state.crawler_schedule.stopping.load(Ordering::Acquire) {
+        return DailyFallbackLaunch::Cooldown(30);
+    }
     let Some(plan) = selection.fallback_plan(date, &state.config) else {
         return DailyFallbackLaunch::IngestionRequired;
     };
+
+    if state.crawler_jobs.lock().await.values().any(|job| {
+        job.status == crate::models::CrawlerStatus::Running
+            && job.trigger == crate::models::CrawlerTrigger::Scheduled
+            && job.source == plan.job_source
+    }) {
+        return DailyFallbackLaunch::Cooldown(30);
+    }
 
     let key = crate::models::daily_fallback_crawler_runtime_key(selection.source, date);
     let now = tokio::time::Instant::now();
@@ -1064,6 +1076,7 @@ mod tests {
             token_auth_enabled: Arc::new(AtomicBool::new(true)),
             admin_sessions: Arc::new(RwLock::new(HashMap::new())),
             config_path: None,
+            crawler_schedule: Default::default(),
         })
     }
 

@@ -51,71 +51,7 @@ pub(crate) struct EmbeddingStatusResponse {
     pub(crate) history: Vec<EmbeddingJob>,
 }
 
-pub(super) trait TerminalJob {
-    fn status(&self) -> &CrawlerStatus;
-    fn status_mut(&mut self) -> &mut CrawlerStatus;
-    fn set_output(&mut self, stdout: Vec<u8>, stderr: Vec<u8>);
-}
-
-impl TerminalJob for CrawlerJob {
-    fn status(&self) -> &CrawlerStatus {
-        &self.status
-    }
-
-    fn status_mut(&mut self) -> &mut CrawlerStatus {
-        &mut self.status
-    }
-
-    fn set_output(&mut self, stdout: Vec<u8>, stderr: Vec<u8>) {
-        CrawlerJob::set_output(self, stdout, stderr);
-    }
-}
-
-impl TerminalJob for EmbeddingJob {
-    fn status(&self) -> &CrawlerStatus {
-        &self.status
-    }
-
-    fn status_mut(&mut self) -> &mut CrawlerStatus {
-        &mut self.status
-    }
-
-    fn set_output(&mut self, stdout: Vec<u8>, stderr: Vec<u8>) {
-        EmbeddingJob::set_output(self, stdout, stderr);
-    }
-}
-
-pub(super) fn apply_terminal_update<T: TerminalJob>(
-    job: &mut T,
-    terminal_status: Option<CrawlerStatus>,
-    capture_result: std::io::Result<crate::utils::CapturedOutput>,
-    job_kind: &str,
-) {
-    let already_terminal = crate::utils::crawler_status_is_terminal(job.status());
-
-    match capture_result {
-        Ok(output) => {
-            if let Some(status) = terminal_status.filter(|_| !already_terminal) {
-                *job.status_mut() = status;
-            }
-            job.set_output(output.stdout, output.stderr);
-        }
-        Err(err) => {
-            tracing::error!("{} capture error: {}", job_kind, err);
-            if already_terminal {
-                return;
-            }
-            match terminal_status {
-                Some(CrawlerStatus::TimedOut) => {
-                    *job.status_mut() = CrawlerStatus::TimedOut;
-                }
-                Some(_) | None => {
-                    *job.status_mut() = CrawlerStatus::Failed;
-                }
-            }
-        }
-    }
-}
+pub(super) use crate::job::apply_terminal_update;
 
 pub(super) fn inject_job_environment(
     cmd: &mut tokio::process::Command,
@@ -124,13 +60,6 @@ pub(super) fn inject_job_environment(
     artifact_paths: &JobArtifactPaths,
 ) {
     crate::utils::inject_job_environment(cmd, job_id, job_type, artifact_paths);
-}
-
-pub(super) async fn persist_crawler_running_progress(
-    artifact_paths: &JobArtifactPaths,
-    job: &CrawlerJob,
-) {
-    crate::utils::persist_crawler_running_progress(artifact_paths, job).await;
 }
 
 pub(super) async fn persist_crawler_terminal_progress(
@@ -181,53 +110,12 @@ pub(super) async fn persist_embedding_terminal_progress(
     }
 }
 
-pub(super) fn manual_trigger_conflicts(manual_guard: &Option<String>) -> bool {
-    manual_guard.is_some()
-}
-
-pub(super) fn manual_crawler_launch_allowed(
-    manual_guard: &Option<String>,
-    job: Option<&CrawlerJob>,
-    job_id: &str,
-) -> bool {
-    manual_guard.as_deref() == Some(job_id)
-        && job
-            .map(|job| job.job_id == job_id && job.status == CrawlerStatus::Running)
-            .unwrap_or(false)
-}
-
-pub(super) fn clear_manual_guard_if_matches(manual_guard: &mut Option<String>, job_id: &str) {
-    if manual_guard.as_deref() == Some(job_id) {
-        *manual_guard = None;
-    }
-}
-
-pub(super) fn with_owned_manual_crawler_job<T>(
-    crawler_jobs: &mut HashMap<String, CrawlerJob>,
-    job_id: &str,
-    update: impl FnOnce(&mut CrawlerJob) -> T,
-) -> Option<T> {
-    let job = crawler_jobs.get_mut(crate::models::manual_crawler_runtime_key())?;
-    if job.job_id != job_id {
-        return None;
-    }
-    Some(update(job))
-}
-
-pub(super) fn finalize_owned_manual_crawler_job(
-    crawler_jobs: &mut HashMap<String, CrawlerJob>,
-    job_id: &str,
-    terminal_status: Option<CrawlerStatus>,
-    capture_result: std::io::Result<crate::utils::CapturedOutput>,
-) -> Option<CrawlerJob> {
-    with_owned_manual_crawler_job(crawler_jobs, job_id, |job| {
-        if job.status == CrawlerStatus::Running && job.finished_at.is_none() {
-            job.finished_at = Some(chrono::Utc::now().to_rfc3339());
-        }
-        apply_terminal_update(job, terminal_status, capture_result, "crawler");
-        job.clone()
-    })
-}
+pub(super) use crate::crawler::clear_manual_guard_if_matches;
+#[cfg(test)]
+pub(super) use crate::crawler::{
+    finalize_owned_manual_crawler_job, manual_crawler_launch_allowed, manual_trigger_conflicts,
+    with_owned_manual_crawler_job,
+};
 
 pub(super) fn take_manual_crawler_pid(
     active_crawler_pids: &mut HashMap<String, ActiveCrawlerPid>,

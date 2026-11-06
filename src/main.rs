@@ -101,7 +101,10 @@ async fn main() {
         token_auth_enabled: token_auth_flag.clone(),
         admin_sessions: admin_sessions.clone(),
         config_path: config_path_for_children,
+        crawler_schedule: Default::default(),
     });
+
+    oj_api_rs::crawler_schedule::spawn_scheduler(state.clone());
 
     // 12. Scheduled refresh for additional daily sources (UTC+8 08:00/10:00/12:00)
     api::daily::spawn_additional_daily_source_scheduler(state.clone());
@@ -198,7 +201,15 @@ async fn shutdown_signal(state: Arc<AppState>, timeout_secs: u64) {
         _ = terminate => {},
     }
 
-    cleanup_active_jobs(&state).await;
+    {
+        let _launch = state.crawler_schedule.launch.lock().await;
+        state
+            .crawler_schedule
+            .stopping
+            .store(true, std::sync::atomic::Ordering::Release);
+        state.crawler_schedule.changed.notify_one();
+        cleanup_active_jobs(&state).await;
+    }
 
     tracing::info!(
         "shutdown signal received, waiting up to {}s for in-flight requests",

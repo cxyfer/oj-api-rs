@@ -361,6 +361,7 @@ pub enum CrawlerStatus {
 pub enum CrawlerTrigger {
     Admin,
     DailyFallback,
+    Scheduled,
 }
 
 impl std::fmt::Display for CrawlerStatus {
@@ -380,6 +381,7 @@ impl std::fmt::Display for CrawlerTrigger {
         match self {
             Self::Admin => write!(f, "admin"),
             Self::DailyFallback => write!(f, "daily_fallback"),
+            Self::Scheduled => write!(f, "scheduled"),
         }
     }
 }

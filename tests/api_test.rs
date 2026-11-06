@@ -483,3 +483,35 @@ fn seed_daily_row(db_path: &std::path::Path, date: &str, source: &str, refs: &[&
     )
     .unwrap();
 }
+
+#[tokio::test]
+async fn daily_fallback_waits_while_same_source_scheduled_job_is_running() {
+    let (app, _guard, state) = common::build_test_app_with_state();
+    state.crawler_jobs.lock().await.insert(
+        "scheduled:leetcode".into(),
+        oj_api_rs::models::CrawlerJob {
+            job_id: "scheduled-daily-conflict".into(),
+            source: "leetcode".into(),
+            args: vec!["--sync-problemset".into()],
+            trigger: oj_api_rs::models::CrawlerTrigger::Scheduled,
+            started_at: chrono::Utc::now().to_rfc3339(),
+            finished_at: None,
+            status: oj_api_rs::models::CrawlerStatus::Running,
+            stdout: None,
+            stderr: None,
+        },
+    );
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/daily?async=true")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    assert!(state.daily_fallback.lock().await.is_empty());
+    assert!(state.active_crawler_pids.lock().await.is_empty());
+    assert_eq!(state.crawler_jobs.lock().await.len(), 1);
+}

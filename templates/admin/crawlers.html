@@ -24,6 +24,13 @@
     </div>
 </div>
 
+<section class="crawler-schedule-section" aria-labelledby="schedule-heading">
+    <h2 id="schedule-heading" data-i18n="schedules.title">Scheduled crawling</h2>
+    <p class="schedule-note" data-i18n="schedules.intro">Schedules are independent for each source. Save to apply changes; missed runs are skipped.</p>
+    <div id="crawler-schedules" class="schedule-grid" aria-live="polite"></div>
+</section>
+<script src="/static/crawler-schedules.js" defer></script>
+
 <div class="card status-card" id="crawler-status-card" style="margin-bottom:1rem{% if !is_running %};display:none{% endif %}">
     {% if is_running %}
     {% match current_job %}{% when Some with (job) %}

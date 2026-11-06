@@ -67,6 +67,7 @@ fn test_state() -> Arc<AppState> {
         token_auth_enabled: Arc::new(AtomicBool::new(true)),
         admin_sessions: Arc::new(RwLock::new(HashMap::new())),
         config_path: None,
+        crawler_schedule: Default::default(),
     })
 }
 
@@ -1629,4 +1630,152 @@ async fn embedding_progress_returns_not_found_for_missing_non_running_job() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
     let _ = tokio::fs::remove_dir_all(&paths.job_dir).await;
+}
+
+#[tokio::test]
+async fn scheduled_launch_skips_any_running_same_source_and_manual_respects_schedule() {
+    for trigger in [
+        CrawlerTrigger::Admin,
+        CrawlerTrigger::DailyFallback,
+        CrawlerTrigger::Scheduled,
+    ] {
+        let state = test_state();
+        state.crawler_jobs.lock().await.insert(
+            "existing".into(),
+            crawler_job("existing", trigger, CrawlerStatus::Running),
+        );
+        let err = crate::crawler::launch(
+            state.clone(),
+            "leetcode".into(),
+            vec![],
+            CrawlerTrigger::Scheduled,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status, 409);
+        assert_eq!(state.crawler_jobs.lock().await.len(), 1);
+    }
+    let state = test_state();
+    state.crawler_jobs.lock().await.insert(
+        "scheduled:leetcode".into(),
+        crawler_job(
+            "scheduled",
+            CrawlerTrigger::Scheduled,
+            CrawlerStatus::Running,
+        ),
+    );
+    let response = super::crawler::trigger_crawler(
+        State(state),
+        Json(TriggerCrawlerRequest {
+            source: "leetcode".into(),
+            args: vec![],
+        }),
+    )
+    .await
+    .into_response();
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn schedule_update_failure_keeps_previous_configuration() {
+    let state = test_state();
+    crate::db::ensure_app_settings_table(&state.rw_pool);
+    let original = crate::crawler_schedule::default_schedules();
+    crate::crawler_schedule::save_schedules(&state.rw_pool, &original).unwrap();
+    state.rw_pool.get().unwrap().execute_batch("CREATE TRIGGER deny_schedule_update BEFORE UPDATE ON app_settings BEGIN SELECT RAISE(FAIL, 'read only'); END;").unwrap();
+    let response = super::schedule::put_crawler_schedule(
+        State(state.clone()),
+        Json(super::schedule::UpdateCrawlerScheduleRequest {
+            source: "leetcode".into(),
+            schedule: crate::crawler_schedule::CrawlerSchedule {
+                enabled: true,
+                cron: "* * * * *".into(),
+                timezone: String::new(),
+                args: vec![],
+            },
+        }),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(
+        crate::crawler_schedule::load_schedules(&state.rw_pool, "UTC").unwrap()["leetcode"],
+        original["leetcode"]
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn scheduled_runner_retains_metadata_logs_and_leaves_manual_slot_available() {
+    let _root_lock = crate::utils::TEST_JOB_ARTIFACTS_ROOT_MUTEX
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let _uv = FakeUvGuard::install(
+        "#!/bin/sh\nprintf 'scheduled stdout\\n'\nprintf 'scheduled stderr\\n' >&2\nexit 0\n",
+    )
+    .await;
+    let state = test_state();
+    let id = crate::crawler::launch(
+        state.clone(),
+        "leetcode".into(),
+        vec!["--sync-problemset".into()],
+        CrawlerTrigger::Scheduled,
+    )
+    .await
+    .unwrap();
+    wait_for_manual_job_terminal(&state, "scheduled:leetcode").await;
+    let jobs = state.crawler_jobs.lock().await;
+    let job = &jobs["scheduled:leetcode"];
+    assert_eq!(job.status, CrawlerStatus::Completed);
+    assert_eq!(job.trigger, CrawlerTrigger::Scheduled);
+    assert!(job.stdout.as_ref().unwrap().contains("scheduled stdout"));
+    assert!(state.manual_crawler_guard.lock().await.is_none());
+    drop(jobs);
+    let paths = crate::utils::canonical_job_artifact_paths(JobType::Crawler, &id).unwrap();
+    let progress: serde_json::Value =
+        serde_json::from_str(&tokio::fs::read_to_string(&paths.progress).await.unwrap()).unwrap();
+    assert_eq!(progress["metadata"]["trigger"], "scheduled");
+    assert_eq!(progress["phase"], "completed");
+    tokio::fs::remove_dir_all(paths.job_dir).await.unwrap();
+}
+
+#[tokio::test]
+async fn scheduled_conflict_uses_effective_shared_script_source() {
+    let state = test_state();
+    let mut existing = crawler_job("manual-spoj", CrawlerTrigger::Admin, CrawlerStatus::Running);
+    existing.source = "luogu".into();
+    existing.args = vec!["--sync-problemset".into(), "--source".into(), "spoj".into()];
+    state
+        .crawler_jobs
+        .lock()
+        .await
+        .insert("manual".into(), existing);
+    let err = crate::crawler::launch(
+        state,
+        "spoj".into(),
+        vec!["--sync-problemset".into()],
+        CrawlerTrigger::Scheduled,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(err.status, 409);
+}
+
+#[tokio::test]
+async fn shutting_down_rejects_future_scheduled_launches() {
+    let state = test_state();
+    state
+        .crawler_schedule
+        .stopping
+        .store(true, std::sync::atomic::Ordering::Release);
+    let err = crate::crawler::launch(
+        state.clone(),
+        "leetcode".into(),
+        vec![],
+        CrawlerTrigger::Scheduled,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(err.status, 409);
+    assert!(state.crawler_jobs.lock().await.is_empty());
+    assert!(state.active_crawler_pids.lock().await.is_empty());
 }

@@ -87,6 +87,7 @@ pub fn build_test_app_with_state_and_config(
         token_auth_enabled: token_auth_flag.clone(),
         admin_sessions: admin_sessions.clone(),
         config_path: None,
+        crawler_schedule: Default::default(),
     });
 
     let health_cors = CorsLayer::new()

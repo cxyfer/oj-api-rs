@@ -3,6 +3,7 @@ pub(crate) mod common;
 pub(crate) mod crawler;
 pub(crate) mod embedding;
 mod problem;
+mod schedule;
 mod settings;
 #[cfg(test)]
 mod tests;
@@ -13,5 +14,6 @@ pub(crate) use common::{CrawlerStatusResponse, EmbeddingStatusResponse};
 pub use crawler::*;
 pub use embedding::*;
 pub use problem::*;
+pub use schedule::*;
 pub use settings::*;
 pub use token::*;

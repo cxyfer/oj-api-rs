@@ -50,6 +50,9 @@ use utoipa::OpenApi;
         // Admin API - Settings
         crate::admin::handlers::get_token_auth_setting,
         crate::admin::handlers::set_token_auth_setting,
+        crate::admin::handlers::get_crawler_schedules,
+        crate::admin::handlers::put_crawler_schedule,
+        crate::admin::handlers::preview_crawler_schedule,
         // Admin API - Crawlers
         crate::admin::handlers::trigger_crawler,
         crate::admin::handlers::cancel_crawler,
@@ -101,6 +104,9 @@ use utoipa::OpenApi;
         crate::admin::handlers::CreateProblemRequest,
         crate::admin::handlers::CreateTokenRequest,
         crate::admin::handlers::TriggerCrawlerRequest,
+        crate::admin::handlers::UpdateCrawlerScheduleRequest,
+        crate::admin::handlers::CrawlerScheduleView,
+        crate::crawler_schedule::CrawlerSchedule,
         crate::admin::handlers::TriggerEmbeddingRequest,
         crate::admin::handlers::TokenAuthSettingRequest,
         crate::admin::handlers::CrawlerStatusResponse,
