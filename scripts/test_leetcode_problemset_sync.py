@@ -1,22 +1,107 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from leetcode import LeetCodeClient
 from utils.database import ProblemsDatabaseManager
+
+
+class _FakeResponse:
+    def __init__(self, status_code, payload=None, text=None):
+        self.status_code = status_code
+        self.text = text if text is not None else json.dumps(payload)
+
+
+class _FakeSession:
+    def __init__(self, responses):
+        self._responses = list(responses)
+        self.requests = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, traceback):
+        return False
+
+    async def get(self, url, **kwargs):
+        self.requests.append((url, kwargs))
+        response = self._responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 class LeetCodeProblemsetSyncTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self._tmpdir = tempfile.TemporaryDirectory()
         self.db_path = str(Path(self._tmpdir.name) / "data.db")
-        self.client = LeetCodeClient.__new__(LeetCodeClient)
-        self.client.problems_db = ProblemsDatabaseManager(self.db_path)
-        self.client.ratings = {}
-        self.client.ratings_last_update = 0
+        self.client = self._make_client()
 
     def tearDown(self):
         self._tmpdir.cleanup()
+
+    def _make_client(self):
+        client = LeetCodeClient.__new__(LeetCodeClient)
+        client.problems_db = ProblemsDatabaseManager(self.db_path)
+        client.ratings = {}
+        client.ratings_last_update = 0
+        client.max_retries = 3
+        client.retry_delay = 0
+        client.base_url = "https://leetcode.com"
+        client._http_config = SimpleNamespace(user_agent="test-agent")
+        return client
+
+    async def test_fetch_category_problems_uses_curl_browser_impersonation(self):
+        client = self._make_client()
+        captured = {}
+
+        def create_session(**kwargs):
+            captured.update(kwargs)
+            return _FakeSession(
+                [_FakeResponse(200, payload=self._problemset_payload())]
+            )
+
+        client._create_curl_session = create_session
+
+        problems = await client.fetch_category_problems("algorithms")
+
+        self.assertEqual(captured["impersonate"], "chrome124")
+        self.assertEqual(len(problems), 1)
+        self.assertEqual(problems[0]["id"], 1)
+        self.assertEqual(problems[0]["slug"], "two-sum")
+
+    async def test_fetch_category_problems_raises_after_retries(self):
+        client = self._make_client()
+        client.max_retries = 2
+        attempts = 0
+
+        def create_session(**kwargs):
+            nonlocal attempts
+            attempts += 1
+            return _FakeSession(
+                [_FakeResponse(403, text="<title>Just a moment...</title>")]
+            )
+
+        client._create_curl_session = create_session
+
+        with self.assertRaisesRegex(RuntimeError, "failed to fetch algorithms"):
+            await client.fetch_category_problems("algorithms")
+        self.assertEqual(attempts, 2)
+
+    async def test_fetch_all_problems_propagates_category_failure(self):
+        client = self._make_client()
+
+        async def fetch_category(category):
+            if category == "database":
+                raise RuntimeError("HTTP 403")
+            return [self._problem(id="1", slug="two-sum")]
+
+        client.fetch_category_problems = fetch_category
+
+        with self.assertRaisesRegex(RuntimeError, "HTTP 403"):
+            await client.fetch_all_problems()
 
     def test_merge_problemset_ratings_normalizes_frontend_ids(self):
         problems = [
@@ -157,6 +242,26 @@ class LeetCodeProblemsetSyncTests(unittest.IsolatedAsyncioTestCase):
             "content": None,
             "content_cn": None,
             "similar_questions": None,
+        }
+
+    @staticmethod
+    def _problemset_payload():
+        return {
+            "num_total": 1,
+            "stat_status_pairs": [
+                {
+                    "stat": {
+                        "frontend_question_id": 1,
+                        "question__title_slug": "two-sum",
+                        "question__title": "Two Sum",
+                        "question__hide": False,
+                        "total_submitted": 100,
+                        "total_acs": 50,
+                    },
+                    "difficulty": {"level": 1},
+                    "paid_only": False,
+                }
+            ],
         }
 
 
