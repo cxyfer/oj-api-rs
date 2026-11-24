@@ -238,10 +238,7 @@ class LeetCodeClient(BaseCrawler):
                 ) as session:
                     res = await session.get(
                         url,
-                        headers={
-                            **self._headers(),
-                            "X-Requested-With": "XMLHttpRequest",
-                        },
+                        headers={"X-Requested-With": "XMLHttpRequest"},
                         timeout=30,
                     )
                     if res.status_code != 200:

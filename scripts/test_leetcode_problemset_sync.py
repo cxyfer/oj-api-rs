@@ -56,18 +56,24 @@ class LeetCodeProblemsetSyncTests(unittest.IsolatedAsyncioTestCase):
     async def test_fetch_category_problems_uses_curl_browser_impersonation(self):
         client = self._make_client()
         captured = {}
+        sessions = []
 
         def create_session(**kwargs):
             captured.update(kwargs)
-            return _FakeSession(
+            session = _FakeSession(
                 [_FakeResponse(200, payload=self._problemset_payload())]
             )
+            sessions.append(session)
+            return session
 
         client._create_curl_session = create_session
 
         problems = await client.fetch_category_problems("algorithms")
 
         self.assertEqual(captured["impersonate"], "chrome124")
+        request_headers = sessions[0].requests[0][1]["headers"]
+        self.assertNotIn("User-Agent", request_headers)
+        self.assertEqual(request_headers["X-Requested-With"], "XMLHttpRequest")
         self.assertEqual(len(problems), 1)
         self.assertEqual(problems[0]["id"], 1)
         self.assertEqual(problems[0]["slug"], "two-sum")
