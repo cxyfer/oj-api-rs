@@ -19,6 +19,8 @@ from utils.logger import get_leetcode_logger
 # Set up logging
 logger = get_leetcode_logger()
 
+CURL_IMPERSONATE = "chrome124"
+
 
 def generate_history_dates(anchor_date: str, years: int = 5) -> list[str]:
     """
@@ -228,40 +230,40 @@ class LeetCodeClient(BaseCrawler):
         """
         url = self.PROBLEMS_BASE_URL.format(category + "/")
         attempt = 0
+        last_error = None
         while attempt < self.max_retries:
             try:
-                async with self._create_aiohttp_session() as session:
-                    async with session.get(
+                async with self._create_curl_session(
+                    impersonate=CURL_IMPERSONATE
+                ) as session:
+                    res = await session.get(
                         url,
-                        headers={
-                            **self._headers(),
-                            "X-Requested-With": "XMLHttpRequest",
-                        },
-                        proxy=self._get_aiohttp_request_proxy("https"),
-                    ) as res:
-                        if res.status != 200:
-                            raise Exception(f"HTTP {res.status}")
-                        text = await res.text()
-                        try:
-                            json_data = json.loads(text)
-                        except json.JSONDecodeError:
-                            snippet = text[:200].replace("\n", " ").replace("\r", " ")
-                            raise Exception(f"Failed to parse JSON. Snippet: {snippet}")
-                        problems = self._parse_problems(json_data, category.title())
-                        logger.info(f"Downloaded {category} problems.")
-                        return problems
+                        headers={"X-Requested-With": "XMLHttpRequest"},
+                        timeout=30,
+                    )
+                    if res.status_code != 200:
+                        raise Exception(f"HTTP {res.status_code}")
+                    text = res.text
+                    try:
+                        json_data = json.loads(text)
+                    except json.JSONDecodeError:
+                        snippet = text[:200].replace("\n", " ").replace("\r", " ")
+                        raise Exception(f"Failed to parse JSON. Snippet: {snippet}")
+                    problems = self._parse_problems(json_data, category.title())
+                    logger.info(f"Downloaded {category} problems.")
+                    return problems
             except Exception as e:
+                last_error = e
                 attempt += 1
                 logger.error(
                     f"Failed to fetch {category} (attempt {attempt}/{self.max_retries}): {e}"
                 )
                 if attempt < self.max_retries:
                     await asyncio.sleep(self.retry_delay)
-                else:
-                    logger.error(
-                        f"Giving up on {category} after {self.max_retries} attempts."
-                    )
-                    return []
+        logger.error(f"Giving up on {category} after {self.max_retries} attempts.")
+        raise RuntimeError(
+            f"failed to fetch {category} after {self.max_retries} attempts: {last_error}"
+        )
 
     def _parse_problems(self, json_data, category):
         """
@@ -641,7 +643,7 @@ class LeetCodeClient(BaseCrawler):
         """POST to leetcode.cn GraphQL using curl_cffi with browser impersonation."""
         import json as _json
 
-        async with self._create_curl_session(impersonate="chrome124") as session:
+        async with self._create_curl_session(impersonate=CURL_IMPERSONATE) as session:
             response = await session.post(
                 url, headers=headers, json=payload, timeout=30
             )
